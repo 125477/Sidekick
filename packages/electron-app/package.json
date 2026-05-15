@@ -1,0 +1,74 @@
+{
+  "name": "@sidekick/electron-app",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "scripts/dev-main.mjs",
+  "dependencies": {
+    "@sidekick/core": "workspace:*"
+  },
+  "devDependencies": {
+    "electron": "^38.5.1",
+    "electron-builder": "^25.1.8",
+    "sharp": "^0.34.5"
+  },
+  "scripts": {
+    "dev": "electron ./scripts/dev-main.mjs",
+    "build": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "icons:transparent": "node ./scripts/transparentize-app-icon.mjs",
+    "icons:mac-icns": "node ./scripts/build-mac-icns.mjs",
+    "pack": "electron-builder"
+  },
+  "build": {
+    "appId": "app.lingban.companion",
+    "productName": "灵伴",
+    "copyright": "Copyright © 2026",
+    "compression": "maximum",
+    "directories": {
+      "output": "release",
+      "buildResources": "resources"
+    },
+    "beforePack": "./scripts/before-pack.cjs",
+    "icon": "resources/icon.png",
+    "files": [
+      "scripts/**/*",
+      "package.json"
+    ],
+    "dmg": {
+      "title": "${productName} ${version}",
+      "icon": "resources/icon.icns"
+    },
+    "extraResources": [
+      {
+        "from": "../ui/dist",
+        "to": "ui-dist"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.lifestyle",
+      "icon": "resources/icon.icns",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Utility"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "afterAllArtifactBuild": "./scripts/after-all-artifact-build.cjs"
+  }
+}

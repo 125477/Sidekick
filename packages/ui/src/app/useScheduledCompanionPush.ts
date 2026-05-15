@@ -1,0 +1,156 @@
+import type { MutableRefObject, Dispatch, SetStateAction } from 'react'
+import { useEffect } from 'react'
+import { appendText } from '@sidekick/core'
+import { fetchCompanionCopy, canPushNow } from './companionCopy'
+import type { SidekickSettings } from '../state/settingsState'
+import type { SpriteState, UiAction } from '../state/uiState'
+import { reportSpriteAnchorToMain } from '../utils/reportSpriteAnchor'
+import { speakCompanionLine } from '../utils/companionTts'
+
+export type UseScheduledCompanionPushArgs = {
+  settings: SidekickSettings
+  settingsReady: boolean
+  settingsRef: MutableRefObject<SidekickSettings>
+  onboardingDone: boolean | null
+  runsScheduledPush: boolean
+  isWidgetMode: boolean
+  dispatch: Dispatch<UiAction>
+  setToastMeta: Dispatch<SetStateAction<{ id: string; favorite: boolean } | null>>
+  setSpriteState: Dispatch<SetStateAction<SpriteState>>
+  widgetMeasureRef: MutableRefObject<HTMLDivElement | null>
+  pushCopyToastSuccessCountRef: MutableRefObject<number>
+  companionBootstrapDoneRef: MutableRefObject<boolean>
+  recentCompanionLinesRef: MutableRefObject<string[]>
+  advanceAvatarAfterPushCopy: () => void
+}
+
+/** 定时陪伴推送：interval + 推送开关变更时重置会话计数。 */
+export function useScheduledCompanionPush({
+  settings,
+  settingsReady,
+  settingsRef,
+  onboardingDone,
+  runsScheduledPush,
+  isWidgetMode,
+  dispatch,
+  setToastMeta,
+  setSpriteState,
+  widgetMeasureRef,
+  pushCopyToastSuccessCountRef,
+  companionBootstrapDoneRef,
+  recentCompanionLinesRef,
+  advanceAvatarAfterPushCopy,
+}: UseScheduledCompanionPushArgs) {
+  useEffect(() => {
+    if (!settings.pushEnabled) {
+      pushCopyToastSuccessCountRef.current = 0
+      companionBootstrapDoneRef.current = false
+    }
+  }, [settings.pushEnabled, pushCopyToastSuccessCountRef, companionBootstrapDoneRef])
+
+  useEffect(() => {
+    if (!settingsReady) return
+    if (onboardingDone !== true) return
+    if (!runsScheduledPush) return
+    if (!settings.pushEnabled) return
+    const showPushText = () => {
+      void (async () => {
+        const s = settingsRef.current
+        if (!s.pushEnabled || !canPushNow(s)) return
+        const avoidPush = recentCompanionLinesRef.current
+        const result = await fetchCompanionCopy(
+          s,
+          undefined,
+          undefined,
+          avoidPush.length > 0 ? avoidPush : undefined,
+        )
+        const next = await appendText({
+          id: `text-${Date.now()}`,
+          content: result.text,
+          createdAt: new Date().toISOString(),
+          source: result.source,
+          favorite: false,
+        })
+        const newId = next.texts.history[0]?.id
+        const anchor = s.toastAnchor
+        const dwell = s.toastAlwaysVisible ? 0 : s.dwellSeconds
+        if (isWidgetMode && window.sidekickDesktop?.showToastWindow) {
+          await reportSpriteAnchorToMain(widgetMeasureRef.current, {
+            flush: true,
+            avatarSizePercent: settingsRef.current.avatarSize,
+          })
+          await window.sidekickDesktop.showToastWindow({
+            message: result.text,
+            anchor,
+            dwellSeconds: dwell,
+            ...(newId ? { textId: newId, favorite: false } : {}),
+          })
+        } else {
+          if (newId) {
+            setToastMeta({ id: newId, favorite: false })
+          } else {
+            setToastMeta(null)
+          }
+          dispatch({ type: 'SHOW_TOAST', message: result.text })
+        }
+        pushCopyToastSuccessCountRef.current += 1
+        const postPush = settingsRef.current
+        if (
+          postPush.pushAutoSwitchAvatar &&
+          pushCopyToastSuccessCountRef.current > 1
+        ) {
+          advanceAvatarAfterPushCopy()
+        }
+        recentCompanionLinesRef.current = [
+          ...recentCompanionLinesRef.current,
+          result.text,
+        ].slice(-6)
+        const tts = settingsRef.current
+        void speakCompanionLine(result.text, {
+          enabled: tts.companionTtsEnabled,
+          model: tts.companionTtsModel,
+          voice: tts.companionTtsVoice,
+          speechRate: tts.companionTtsSpeechRate,
+        })
+        setSpriteState('notify')
+        window.setTimeout(() => setSpriteState('idle'), 520)
+      })()
+    }
+
+    const raw = Number(settings.pushIntervalMinutes)
+    const intervalMinutes =
+      Number.isFinite(raw) && raw >= 1 && raw <= 60 ? Math.floor(raw) : 10
+    const intervalMs = intervalMinutes * 60_000
+
+    if (!companionBootstrapDoneRef.current) {
+      companionBootstrapDoneRef.current = true
+      showPushText()
+    }
+
+    const intervalId = window.setInterval(showPushText, intervalMs)
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [
+    settingsReady,
+    runsScheduledPush,
+    settings.pushEnabled,
+    settings.pushIntervalMinutes,
+    settings.pushStart,
+    settings.pushEnd,
+    settings.quietHoursEnabled,
+    settings.quietStart,
+    settings.quietEnd,
+    dispatch,
+    isWidgetMode,
+    onboardingDone,
+    advanceAvatarAfterPushCopy,
+    settingsRef,
+    widgetMeasureRef,
+    setToastMeta,
+    setSpriteState,
+    pushCopyToastSuccessCountRef,
+    companionBootstrapDoneRef,
+    recentCompanionLinesRef,
+  ])
+}

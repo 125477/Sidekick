@@ -1,0 +1,65 @@
+@import "./styles/tokens.css";
+@import "tailwindcss";
+@import "./styles/utilities.css";
+
+html,
+body,
+#root {
+  background: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/** Frameless Electron views (widget / detached toast): kill stray scrollbars from 100vw/100vh vs inner size. */
+html.sidekick-widget-root,
+html.sidekick-toast-root,
+body.sidekick-widget-root,
+body.sidekick-toast-root {
+  margin: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body.sidekick-widget-root #root,
+body.sidekick-toast-root #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+img {
+  -webkit-user-drag: none;
+}
+
+/* Transparent Electron widget: hide macOS/Electron gold-orange focus halo on window/chrome */
+html.sidekick-widget-root,
+body.sidekick-widget-root {
+  outline: none !important;
+}
+
+body.sidekick-widget-root main {
+  outline: none !important;
+}
+
+/** 独立 panel / 引导窗：占满 Electron 内容区，便于内部卡片全屏铺开。 */
+html.sidekick-panel-root {
+  min-height: 100dvh;
+}
+
+html.sidekick-panel-root,
+body.sidekick-panel-root {
+  margin: 0;
+  height: 100%;
+  width: 100%;
+  min-height: 100%;
+  overflow: hidden;
+}
+
+body.sidekick-panel-root #root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+}

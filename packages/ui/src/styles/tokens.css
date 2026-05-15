@@ -1,0 +1,182 @@
+/**
+ * Sidekick（灵伴）设计 token — 语义色与深浅主题
+ *
+ * 品牌强调：**紫系 violet**（陪伴感、与原产品视觉一致）。青绿实验已回退。
+ * 浅色：极淡紫粉环境 + 白内容区，避免高饱和「医疗绿」块面。
+ * 深色：冷灰底 + **柔紫强调**（非荧光青），边框用低对比结构线，减少「画框」感。
+ *
+ * 主题：`data-theme` 缺省或 `light` 为浅色；`dark` 为深色。
+ */
+
+:root {
+  color-scheme: light;
+
+  /* 面板：淡紫 → 白 → 中性灰，克制渐变 */
+  --sk-panel-gradient: linear-gradient(
+    to bottom,
+    rgb(245 243 255),
+    rgb(255 255 255),
+    rgb(248 250 252)
+  );
+  --sk-frame-bg: rgb(255 255 255);
+  --sk-frame-border: rgb(226 232 240 / 0.88);
+  --sk-frame-shadow: 0 12px 40px -12px rgb(91 33 182 / 0.06);
+
+  --sk-nav-bg: rgb(245 243 255 / 0.55);
+  --sk-nav-btn-text: rgb(71 85 105);
+  --sk-nav-btn-hover-bg: rgb(237 233 254 / 0.85);
+  --sk-nav-btn-active-bg: rgb(255 255 255);
+  --sk-nav-btn-active-shadow: 0 1px 2px 0 rgb(15 23 42 / 0.05);
+
+  --sk-content-border: rgb(226 232 240 / 0.92);
+  --sk-content-surface: rgb(255 255 255);
+
+  --sk-card-bg: rgb(248 250 252 / 0.92);
+  --sk-card-border: rgb(228 231 236);
+
+  --sk-text-primary: rgb(15 23 42);
+  --sk-text-body: rgb(30 41 59);
+  --sk-text-secondary: rgb(71 85 105);
+  --sk-text-muted: rgb(100 116 139);
+  --sk-text-label: rgb(71 85 105);
+  --sk-heading-rule: rgb(226 232 240);
+
+  /* 品牌紫：开关 / 滑块 / 选中 */
+  --sk-accent: rgb(124 58 237);
+  --sk-accent-hover: rgb(109 40 217);
+  --sk-accent-subtle-bg: rgb(245 243 255 / 0.85);
+  --sk-accent-border: rgb(221 214 254);
+  --sk-accent-border-strong: rgb(196 181 253);
+  --sk-accent-on-subtle: rgb(91 33 182);
+  --sk-focus-ring: rgb(139 92 246);
+
+  --sk-switch-off-bg: rgb(226 232 240);
+
+  --sk-input-bg: rgb(255 255 255);
+  --sk-input-border: rgb(226 232 240);
+  --sk-input-text: rgb(15 23 42);
+  --sk-input-disabled-bg: rgb(241 245 249);
+  --sk-input-disabled-text: rgb(148 163 184);
+  --sk-input-placeholder: rgb(148 163 184);
+
+  --sk-segmented-bg: rgb(241 245 249);
+  --sk-segmented-active-bg: rgb(255 255 255);
+
+  --sk-chip-off-border: rgb(226 232 240);
+  --sk-chip-off-bg: rgb(255 255 255);
+  --sk-chip-off-text: rgb(71 85 105);
+  --sk-chip-on-border: rgb(167 139 250);
+  --sk-chip-on-bg: rgb(245 243 255);
+  --sk-chip-on-text: rgb(91 33 182);
+
+  --sk-callout-border: rgb(221 214 254);
+  --sk-callout-bg: rgb(245 243 255 / 0.72);
+  --sk-callout-btn-border: rgb(196 181 253);
+  --sk-callout-btn-bg: rgb(255 255 255);
+  --sk-callout-btn-text: rgb(91 33 182);
+  --sk-callout-btn-hover: rgb(237 233 254);
+
+  --sk-divider: rgb(226 232 240 / 0.88);
+
+  /* 主按钮：深紫，与强调色同系 */
+  --sk-btn-primary-bg: rgb(109 40 217);
+  --sk-btn-primary-text: rgb(255 255 255);
+  --sk-btn-primary-hover: rgb(91 33 182);
+
+  --sk-time-field-muted-bg: rgb(241 245 249);
+
+  --sk-hero-section-border: rgb(237 233 254);
+  --sk-hero-section-bg: rgb(255 255 255 / 0.82);
+  --sk-modal-elevated-border: rgb(221 214 254);
+  --sk-modal-elevated-bg: rgb(255 255 255);
+
+  --sk-radius-sm: 0.375rem;
+  --sk-radius-md: 0.5rem;
+  --sk-radius-card: 0.75rem;
+  --sk-radius-frame: 1.5rem;
+  --sk-space-tab-gap: 1rem;
+  --sk-space-card-inner: 0.75rem;
+  --sk-space-card-inner-titled: 0.625rem;
+}
+
+html[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* 深色底：偏 zinc/slate，不叠浓紫渐变 */
+  --sk-panel-gradient: linear-gradient(
+    to bottom,
+    rgb(24 24 27),
+    rgb(15 23 42),
+    rgb(23 23 23)
+  );
+  --sk-frame-bg: rgb(30 27 46);
+  --sk-frame-border: rgb(63 63 70 / 0.45);
+  --sk-frame-shadow: 0 12px 40px -8px rgb(0 0 0 / 0.4);
+
+  --sk-nav-bg: rgb(24 24 27 / 0.65);
+  --sk-nav-btn-text: rgb(161 161 170);
+  --sk-nav-btn-hover-bg: rgb(63 63 70 / 0.35);
+  --sk-nav-btn-active-bg: rgb(39 39 42);
+  --sk-nav-btn-active-shadow: none;
+
+  --sk-content-border: rgb(63 63 70 / 0.4);
+  --sk-content-surface: rgb(24 24 27);
+
+  --sk-card-bg: rgb(39 39 42 / 0.55);
+  --sk-card-border: rgb(63 63 70 / 0.35);
+
+  --sk-text-primary: rgb(250 250 250);
+  --sk-text-body: rgb(228 228 231);
+  --sk-text-secondary: rgb(161 161 170);
+  --sk-text-muted: rgb(113 113 122);
+  --sk-text-label: rgb(212 212 216);
+  --sk-heading-rule: rgb(63 63 70 / 0.55);
+
+  /* 深色上略提亮的紫，避免发灰发青 */
+  --sk-accent: rgb(167 139 250);
+  --sk-accent-hover: rgb(196 181 253);
+  --sk-accent-subtle-bg: rgb(91 33 182 / 0.2);
+  --sk-accent-border: rgb(139 92 246 / 0.35);
+  --sk-accent-border-strong: rgb(167 139 250 / 0.5);
+  --sk-accent-on-subtle: rgb(237 233 254);
+  --sk-focus-ring: rgb(196 181 253);
+
+  --sk-switch-off-bg: rgb(63 63 70 / 0.9);
+
+  --sk-input-bg: rgb(24 24 27);
+  --sk-input-border: rgb(63 63 70 / 0.55);
+  --sk-input-text: rgb(250 250 250);
+  --sk-input-disabled-bg: rgb(39 39 42 / 0.7);
+  --sk-input-disabled-text: rgb(113 113 122);
+  --sk-input-placeholder: rgb(113 113 122);
+
+  --sk-segmented-bg: rgb(24 24 27);
+  --sk-segmented-active-bg: rgb(39 39 42);
+
+  --sk-chip-off-border: rgb(63 63 70 / 0.55);
+  --sk-chip-off-bg: rgb(39 39 42 / 0.5);
+  --sk-chip-off-text: rgb(212 212 216);
+  --sk-chip-on-border: rgb(167 139 250 / 0.45);
+  --sk-chip-on-bg: rgb(91 33 182 / 0.25);
+  --sk-chip-on-text: rgb(237 233 254);
+
+  --sk-callout-border: rgb(139 92 246 / 0.3);
+  --sk-callout-bg: rgb(91 33 182 / 0.16);
+  --sk-callout-btn-border: rgb(167 139 250 / 0.4);
+  --sk-callout-btn-bg: rgb(39 39 42);
+  --sk-callout-btn-text: rgb(237 233 254);
+  --sk-callout-btn-hover: rgb(63 63 70 / 0.65);
+
+  --sk-divider: rgb(63 63 70 / 0.35);
+
+  --sk-btn-primary-bg: rgb(139 92 246);
+  --sk-btn-primary-text: rgb(255 255 255);
+  --sk-btn-primary-hover: rgb(124 58 237);
+
+  --sk-time-field-muted-bg: rgb(39 39 42 / 0.55);
+
+  --sk-hero-section-border: rgb(139 92 246 / 0.22);
+  --sk-hero-section-bg: rgb(24 24 27 / 0.55);
+  --sk-modal-elevated-border: rgb(139 92 246 / 0.22);
+  --sk-modal-elevated-bg: rgb(30 27 46);
+}

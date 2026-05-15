@@ -1,0 +1,36 @@
+{
+  "name": "ui",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "sync:lottie-presets": "node scripts/sync-lottie-builtin-presets.mjs",
+    "sync:video-presets": "node scripts/sync-video-builtin-presets.mjs",
+    "sync:gif-presets": "node scripts/sync-gif-builtin-presets.mjs",
+    "predev": "node scripts/sync-lottie-builtin-presets.mjs && node scripts/sync-gif-builtin-presets.mjs",
+    "prebuild": "node scripts/sync-lottie-builtin-presets.mjs && node scripts/sync-gif-builtin-presets.mjs",
+    "dev": "vite --port 5173",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "typecheck": "tsc -b",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@lottiefiles/dotlottie-react": "^0.17.15",
+    "@sidekick/core": "workspace:*",
+    "chart.js": "^4.5.1",
+    "localforage": "^1.10.0",
+    "react": "^19.2.5",
+    "react-chartjs-2": "^5.3.1",
+    "react-dom": "^19.2.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.4",
+    "@types/node": "^24.12.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "tailwindcss": "^4.2.4",
+    "vite": "^8.0.10"
+  }
+}

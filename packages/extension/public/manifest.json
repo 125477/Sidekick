@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "灵伴",
+  "version": "0.1.0",
+  "description": "Emotion sidekick extension with alarms and notifications.",
+  "permissions": ["alarms", "storage", "notifications"],
+  "background": {
+    "service_worker": "service-worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "灵伴"
+  }
+}

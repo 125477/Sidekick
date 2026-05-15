@@ -1,0 +1,6 @@
+packages:
+  - "packages/*"
+
+# Let electron run postinstall (download binary). Used by pnpm 10.26+; older pnpm may ignore.
+allowBuilds:
+  electron: true

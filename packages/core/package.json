@@ -1,0 +1,19 @@
+{
+  "name": "@sidekick/core",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "prebuild": "node ../ui/scripts/sync-lottie-builtin-presets.mjs && node ../ui/scripts/sync-gif-builtin-presets.mjs",
+    "pretypecheck": "node ../ui/scripts/sync-lottie-builtin-presets.mjs && node ../ui/scripts/sync-gif-builtin-presets.mjs",
+    "build": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "localforage": "^1.10.0"
+  }
+}
