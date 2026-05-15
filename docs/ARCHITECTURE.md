@@ -87,5 +87,5 @@ packages/
 
 ## 相关文档
 
-- **贡献与命令**：根目录 `CONTRIBUTING.md`
+- **命令、包边界与编码约定**：`.cursor/rules/sidekick-project.mdc`
 - **Figma 1:1 等 UI 硬规则**：`.cursor/rules/figma-strict-restore.mdc`
