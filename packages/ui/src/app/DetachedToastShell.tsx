@@ -4,6 +4,8 @@ import { SpriteMenu, type MenuAction } from '../components/menu/SpriteMenu'
 import { speakCompanionLine } from '../utils/companionTts'
 import { toggleTextFavorite } from '@sidekick/core'
 import type { SidekickSettings } from '../state/settingsState'
+import { saveAppSelfIntroShown } from '../state/appSelfIntroStorage'
+import { broadcastAppSelfIntroDismissed } from '../state/appSelfIntroSync'
 import { zLayers } from '../state/uiState'
 
 type DetachedToastShellProps = {
@@ -12,6 +14,7 @@ type DetachedToastShellProps = {
   toastDetachAnchor: 'top' | 'bottom'
   toastDetachBubblePlacement: 'above' | 'below'
   toastMessageFromQuery: string
+  toastIntroFromQuery: boolean
   settings: SidekickSettings
   toastTextIdFromQuery: string | null
   toastDetachFavorite: boolean
@@ -36,6 +39,7 @@ export function DetachedToastShell({
   toastDetachAnchor,
   toastDetachBubblePlacement,
   toastMessageFromQuery,
+  toastIntroFromQuery,
   settings,
   toastTextIdFromQuery,
   toastDetachFavorite,
@@ -52,6 +56,13 @@ export function DetachedToastShell({
   onMenuAction,
   holdToastToolbarForMenu,
 }: DetachedToastShellProps) {
+  const introMode = toastIntroFromQuery
+  const dismissIntro = () => {
+    void saveAppSelfIntroShown()
+    broadcastAppSelfIntroDismissed()
+    void window.sidekickDesktop?.hideToastWindow?.()
+  }
+
   return (
     <>
       <main className="relative block h-full min-h-0 w-full overflow-visible bg-transparent text-slate-800 select-none">
@@ -72,11 +83,15 @@ export function DetachedToastShell({
               zIndexClass={zLayers.toast}
               dwellSeconds={0}
               message={toastMessageFromQuery}
-              maxChars={settings.textMaxChars}
-              onRegenerate={() => {
-                void window.sidekickDesktop?.requestRegenerateCopy?.()
-              }}
-              keepRegenerateLoadingUntilUnmount
+              maxChars={introMode ? undefined : settings.textMaxChars}
+              {...(introMode
+                ? { messageRegeneratesOnClick: false }
+                : {
+                    onRegenerate: () => {
+                      void window.sidekickDesktop?.requestRegenerateCopy?.()
+                    },
+                    keepRegenerateLoadingUntilUnmount: true,
+                  })}
               linkedTextId={toastTextIdFromQuery}
               favorite={toastDetachFavorite}
               {...(toastTextIdFromQuery
@@ -111,7 +126,14 @@ export function DetachedToastShell({
               onOpenMenu={openSpriteMenuFromToastToolbar}
               spriteInteractionLocked={spriteInteractionLocked}
               onSpriteInteractionLockedChange={onSpriteInteractionLockedChange}
+              showLightFeedback={!introMode}
+              toastMode={introMode ? 'intro' : 'normal'}
+              onIntroDismiss={introMode ? dismissIntro : undefined}
               onClose={() => {
+                if (introMode) {
+                  dismissIntro()
+                  return
+                }
                 void window.sidekickDesktop?.hideToastWindow()
               }}
               holdToastToolbarForMenu={holdToastToolbarForMenu}

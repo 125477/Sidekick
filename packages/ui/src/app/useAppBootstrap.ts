@@ -7,7 +7,6 @@ import { areSettingsEqual, type SidekickSettings } from '../state/settingsState'
 import {
   loadOnboardingComplete,
   loadSettings,
-  saveOnboardingComplete,
   saveSettings,
 } from '../state/settingsStorage'
 import type { UiAction } from '../state/uiState'
@@ -65,11 +64,9 @@ export function useAppBootstrap({
       loadData(),
       loadOnboardingComplete(),
     ]).then(async ([saved, data, onboarded]) => {
-      let done = onboarded === true
-      if (!done && data.texts.history.length > 0) {
-        await saveOnboardingComplete()
-        done = true
-      }
+      // 仅当用户在引导里点「完成」或「跳过」时写入 `saveOnboardingComplete`；
+      // 勿用文案历史等侧写条件自动标记，否则中途退出应用会被误判为已引导。
+      const done = onboarded === true
       setOnboardingDone(done)
       setSettings(mergeLoadedSettings(saved, data))
       setAvatars(data.avatar.presets)

@@ -15,8 +15,11 @@ export type CompanionCopyStyle =
 export function emotionCnLabelToKind(label: string): EmotionKind | undefined {
   const map: Record<string, EmotionKind> = {
     开心: 'happy',
+    愉快: 'happy',
     平静: 'calm',
+    感动: 'calm',
     焦虑: 'anxious',
+    烦躁: 'anxious',
     低落: 'low',
     疲惫: 'tired',
   }
@@ -64,6 +67,11 @@ export type BuildCompanionPromptInput = {
   recentOutputsGuard?: boolean
   /** 用户在设置/引导中填写的兴趣；非空时并入通义千问（DashScope）的 system 提示，见下方 `interestLines`。 */
   companionInterests?: string[]
+  /**
+   * 气泡「轻反馈」经通义千问归纳后的短句（本地滚动保留若干条）。
+   * 写入 system 提示，影响后续陪伴句生成。
+   */
+  companionLightFeedbackHints?: string[]
 }
 
 const STYLE_GUIDE: Record<CompanionCopyStyle, string> = {
@@ -116,11 +124,23 @@ export function buildCompanionSystemPrompt(input: BuildCompanionPromptInput): st
       ]
       : []
 
+  const hints = (input.companionLightFeedbackHints ?? [])
+    .map((s) => s.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .slice(-6)
+  const lightFeedbackLines =
+    hints.length > 0
+      ? [
+        `【用户轻反馈（通义归纳）】${hints.join('；')}。写作时优先顺应这些偏好；若与当前情绪、长度或「禁止微改编」冲突，则以情绪与硬约束为准。`,
+      ]
+      : []
+
   return [
     '你是桌面情绪陪伴助手，只输出一条中文短句。',
     ...emotionLines,
     ...duplicateGuardLines,
     ...interestLines,
+    ...lightFeedbackLines,
     `目标语气类型：${input.style}。`,
     `语气要求：${STYLE_GUIDE[input.style]}`,
     `长度要求：不超过 ${input.maxChars} 个汉字。`,

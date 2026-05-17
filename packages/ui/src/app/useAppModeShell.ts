@@ -11,6 +11,7 @@ export type UseAppModeShellArgs = {
   isToastMode: boolean
   isPanelMode: boolean
   isOnboardingMode: boolean
+  isDragTrailMode: boolean
   themeSyncApplies: boolean
   settings: SidekickSettings
   settingsRef: MutableRefObject<SidekickSettings>
@@ -50,6 +51,7 @@ export function useAppModeShell({
   isToastMode,
   isPanelMode,
   isOnboardingMode,
+  isDragTrailMode = false,
   themeSyncApplies,
   settings,
   settingsRef,
@@ -204,15 +206,6 @@ export function useAppModeShell({
 
   useEffect(() => {
     if (!isWidgetMode) return
-    return window.sidekickDesktop?.onWidgetMoved?.(() => {
-      reportSpriteAnchorToMain(widgetMeasureRef.current, {
-        avatarSizePercent: settingsRef.current.avatarSize,
-      })
-    })
-  }, [isWidgetMode, settingsRef, widgetMeasureRef])
-
-  useEffect(() => {
-    if (!isWidgetMode) return
     return window.sidekickDesktop?.onOnboardingFinished?.(() => {
       setOnboardingDone(true)
       onboardingOpenSentRef.current = false
@@ -302,6 +295,16 @@ export function useAppModeShell({
       document.body.classList.remove('sidekick-toast-root')
     }
   }, [isToastMode])
+
+  useEffect(() => {
+    if (!isDragTrailMode) return
+    document.documentElement.classList.add('sidekick-drag-trail-root')
+    document.body.classList.add('sidekick-drag-trail-root')
+    return () => {
+      document.documentElement.classList.remove('sidekick-drag-trail-root')
+      document.body.classList.remove('sidekick-drag-trail-root')
+    }
+  }, [isDragTrailMode])
 
   useEffect(() => {
     if (!themeSyncApplies) {

@@ -1,7 +1,7 @@
 export const EXPLICIT_UI_URL = process.env.SIDEKICK_UI_URL
 export const DEV_SERVER_URL_CANDIDATES = EXPLICIT_UI_URL
   ? [EXPLICIT_UI_URL]
-  : [5174, 5175, 5176, 5177, 5178].map((port) => `http://localhost:${port}`)
+  : [5173,5174, 5175, 5176, 5177, 5178].map((port) => `http://localhost:${port}`)
 
 export const WIDGET_WINDOW_WIDTH = 360
 /** Initial height; renderer measures sprite layer and IPC-resizes to fit. */
@@ -26,6 +26,9 @@ export const SPRITE_SIZE = 144
 export const SPRITE_MENU_WINDOW_WIDTH = 172
 /** 与 `SpriteMenuPanel` 六行 `h-9` + `divide-y` 对齐 */
 export const SPRITE_MENU_WINDOW_HEIGHT = 232
+/** 拖动星星拖尾 overlay（单次拖动内固定位置，略大以减少 Win 上 setBounds）。 */
+export const DRAG_TRAIL_WINDOW_WIDTH = 560
+export const DRAG_TRAIL_WINDOW_HEIGHT = 400
 
 export const SPRITE_MENU_ACTIONS = new Set([
   'skin',

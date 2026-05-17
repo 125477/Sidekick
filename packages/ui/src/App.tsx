@@ -18,17 +18,22 @@ import { defaultSettings, type SidekickSettings } from './state/settingsState'
 import { initialUiState, uiReducer, type SpriteState } from './state/uiState'
 import { openAuxPanelFromBridgeOrDispatch } from './app/openAuxPanelFromBridgeOrDispatch'
 import { useScheduledCompanionPush } from './app/useScheduledCompanionPush'
+import { useDailyMoodReminder } from './app/useDailyMoodReminder'
 import { useAppBootstrap } from './app/useAppBootstrap'
 import { useAppModeShell } from './app/useAppModeShell'
 import { useDetachedSpriteMenu } from './app/useDetachedSpriteMenu'
 import { useAppMenuMachine } from './app/useAppMenuMachine'
 import { useCompanionActions } from './app/useCompanionActions'
+import { useAppSelfIntroBubble } from './app/useAppSelfIntroBubble'
+import { useYesterdayEmotionGreeting } from './app/useYesterdayEmotionGreeting'
+import { PanelBackgroundLayer } from './components/panel/PanelBackgroundLayer'
 import { readAppSearchParams } from './app/readAppSearchParams'
 import { AppPanelContent } from './app/AppPanelContent'
 import { WidgetSpriteLayer } from './app/WidgetSpriteLayer'
 import { DetachedToastShell } from './app/DetachedToastShell'
 import { FortuneWidgetModal } from './app/FortuneWidgetModal'
 import { HostAppMain } from './app/HostAppMain'
+import { DragTrailOverlayPage } from './app/DragTrailOverlayPage'
 import type { MenuAction } from './components/menu/SpriteMenu'
 
 function App() {
@@ -49,6 +54,7 @@ function App() {
   const widgetMeasureRef = useRef<HTMLDivElement>(null)
   const onboardingOpenSentRef = useRef(false)
   const moreRestoreToastTimerRef = useRef<number | null>(null)
+  const blockScheduledPushRef = useRef(false)
   const lastShownToastMessageRef = useRef('')
   const handleMenuActionRef = useRef<(action: MenuAction) => void>(() => {})
   const [settingsReady, setSettingsReady] = useState(false)
@@ -159,6 +165,8 @@ function App() {
     toastBubblePlacement,
     toastTextIdFromQuery,
     toastFavoriteFromUrl,
+    toastIntroFromQuery,
+    emotionTabFromQuery,
   } = readAppSearchParams()
 
   const [detachPlacementFromMain, setDetachPlacementFromMain] = useState<{
@@ -174,10 +182,14 @@ function App() {
   const isToastMode = mode === 'toast'
   const isOnboardingMode = mode === 'onboarding'
   const isSpriteMenuMode = mode === 'sprite-menu'
+  const isDragTrailMode = mode === 'drag-trail'
   const themeSyncApplies =
     isPanelMode ||
     isOnboardingMode ||
-    (!isWidgetMode && !isToastMode && !isSpriteMenuMode)
+    (!isWidgetMode &&
+      !isToastMode &&
+      !isSpriteMenuMode &&
+      !isDragTrailMode)
   const runsScheduledPush = isWidgetMode || mode === 'app'
   const [toastDetachFavorite, setToastDetachFavorite] =
     useState(toastFavoriteFromUrl)
@@ -215,6 +227,7 @@ function App() {
     isToastMode,
     isPanelMode,
     isOnboardingMode,
+    isDragTrailMode,
     themeSyncApplies,
     settings,
     settingsRef,
@@ -268,11 +281,14 @@ function App() {
     detachedWidgetSpriteMenu,
     openDetachedSpriteMenuSupported,
     panelFromQuery,
+    emotionTabFromQuery,
     uiState,
     dispatch,
     setToastMeta,
     moreRestoreToastTimerRef,
   })
+
+  useDailyMoodReminder(settings, settingsReady, isWidgetMode, onboardingDone)
 
   const {
     showToastMessage,
@@ -307,6 +323,23 @@ function App() {
     handleMenuActionRef,
   })
 
+  useAppSelfIntroBubble({
+    isWidgetMode,
+    settingsReady,
+    blockScheduledPushRef,
+    widgetMeasureRef,
+    showToastMessage,
+  })
+
+  useYesterdayEmotionGreeting({
+    isWidgetMode,
+    settingsReady,
+    settingsRef,
+    emotionRecords,
+    blockScheduledPushRef,
+    showToastMessage,
+  })
+
   useScheduledCompanionPush({
     settings,
     settingsReady,
@@ -322,6 +355,7 @@ function App() {
     companionBootstrapDoneRef,
     recentCompanionLinesRef,
     advanceAvatarAfterPushCopy,
+    blockScheduledPushRef,
   })
 
   const builtinAvatars = useMemo(
@@ -374,6 +408,7 @@ function App() {
       onboardingDone={onboardingDone}
       avatars={avatars}
       selectedAvatarId={selectedAvatarId}
+      onSelectedAvatarIdChange={setSelectedAvatarId}
       textStyle={settings.textStyle}
       companionInterests={settings.companionInterests}
       completeOnboarding={completeOnboarding}
@@ -417,6 +452,7 @@ function App() {
         toastDetachAnchor={toastDetachAnchor}
         toastDetachBubblePlacement={toastDetachBubblePlacement}
         toastMessageFromQuery={toastMessageFromQuery}
+        toastIntroFromQuery={toastIntroFromQuery}
         settings={settings}
         toastTextIdFromQuery={toastTextIdFromQuery}
         toastDetachFavorite={toastDetachFavorite}
@@ -442,6 +478,10 @@ function App() {
     return <WidgetSpriteMenuPage />
   }
 
+  if (isDragTrailMode) {
+    return <DragTrailOverlayPage />
+  }
+
   if (isOnboardingMode) {
     if (!settingsReady || onboardingDone === null) {
       return (
@@ -452,15 +492,23 @@ function App() {
     }
     return (
       <main className="sk-panel-outer box-border flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden px-4 py-4 sm:px-5 sm:py-5">
+        <PanelBackgroundLayer
+          enabled={settings.panelBackgroundEnabled}
+          overlayOpacity={settings.panelBackgroundOverlayOpacity}
+          imageOpacity={settings.panelBackgroundImageOpacity}
+          blurPx={settings.panelBackgroundBlurPx}
+        >
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <OnboardingWizard
             presets={avatars}
-            initialAvatarId={selectedAvatarId}
+            selectedAvatarId={selectedAvatarId}
+            onSelectedAvatarIdChange={setSelectedAvatarId}
             initialTextStyle={settings.textStyle}
             initialInterests={settings.companionInterests}
             onComplete={completeOnboarding}
           />
         </div>
+        </PanelBackgroundLayer>
       </main>
     )
   }
@@ -498,7 +546,8 @@ function App() {
         <div className="mx-auto flex min-h-screen max-w-2xl items-center justify-center px-6 py-10">
           <OnboardingWizard
             presets={avatars}
-            initialAvatarId={selectedAvatarId}
+            selectedAvatarId={selectedAvatarId}
+            onSelectedAvatarIdChange={setSelectedAvatarId}
             initialTextStyle={settings.textStyle}
             initialInterests={settings.companionInterests}
             onComplete={completeOnboarding}
@@ -510,10 +559,17 @@ function App() {
 
   if (isPanelMode) {
     return (
-      <main className="sk-panel-outer box-border flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden p-3 sm:p-4">
-        <div className="sk-panel-inner box-border flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden">
-          {panelContent}
-        </div>
+      <main className="sk-panel-outer relative box-border flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden">
+        <PanelBackgroundLayer
+          enabled={settings.panelBackgroundEnabled}
+          overlayOpacity={settings.panelBackgroundOverlayOpacity}
+          imageOpacity={settings.panelBackgroundImageOpacity}
+          blurPx={settings.panelBackgroundBlurPx}
+        >
+          <div className="sk-panel-inner box-border flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden p-3 sm:p-4">
+            {panelContent}
+          </div>
+        </PanelBackgroundLayer>
       </main>
     )
   }

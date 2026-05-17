@@ -10,6 +10,7 @@ export type UseAppMenuMachineArgs = {
   detachedWidgetSpriteMenu: boolean
   openDetachedSpriteMenuSupported: boolean
   panelFromQuery: string | null
+  emotionTabFromQuery: 'moment' | 'summary' | null
   uiState: UiState
   dispatch: Dispatch<UiAction>
   setToastMeta: Dispatch<SetStateAction<{ id: string; favorite: boolean } | null>>
@@ -24,6 +25,7 @@ export function useAppMenuMachine({
   detachedWidgetSpriteMenu,
   openDetachedSpriteMenuSupported,
   panelFromQuery,
+  emotionTabFromQuery,
   uiState,
   dispatch,
   setToastMeta,
@@ -120,8 +122,14 @@ export function useAppMenuMachine({
       panelFromQuery === 'favorites'
     ) {
       dispatch({ type: 'SET_PANEL', panel: panelFromQuery })
+      if (
+        panelFromQuery === 'emotion' &&
+        (emotionTabFromQuery === 'summary' || emotionTabFromQuery === 'moment')
+      ) {
+        dispatch({ type: 'SET_EMOTION_MOOD_TAB', tab: emotionTabFromQuery })
+      }
     } else {
       dispatch({ type: 'SET_PANEL', panel: 'settings' })
     }
-  }, [dispatch, isPanelMode, panelFromQuery])
+  }, [dispatch, isPanelMode, panelFromQuery, emotionTabFromQuery])
 }

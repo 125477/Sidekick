@@ -32,4 +32,9 @@ export type EmotionToastProps = {
   onPointerEnteredToastChrome?: () => void
   toastToolbarInlineMenu?: ReactNode
   holdToastToolbarForMenu?: boolean
+  /** 文案下方轻反馈（喜欢 / 一般 / 少推），归纳后写入通义 system 提示。 */
+  showLightFeedback?: boolean
+  /** App 自我介绍：长文案 + 知道了，隐藏轻反馈。 */
+  toastMode?: 'normal' | 'intro'
+  onIntroDismiss?: () => void
 }

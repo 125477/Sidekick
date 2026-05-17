@@ -35,7 +35,7 @@ export function SkinningPanel({
           type="button"
           role="tab"
           aria-selected={activeTab === 'jimeng'}
-          className={`rounded-lg px-4 py-2 text-sm ${activeTab === 'jimeng' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}
+          className={`cursor-pointer rounded-lg px-4 py-2 text-sm ${activeTab === 'jimeng' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}
           onClick={() => onTabChange('jimeng')}
         >
           AI生成
@@ -44,7 +44,7 @@ export function SkinningPanel({
           type="button"
           role="tab"
           aria-selected={activeTab === 'upload'}
-          className={`rounded-lg px-4 py-2 text-sm ${activeTab === 'upload' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}
+          className={`cursor-pointer rounded-lg px-4 py-2 text-sm ${activeTab === 'upload' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}
           onClick={() => onTabChange('upload')}
         >
           上传形象

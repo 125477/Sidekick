@@ -24,6 +24,12 @@ import {
   stopToastPassthroughHitTest,
   tickToastPassthroughHitTest,
 } from './toastPassthrough.mjs'
+import { showSidekickSystemNotification } from './notification.mjs'
+import {
+  beginDragTrailSession,
+  endDragTrailSession,
+  pushDragTrailScreenPoint,
+} from './dragTrail.mjs'
 import {
   createSpriteWindow,
   hideToastWindow,
@@ -34,7 +40,15 @@ import {
 
 /** Register before `ready` so renderer `invoke` never races an empty IPC table (Electron guidance). */
 export function registerSidekickIpcHandlers() {
-  ipcMain.handle('sidekick:open-panel', (_event, panel) => {
+  ipcMain.handle('sidekick:open-panel', (_event, payload) => {
+    const panel =
+      typeof payload === 'string'
+        ? payload
+        : payload && typeof payload === 'object'
+          ? payload.panel
+          : undefined
+    const emotionTab =
+      payload && typeof payload === 'object' ? payload.emotionTab : undefined
     if (
       panel === 'skin' ||
       panel === 'settings' ||
@@ -42,9 +56,17 @@ export function registerSidekickIpcHandlers() {
       panel === 'fortune' ||
       panel === 'favorites'
     ) {
-      openPanelWindow(panel)
+      openPanelWindow(
+        panel,
+        emotionTab === 'summary' || emotionTab === 'moment'
+          ? { emotionTab }
+          : {},
+      )
     }
     return undefined
+  })
+  ipcMain.handle('sidekick:show-system-notification', (_event, payload) => {
+    return showSidekickSystemNotification(payload ?? {})
   })
   ipcMain.handle('sidekick:open-onboarding', () => {
     openOnboardingWindow()
@@ -222,16 +244,30 @@ export function registerSidekickIpcHandlers() {
     ny = clamp(ny, wa.y - b.height + margin, wa.y + wa.height - margin)
     state.spriteWindow.setBounds({ ...b, x: nx, y: ny })
     persistWidgetBounds(state.spriteWindow)
-    if (state.toastWindow && !state.toastWindow.isDestroyed()) {
-      applyToastWindowBounds()
-    }
+    // 气泡位置由 `spriteWindow` 的 `move` 事件里 `applyToastWindowBounds` 同步，避免与 `move` 重复 setBounds。
     return undefined
+  })
+  ipcMain.handle('sidekick:begin-drag-trail', (_event, payload) => {
+    const screenX = Number(payload?.screenX)
+    const screenY = Number(payload?.screenY)
+    return beginDragTrailSession(
+      Number.isFinite(screenX) ? screenX : undefined,
+      Number.isFinite(screenY) ? screenY : undefined,
+    )
+  })
+  ipcMain.on('sidekick:drag-trail-point', (_event, payload) => {
+    const screenX = Number(payload?.screenX)
+    const screenY = Number(payload?.screenY)
+    pushDragTrailScreenPoint(screenX, screenY)
+  })
+  ipcMain.on('sidekick:end-drag-trail', () => {
+    endDragTrailSession()
   })
   ipcMain.handle('sidekick:resize-panel', (_event, _payload) => {
     if (!state.panelWindow || state.panelWindow.isDestroyed()) return
     state.panelWindow.setContentSize(AUX_WINDOW_WIDTH, AUX_WINDOW_HEIGHT)
   })
-  ipcMain.handle('sidekick:set-sprite-anchor', (_event, anchor) => {
+  function applySetSpriteAnchorFromRenderer(anchor) {
     const centerX = Number(anchor?.centerX)
     const topY = Number(anchor?.topY)
     const bottomY = Number(anchor?.bottomY)
@@ -250,6 +286,14 @@ export function registerSidekickIpcHandlers() {
     if (state.toastWindow && !state.toastWindow.isDestroyed() && state.toastWindow.isVisible()) {
       applyToastWindowBounds()
     }
+  }
+
+  ipcMain.handle('sidekick:set-sprite-anchor', (_event, anchor) => {
+    applySetSpriteAnchorFromRenderer(anchor)
+    return undefined
+  })
+  ipcMain.on('sidekick:set-sprite-anchor-push', (_event, anchor) => {
+    applySetSpriteAnchorFromRenderer(anchor)
   })
   ipcMain.handle('sidekick:resize-toast', (_event, payload) => {
     const raw = Number(payload?.height)

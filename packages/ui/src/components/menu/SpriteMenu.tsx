@@ -22,10 +22,11 @@ type SpriteMenuProps = {
   onAction: (action: MenuAction) => void
 }
 
+/** 按日常使用频率：互动功能在上，换肤/设置偏下，退出置底。 */
 const ITEMS: Array<{ id: MenuAction; label: string }> = [
+  { id: 'emotion', label: '情绪反馈' },
   { id: 'skin', label: '换肤' },
   { id: 'settings', label: '设置' },
-  { id: 'emotion', label: '情绪反馈' },
   { id: 'fortune', label: '每日抽签' },
   { id: 'more', label: '更多...' },
   { id: 'exit', label: '退出' },
@@ -64,7 +65,7 @@ export function SpriteMenuPanel({
           <button
             key={item.id}
             type="button"
-            className={`${cornerClass} flex h-9 w-full items-center border-0 bg-transparent py-0 pl-5 pr-3 text-left text-sm leading-none text-[color:var(--sk-text-body)] transition-colors hover:bg-[color:var(--sk-card-bg)] focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--sk-focus-ring)] [-webkit-app-region:no-drag]`}
+            className={`${cornerClass} flex h-9 w-full cursor-pointer items-center border-0 bg-transparent py-0 pl-5 pr-3 text-left text-sm leading-none text-[color:var(--sk-text-body)] transition-colors hover:bg-[color:var(--sk-card-bg)] focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--sk-focus-ring)] [-webkit-app-region:no-drag]`}
             onClick={() => onPick(item.id)}
           >
             {item.label}

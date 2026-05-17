@@ -55,6 +55,8 @@
       ]
     },
     "win": {
+      "executableName": "Sidekick",
+      "asar": false,
       "target": [
         "nsis"
       ]

@@ -25,6 +25,11 @@ type SidekickSpriteAnchor = {
   bottomY: number
   /** 与设置「大小(%)」一致；用于主进程按比例拉开独立气泡与精灵间距。 */
   avatarSizePercent?: number
+  /**
+   * 仅传给 preload：为 true 时用 `invoke` 与主进程同帧对齐（打开气泡前须 await）。
+   * 高频上报（ResizeObserver 等）不传，走 `send` 降低往返延迟。
+   */
+  _sync?: boolean
 }
 
 type ScreenWorkArea = {
@@ -59,7 +64,17 @@ type DashScopeTtsResult = {
 }
 
 type SidekickDesktopApi = {
-  openPanelWindow: (panel: SidekickPanel) => Promise<void>
+  openPanelWindow: (
+    panel: SidekickPanel,
+    opts?: { emotionTab?: 'moment' | 'summary' },
+  ) => Promise<void>
+  /** 系统通知（点击可打开情绪面板并定位到今日小结）。 */
+  showSystemNotification?: (payload: {
+    title?: string
+    body: string
+    panel?: 'emotion'
+    emotionTab?: 'moment' | 'summary'
+  }) => Promise<boolean>
   /** 打开独立「首次引导」窗口（与精灵悬浮窗分离）。 */
   openOnboardingWindow?: () => Promise<void>
   /** 引导窗内保存完成后调用：通知精灵窗并关闭引导窗口。 */
@@ -73,6 +88,8 @@ type SidekickDesktopApi = {
     /** 与本地 `texts.history` 对应，用于独立气泡内收藏 */
     textId?: string
     favorite?: boolean
+    /** App 自我介绍：长文案 + 知道了 */
+    toastIntro?: boolean
   }) => Promise<void>
   /**
    * 已展示独立气泡时，主进程优先用 IPC 同步版式；仅在页面未就绪时整页重载。无气泡则仅更新主进程偏好。
@@ -84,6 +101,8 @@ type SidekickDesktopApi = {
     forceReplay?: boolean
   }) => Promise<void>
   hideToastWindow: () => Promise<void>
+  /** 系统休眠恢复 / 解锁屏幕（仅 Electron 桌面端）。 */
+  onSystemResume?: (callback: () => void) => () => void
   /**
    * Electron 独立气泡：锁定后整窗 `setIgnoreMouseEvents(forward)` 穿透；
    * 渲染进程上报解锁按钮（或换句 loading 时整张卡）的视口矩形，主进程轮询光标是否在矩形内。
@@ -113,6 +132,36 @@ type SidekickDesktopApi = {
   resizeWidgetWindow?: (payload: { height: number; width?: number }) => Promise<void>
   /** 挂件精灵窗：在形象 `no-drag` 热区内拖动时，由主进程按增量平移窗口（避免 `-webkit-app-region: drag` 吞点击）。 */
   moveWidgetBy?: (payload: { dx: number; dy: number }) => Promise<void>
+  /** 打开/复用全屏拖尾 overlay，在拖动开始时调用。 */
+  beginDragTrail?: (payload: {
+    screenX: number
+    screenY: number
+  }) => Promise<boolean | void>
+  pushDragTrailPoint?: (payload: {
+    screenX: number
+    screenY: number
+  }) => void
+  endDragTrail?: () => void
+  /** `mode=drag-trail` overlay 窗订阅 */
+  onDragTrailPoint?: (
+    callback: (payload: { x: number; y: number }) => void,
+  ) => () => void
+  onDragTrailPoints?: (
+    callback: (points: Array<{ x: number; y: number }>) => void,
+  ) => () => void
+  onDragTrailShift?: (
+    callback: (payload: { dx: number; dy: number }) => void,
+  ) => () => void
+  onDragTrailReset?: (callback: () => void) => () => void
+  onDragTrailResetSampler?: (callback: () => void) => () => void
+  onDragTrailSync?: (
+    callback: (payload: {
+      originX: number
+      originY: number
+      width: number
+      height: number
+    }) => void,
+  ) => () => void
   /** 将 panel 窗内容区设回与主进程 `AUX_WINDOW_*` 一致（payload 已忽略，可传任意占位）。 */
   resizePanelWindow?: (payload?: { width?: number; height?: number }) => Promise<void>
   /** Widget only: measured sprite bounds in screen coordinates for toast placement. */
@@ -122,7 +171,6 @@ type SidekickDesktopApi = {
   requestRegenerateCopy?: () => Promise<void>
   /** Widget only: main forwards clicks from the detached toast. */
   onRegenerateCopyRequested?: (callback: () => void) => () => void
-  onWidgetMoved?: (callback: () => void) => () => void
   getWorkArea?: () => Promise<ScreenWorkArea | null>
   /** Main-process DashScope call (no renderer CORS). */
   dashscopeChat?: (payload: DashScopeChatPayload) => Promise<string>

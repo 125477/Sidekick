@@ -9,6 +9,7 @@ export type SkinTab = 'jimeng' | 'upload'
 export type ToastAnchor = 'top' | 'bottom'
 export type MenuState = 'closed' | 'opening' | 'open' | 'closing'
 export type ToastState = 'hidden' | 'entering' | 'visible' | 'leaving'
+export type ToastMode = 'normal' | 'intro'
 export type SpriteState =
   | 'idle'
   | 'hover'
@@ -20,6 +21,8 @@ export type SpriteState =
   | 'laugh'
   | 'stretch'
 
+export type EmotionMoodTab = 'moment' | 'summary'
+
 export type UiState = {
   activePanel: ActivePanel
   skinTab: SkinTab
@@ -27,6 +30,9 @@ export type UiState = {
   toastState: ToastState
   toastAnchor: ToastAnchor
   toastMessage: string
+  toastMode: ToastMode
+  /** 情绪反馈面板内「此刻 / 今日小结」页签。 */
+  emotionMoodTab: EmotionMoodTab
 }
 
 export type UiAction =
@@ -35,9 +41,10 @@ export type UiAction =
   | { type: 'MENU_OPENED' }
   | { type: 'MENU_CLOSED' }
   | { type: 'SET_PANEL'; panel: ActivePanel }
+  | { type: 'SET_EMOTION_MOOD_TAB'; tab: EmotionMoodTab }
   | { type: 'SET_SKIN_TAB'; tab: SkinTab }
   | { type: 'SET_TOAST_ANCHOR'; anchor: ToastAnchor }
-  | { type: 'SHOW_TOAST'; message: string }
+  | { type: 'SHOW_TOAST'; message: string; toastMode?: ToastMode }
   | { type: 'HIDE_TOAST' }
   | { type: 'TOAST_VISIBLE' }
   | { type: 'TOAST_HIDDEN' }
@@ -55,6 +62,8 @@ export const initialUiState: UiState = {
   toastState: 'hidden',
   toastAnchor: 'bottom',
   toastMessage: '今天也在稳稳前进，先奖励自己一口深呼吸。',
+  toastMode: 'normal',
+  emotionMoodTab: 'moment',
 }
 
 export function uiReducer(state: UiState, action: UiAction): UiState {
@@ -68,7 +77,14 @@ export function uiReducer(state: UiState, action: UiAction): UiState {
     case 'MENU_CLOSED':
       return { ...state, menuState: 'closed' }
     case 'SET_PANEL':
-      return { ...state, activePanel: action.panel }
+      return {
+        ...state,
+        activePanel: action.panel,
+        emotionMoodTab:
+          action.panel === 'emotion' ? state.emotionMoodTab : 'moment',
+      }
+    case 'SET_EMOTION_MOOD_TAB':
+      return { ...state, emotionMoodTab: action.tab }
     case 'SET_SKIN_TAB':
       return { ...state, skinTab: action.tab }
     case 'SET_TOAST_ANCHOR':
@@ -77,14 +93,15 @@ export function uiReducer(state: UiState, action: UiAction): UiState {
       return {
         ...state,
         toastMessage: action.message,
+        toastMode: action.toastMode ?? 'normal',
         toastState: 'entering',
       }
     case 'TOAST_VISIBLE':
       return { ...state, toastState: 'visible' }
     case 'HIDE_TOAST':
-      return { ...state, toastState: 'leaving' }
+      return { ...state, toastState: 'leaving', toastMode: 'normal' }
     case 'TOAST_HIDDEN':
-      return { ...state, toastState: 'hidden' }
+      return { ...state, toastState: 'hidden', toastMode: 'normal' }
     default:
       return state
   }

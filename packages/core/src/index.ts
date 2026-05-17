@@ -8,6 +8,7 @@ export type CompanionTextStyle =
 export const CORE_PACKAGE = '@sidekick/core'
 
 export type { DashScopeTextRequest } from './clients/dashscopeTextClient'
+export { requestDashScopeText } from './clients/dashscopeTextClient'
 export {
   synthesizeDashScopeTts,
   type DashScopeTtsModel,

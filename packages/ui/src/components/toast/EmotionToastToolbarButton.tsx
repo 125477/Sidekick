@@ -32,6 +32,7 @@ export function EmotionToastToolbarIconButton({
   const btnRef = useRef<HTMLButtonElement>(null)
   const [tipOpen, setTipOpen] = useState(false)
   const [tipPos, setTipPos] = useState({ x: 0, y: 0 })
+  const tipPosRafRef = useRef<number | null>(null)
 
   const updateTipPos = () => {
     const el = btnRef.current
@@ -40,15 +41,27 @@ export function EmotionToastToolbarIconButton({
     setTipPos({ x: r.left + r.width / 2, y: r.top })
   }
 
+  const scheduleTipPosUpdate = () => {
+    if (tipPosRafRef.current != null) return
+    tipPosRafRef.current = window.requestAnimationFrame(() => {
+      tipPosRafRef.current = null
+      updateTipPos()
+    })
+  }
+
   useEffect(() => {
     if (!tipOpen) return
     updateTipPos()
-    const onMove = () => updateTipPos()
+    const onMove = () => scheduleTipPosUpdate()
     window.addEventListener('scroll', onMove, true)
     window.addEventListener('resize', onMove)
     return () => {
       window.removeEventListener('scroll', onMove, true)
       window.removeEventListener('resize', onMove)
+      if (tipPosRafRef.current != null) {
+        window.cancelAnimationFrame(tipPosRafRef.current)
+        tipPosRafRef.current = null
+      }
     }
   }, [tipOpen])
 
@@ -76,7 +89,7 @@ export function EmotionToastToolbarIconButton({
         onMouseLeave={hideTip}
         onFocus={showTip}
         onBlur={hideTip}
-        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-violet-700 transition-colors hover:bg-violet-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-400/50 disabled:cursor-wait disabled:opacity-40 [-webkit-app-region:no-drag]"
+        className="inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-violet-700 transition-colors hover:bg-violet-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-400/50 disabled:cursor-wait disabled:opacity-40 [-webkit-app-region:no-drag]"
       >
         {children}
       </button>

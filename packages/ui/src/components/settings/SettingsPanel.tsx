@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { CompanionCopyStyle } from '@sidekick/core'
 import { APP_DISPLAY_NAME } from '../../constants/brand'
+import { PanelBackgroundPicker } from '../panel/PanelBackgroundPicker'
 import { defaultSettings, type SidekickSettings } from '../../state/settingsState'
 import {
   COMPANION_INTEREST_TAG_OPTIONS,
@@ -52,19 +53,22 @@ type SettingsPanelProps = {
   onRestoreDefaults: () => void
   /** 桌面端打开独立引导窗；纯 Web 则切回全屏引导。 */
   onOpenFirstRunGuide?: () => void
+  /** 以 intro 气泡重温产品介绍。 */
+  onReplayAppIntro?: () => void
   /** 重复点击当前已选中的「气泡位置」分段时触发，用于预览气泡短暂退场再进场；切换另一项时不要调用（避免多余整组件 remount）。 */
   onToastAnchorInteraction?: (anchor: SidekickSettings['toastAnchor']) => void
 }
 
 type SettingTab = 'push' | 'copy' | 'speech' | 'avatar' | 'ai' | 'general'
 
+/** 侧栏顺序：按日常使用频率（文案与形象 → 推送 → 通用 → 进阶）。 */
 const TABS: Array<{ id: SettingTab; label: string }> = [
-  { id: 'push', label: '推送' },
   { id: 'copy', label: '文案展示' },
-  { id: 'speech', label: '语音' },
   { id: 'avatar', label: '形象' },
-  { id: 'ai', label: 'AI' },
+  { id: 'push', label: '推送' },
   { id: 'general', label: '通用' },
+  { id: 'speech', label: '语音' },
+  { id: 'ai', label: 'AI' },
 ]
 
 function openTimePicker(input: HTMLInputElement) {
@@ -121,6 +125,7 @@ type SettingsSwitchProps = {
   checked: boolean
   onCheckedChange: (next: boolean) => void
   'aria-labelledby'?: string
+  disabled?: boolean
 }
 
 function SettingsSwitch({
@@ -128,14 +133,16 @@ function SettingsSwitch({
   checked,
   onCheckedChange,
   'aria-labelledby': ariaLabelledBy,
+  disabled = false,
 }: SettingsSwitchProps) {
   return (
-    <label htmlFor={id} className="sk-switch">
+    <label htmlFor={id} className={`sk-switch ${disabled ? 'pointer-events-none' : ''}`}>
       <input
         id={id}
         type="checkbox"
         role="switch"
         checked={checked}
+        disabled={disabled}
         onChange={(event) => onCheckedChange(event.target.checked)}
         aria-checked={checked}
         aria-labelledby={ariaLabelledBy}
@@ -153,15 +160,20 @@ function SettingsSwitchRow({
   label,
   checked,
   onCheckedChange,
+  disabled = false,
 }: {
   id: string
   labelId: string
   label: string
   checked: boolean
   onCheckedChange: (next: boolean) => void
+  disabled?: boolean
 }) {
   return (
-    <div className="sk-settings-row">
+    <div
+      className={`sk-settings-row ${disabled ? 'opacity-50' : ''}`}
+      aria-disabled={disabled || undefined}
+    >
       <span id={labelId} className="sk-settings-row-label">
         {label}
       </span>
@@ -170,6 +182,7 @@ function SettingsSwitchRow({
         checked={checked}
         onCheckedChange={onCheckedChange}
         aria-labelledby={labelId}
+        disabled={disabled}
       />
     </div>
   )
@@ -235,9 +248,10 @@ export function SettingsPanel({
   imageGenRemaining,
   onRestoreDefaults,
   onOpenFirstRunGuide,
+  onReplayAppIntro,
   onToastAnchorInteraction,
 }: SettingsPanelProps) {
-  const [activeTab, setActiveTab] = useState<SettingTab>('push')
+  const [activeTab, setActiveTab] = useState<SettingTab>('copy')
 
   useEffect(() => {
     const label = TABS.find((t) => t.id === activeTab)?.label ?? '设置'
@@ -297,22 +311,7 @@ export function SettingsPanel({
               </label>
             </SettingsSubsection>
 
-            <SettingsSubsection title="推送后形象">
-              <SettingsSwitchRow
-                id="settings-push-auto-avatar"
-                labelId="settings-push-auto-avatar-lbl"
-                label="推送后自动切换形象"
-                checked={settings.pushAutoSwitchAvatar}
-                onCheckedChange={(v) => update('pushAutoSwitchAvatar', v)}
-              />
-              <p className="sk-muted leading-relaxed">
-                开启后，仅在推送
-                新的陪伴句成功展示后
-                才切换到下一形象
-              </p>
-            </SettingsSubsection>
-
-            <SettingsSubsection title="时段与勿扰">
+            <SettingsSubsection title="推送、勿扰与专注">
               <p className="sk-body-sm font-medium">允许推送</p>
               <div className="grid grid-cols-2 gap-2">
                 <SettingsTimeField
@@ -328,6 +327,67 @@ export function SettingsPanel({
                   onChange={(v) => update('pushEnd', v)}
                 />
               </div>
+              <div className="sk-divider" />
+              <p className="sk-body-sm font-medium">专注模式</p>
+              <label className="grid gap-1">
+                <span className="sk-label">默认时长（分钟）</span>
+                <input
+                  type="number"
+                  min={5}
+                  max={180}
+                  value={settings.focusPresetMinutes}
+                  onChange={(event) =>
+                    update(
+                      'focusPresetMinutes',
+                      Math.min(180, Math.max(5, Number(event.target.value) || 25)),
+                    )
+                  }
+                  className="sk-input"
+                />
+              </label>
+              {settings.focusSessionUntilEpochMs != null &&
+              Date.now() < settings.focusSessionUntilEpochMs ? (
+                <p className="text-xs text-violet-700">
+                  专注进行中，至{' '}
+                  {new Date(settings.focusSessionUntilEpochMs).toLocaleTimeString(
+                    'zh-CN',
+                    { hour: '2-digit', minute: '2-digit' },
+                  )}
+                  ，期间暂停定时陪伴推送。
+                </p>
+              ) : (
+                <p className="sk-muted text-xs">当前未在专注时段。</p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="rounded-lg bg-violet-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-700"
+                  onClick={() =>
+                    onSettingsChange({
+                      ...settings,
+                      focusSessionUntilEpochMs:
+                        Date.now() + settings.focusPresetMinutes * 60_000,
+                    })
+                  }
+                >
+                  开始专注
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+                  onClick={() =>
+                    onSettingsChange({
+                      ...settings,
+                      focusSessionUntilEpochMs: null,
+                    })
+                  }
+                >
+                  结束专注
+                </button>
+              </div>
+              <p className="sk-muted text-xs leading-relaxed">
+                专注是你主动开始的一段会话，期间暂停定时陪伴推送。
+              </p>
               <div className="sk-divider" />
               <SettingsSwitchRow
                 id="settings-quiet-enabled"
@@ -352,6 +412,53 @@ export function SettingsPanel({
                   disabled={!settings.quietHoursEnabled}
                 />
               </div>
+              <p className="sk-muted text-xs leading-relaxed">
+                勿扰按每天重复的时段生效，可与专注模式同时配置。
+              </p>
+              <div className="sk-divider" />
+              <p className="sk-body-sm font-medium">今日心情</p>
+              <SettingsSwitchRow
+                id="settings-daily-mood-enabled"
+                labelId="settings-daily-mood-enabled-lbl"
+                label="启用今日心情（小结与本地日记）"
+                checked={settings.dailyMoodEnabled}
+                onCheckedChange={(v) => update('dailyMoodEnabled', v)}
+              />
+              <SettingsSwitchRow
+                id="settings-daily-mood-reminder"
+                labelId="settings-daily-mood-reminder-lbl"
+                label="到点系统通知提醒"
+                checked={settings.dailyMoodReminderEnabled}
+                onCheckedChange={(v) => update('dailyMoodReminderEnabled', v)}
+                disabled={!settings.dailyMoodEnabled}
+              />
+              <SettingsTimeField
+                id="sidekick-daily-mood-reminder"
+                label="提醒时间"
+                value={settings.dailyMoodReminderTime}
+                onChange={(v) => update('dailyMoodReminderTime', v)}
+                disabled={
+                  !settings.dailyMoodEnabled || !settings.dailyMoodReminderEnabled
+                }
+              />
+              <p className="sk-muted text-xs leading-relaxed">
+                通知点击会打开情绪反馈并定位到「今日小结」；记录仅存本机 IndexedDB。
+              </p>
+            </SettingsSubsection>
+
+            <SettingsSubsection title="推送后形象">
+              <SettingsSwitchRow
+                id="settings-push-auto-avatar"
+                labelId="settings-push-auto-avatar-lbl"
+                label="推送后自动切换形象"
+                checked={settings.pushAutoSwitchAvatar}
+                onCheckedChange={(v) => update('pushAutoSwitchAvatar', v)}
+              />
+              <p className="sk-muted leading-relaxed">
+                开启后，仅在推送
+                新的陪伴句成功展示后
+                才切换到下一形象
+              </p>
             </SettingsSubsection>
           </div>
         )}
@@ -360,33 +467,29 @@ export function SettingsPanel({
           <div className="grid gap-4 text-sm text-[var(--sk-text-body)]">
             <SettingsTabHeading>文案展示</SettingsTabHeading>
 
-            <SettingsSubsection title="气泡位置">
-              <div className="sk-segmented">
-                <button
-                  type="button"
-                  className={`sk-segmented-btn ${settings.toastAnchor === 'top' ? 'sk-segmented-btn-active' : ''}`}
-                  onClick={() => {
-                    if (settings.toastAnchor === 'top') {
-                      onToastAnchorInteraction?.('top')
-                    }
-                    update('toastAnchor', 'top')
-                  }}
+            <SettingsSubsection title="语气类型">
+              <p className="sk-muted leading-relaxed">
+                决定推送与点精灵时的语气；与「情绪反馈」联动时仍以情绪优先。
+              </p>
+              <label className="grid gap-1">
+                <span className="sk-label">语气类型</span>
+                <select
+                  value={settings.textStyle}
+                  onChange={(event) =>
+                    update(
+                      'textStyle',
+                      event.target.value as SidekickSettings['textStyle'],
+                    )
+                  }
+                  className="sk-select"
                 >
-                  从上方弹出
-                </button>
-                <button
-                  type="button"
-                  className={`sk-segmented-btn ${settings.toastAnchor === 'bottom' ? 'sk-segmented-btn-active' : ''}`}
-                  onClick={() => {
-                    if (settings.toastAnchor === 'bottom') {
-                      onToastAnchorInteraction?.('bottom')
-                    }
-                    update('toastAnchor', 'bottom')
-                  }}
-                >
-                  从下方弹出
-                </button>
-              </div>
+                  {COPY_STYLE_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </SettingsSubsection>
 
             <SettingsSubsection title="停留与关闭">
@@ -422,29 +525,33 @@ export function SettingsPanel({
               </label>
             </SettingsSubsection>
 
-            <SettingsSubsection title="语气类型">
-              <p className="sk-muted leading-relaxed">
-                决定推送与点精灵时的语气；与「情绪反馈」联动时仍以情绪优先。
-              </p>
-              <label className="grid gap-1">
-                <span className="sk-label">语气类型</span>
-                <select
-                  value={settings.textStyle}
-                  onChange={(event) =>
-                    update(
-                      'textStyle',
-                      event.target.value as SidekickSettings['textStyle'],
-                    )
-                  }
-                  className="sk-select"
+            <SettingsSubsection title="气泡位置">
+              <div className="sk-segmented">
+                <button
+                  type="button"
+                  className={`sk-segmented-btn ${settings.toastAnchor === 'top' ? 'sk-segmented-btn-active' : ''}`}
+                  onClick={() => {
+                    if (settings.toastAnchor === 'top') {
+                      onToastAnchorInteraction?.('top')
+                    }
+                    update('toastAnchor', 'top')
+                  }}
                 >
-                  {COPY_STYLE_OPTIONS.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  从上方弹出
+                </button>
+                <button
+                  type="button"
+                  className={`sk-segmented-btn ${settings.toastAnchor === 'bottom' ? 'sk-segmented-btn-active' : ''}`}
+                  onClick={() => {
+                    if (settings.toastAnchor === 'bottom') {
+                      onToastAnchorInteraction?.('bottom')
+                    }
+                    update('toastAnchor', 'bottom')
+                  }}
+                >
+                  从下方弹出
+                </button>
+              </div>
             </SettingsSubsection>
 
             <SettingsSubsection title="兴趣偏好（可选）">
@@ -583,12 +690,6 @@ export function SettingsPanel({
         {activeTab === 'avatar' && (
           <div className="grid gap-4 text-sm text-[var(--sk-text-body)]">
             <SettingsTabHeading>形象设置</SettingsTabHeading>
-            <SettingsSubsection title="当前与额度">
-              <p className="sk-body-sm">当前皮肤：默认皮肤 A</p>
-              {imageGenRemaining !== undefined ? (
-                <p className="sk-muted">剩余文生图次数：{imageGenRemaining}</p>
-              ) : null}
-            </SettingsSubsection>
             <SettingsSubsection title="显示大小">
               <label className="grid gap-1">
                 <span className="sk-label">大小（%）</span>
@@ -614,6 +715,12 @@ export function SettingsPanel({
                   className="sk-range w-full"
                 />
               </label>
+            </SettingsSubsection>
+            <SettingsSubsection title="当前与额度">
+              <p className="sk-body-sm">当前皮肤：默认皮肤 A</p>
+              {imageGenRemaining !== undefined ? (
+                <p className="sk-muted">剩余文生图次数：{imageGenRemaining}</p>
+              ) : null}
             </SettingsSubsection>
           </div>
         )}
@@ -679,20 +786,20 @@ export function SettingsPanel({
         {activeTab === 'general' && (
           <div className="grid gap-4 text-sm text-[var(--sk-text-body)]">
             <SettingsTabHeading>通用设置</SettingsTabHeading>
-            {onOpenFirstRunGuide ? (
-              <div className="sk-callout">
-                <p className="sk-muted leading-relaxed">
-                  首次引导仅在未标记完成时自动出现；可随时重新打开，修改形象、语气与兴趣偏好。
-                </p>
-                <button
-                  type="button"
-                  onClick={onOpenFirstRunGuide}
-                  className="sk-callout-btn"
-                >
-                  重新打开首次引导
-                </button>
-              </div>
-            ) : null}
+            <PanelBackgroundPicker
+              enabled={settings.panelBackgroundEnabled}
+              onEnabledChange={(v) => update('panelBackgroundEnabled', v)}
+              overlayOpacity={settings.panelBackgroundOverlayOpacity}
+              onOverlayOpacityChange={(v) =>
+                update('panelBackgroundOverlayOpacity', v)
+              }
+              imageOpacity={settings.panelBackgroundImageOpacity}
+              onImageOpacityChange={(v) =>
+                update('panelBackgroundImageOpacity', v)
+              }
+              blurPx={settings.panelBackgroundBlurPx}
+              onBlurPxChange={(v) => update('panelBackgroundBlurPx', v)}
+            />
             <SettingsSubsection title="外观与语言">
               <SettingsSwitchRow
                 id="settings-dark-mode"
@@ -715,6 +822,34 @@ export function SettingsPanel({
                 </select>
               </label>
             </SettingsSubsection>
+            {onOpenFirstRunGuide ? (
+              <div className="sk-callout">
+                <p className="sk-muted leading-relaxed">
+                  首次引导仅在未标记完成时自动出现；可随时重新打开，修改形象、语气与兴趣偏好。
+                </p>
+                <button
+                  type="button"
+                  onClick={onOpenFirstRunGuide}
+                  className="sk-callout-btn"
+                >
+                  重新打开首次引导
+                </button>
+              </div>
+            ) : null}
+            {onReplayAppIntro ? (
+              <div className="sk-callout">
+                <p className="sk-muted leading-relaxed">
+                  在陪伴气泡中查看灵伴的功能介绍（与首次引导无关）。
+                </p>
+                <button
+                  type="button"
+                  onClick={onReplayAppIntro}
+                  className="sk-callout-btn"
+                >
+                  重温产品介绍
+                </button>
+              </div>
+            ) : null}
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"

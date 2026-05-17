@@ -47,6 +47,22 @@ export type SidekickSettings = {
    * 用户标记的兴趣（如 音乐、影视）；写入 system prompt 作轻微偏好参考。
    */
   companionInterests: string[]
+  /** 今日心情：总开关（含面板与本地记录）。 */
+  dailyMoodEnabled: boolean
+  /** 到点系统通知提醒写今日小结（需 Electron 通知权限）。 */
+  dailyMoodReminderEnabled: boolean
+  /** 本地时区「HH:mm」提醒时间。 */
+  dailyMoodReminderTime: string
+  /** 专注会话结束时间戳（毫秒）；未到时间则暂停定时陪伴推送。 */
+  focusSessionUntilEpochMs: number | null
+  /** 设置页「开始专注」默认时长（分钟）。 */
+  focusPresetMinutes: number
+  /** 辅面板共用自定义背景（媒体存 panelBackground store）。 */
+  panelBackgroundEnabled: boolean
+  panelBackgroundOverlayOpacity: number
+  /** 底图本身不透明度，1 为完全显示。 */
+  panelBackgroundImageOpacity: number
+  panelBackgroundBlurPx: number
 }
 
 /** 用于跨窗口同步后避免 `setSettings` 无变化仍换新引用，触发 `saveSettings` 死循环。 */
@@ -128,4 +144,13 @@ export const defaultSettings: SidekickSettings = {
   companionTtsSpeechRate: 1,
   pushAutoSwitchAvatar: false,
   companionInterests: [],
+  dailyMoodEnabled: true,
+  dailyMoodReminderEnabled: false,
+  dailyMoodReminderTime: '21:00',
+  focusSessionUntilEpochMs: null,
+  focusPresetMinutes: 25,
+  panelBackgroundEnabled: false,
+  panelBackgroundOverlayOpacity: 0.45,
+  panelBackgroundImageOpacity: 1,
+  panelBackgroundBlurPx: 0,
 }

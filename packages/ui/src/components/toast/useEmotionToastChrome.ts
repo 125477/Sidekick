@@ -77,7 +77,9 @@ export function useEmotionToastChrome({
   onToggleFavorite,
   toastToolbarInlineMenu,
   holdToastToolbarForMenu = false,
+  toastMode = 'normal',
 }: EmotionToastProps): EmotionToastChrome {
+  const introMode = toastMode === 'intro'
   const [regenerating, setRegenerating] = useState(false)
   const [copyDone, setCopyDone] = useState(false)
   const regenerateBusyRef = useRef(false)
@@ -114,20 +116,22 @@ export function useEmotionToastChrome({
     return () => window.clearTimeout(id)
   }, [dwellSeconds, visible, onClose])
 
-  const regenInToolbar = Boolean(
-    onRegenerate && messageRegeneratesOnClick === false,
-  )
-  const messageClickable = Boolean(
-    onRegenerate && messageRegeneratesOnClick !== false,
-  )
-  const showCopy = Boolean(onCopy && message.trim())
-  const showFavorite = Boolean(linkedTextId && onToggleFavorite)
-  const showReplay = Boolean(onReplayTts)
-  const showFavoritesRecord = Boolean(onOpenFavorites)
-  const showSettings = Boolean(onOpenSettings)
-  const showSkin = Boolean(onOpenSkin)
-  const showSpriteMenu = Boolean(onOpenMenu)
-  const showLockControl = Boolean(onSpriteInteractionLockedChange)
+  const regenInToolbar =
+    !introMode &&
+    Boolean(onRegenerate && messageRegeneratesOnClick === false)
+  const messageClickable =
+    !introMode &&
+    Boolean(onRegenerate && messageRegeneratesOnClick !== false)
+  const showCopy = !introMode && Boolean(onCopy && message.trim())
+  const showFavorite =
+    !introMode && Boolean(linkedTextId && onToggleFavorite)
+  const showReplay = !introMode && Boolean(onReplayTts)
+  const showFavoritesRecord = !introMode && Boolean(onOpenFavorites)
+  const showSettings = !introMode && Boolean(onOpenSettings)
+  const showSkin = !introMode && Boolean(onOpenSkin)
+  const showSpriteMenu = !introMode && Boolean(onOpenMenu)
+  const showLockControl =
+    !introMode && Boolean(onSpriteInteractionLockedChange)
   const hasToolbarActions =
     regenInToolbar ||
     showCopy ||
@@ -139,13 +143,15 @@ export function useEmotionToastChrome({
     showSpriteMenu ||
     showLockControl
   const showLockedOnlyToolbar = spriteInteractionLocked && showLockControl
-  const showUnlockedToolbar = !spriteInteractionLocked && hasToolbarActions
-  const showToolbar = showLockedOnlyToolbar || showUnlockedToolbar
+  const showUnlockedToolbar =
+    introMode || (!spriteInteractionLocked && hasToolbarActions)
+  const showToolbar = introMode || showLockedOnlyToolbar || showUnlockedToolbar
   const toolbarMenuHoldOpen =
     Boolean(toastToolbarInlineMenu) || holdToastToolbarForMenu
   const toastPassthroughLocked =
     detached && spriteInteractionLocked && showLockControl
-  const toastBarPinnedOpen = toastPassthroughLocked || spriteHoverReveal
+  const toastBarPinnedOpen =
+    introMode || toastPassthroughLocked || spriteHoverReveal
 
   const [lockedMsgHot, setLockedMsgHot] = useState(false)
   const [lockedToolbarHot, setLockedToolbarHot] = useState(false)
@@ -335,7 +341,7 @@ export function useEmotionToastChrome({
     const slop = lockedPassthroughSlopRef.current
     if (slop) ro.observe(slop)
     window.addEventListener('resize', report)
-    const id = window.setInterval(report, 400)
+    const id = window.setInterval(report, 750)
     return () => {
       ro.disconnect()
       window.removeEventListener('resize', report)

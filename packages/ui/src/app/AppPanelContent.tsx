@@ -1,18 +1,6 @@
-import {
-  lazy,
-  Suspense,
-  type Dispatch,
-  type MutableRefObject,
-  type SetStateAction,
-} from 'react'
-import {
-  appendEmotion,
-  emotionCnLabelToKind,
-  type AvatarPreset,
-  type EmotionKind,
-  type EmotionRecord,
-} from '@sidekick/core'
-import { EmotionQuickFeedback } from '../components/emotion/EmotionQuickFeedback'
+import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
+import type { AvatarPreset, EmotionKind, EmotionRecord } from '@sidekick/core'
+import { DailyMoodPanel } from '../components/emotion/DailyMoodPanel'
 import { SettingsPanel } from '../components/settings/SettingsPanel'
 import { AvatarPresetGallery } from '../components/skinning/AvatarPresetGallery'
 import { SkinningPanel } from '../components/skinning/SkinningPanel'
@@ -27,11 +15,7 @@ import {
 import { broadcastSettingsSync } from '../state/settingsSync'
 import type { UiAction, UiState } from '../state/uiState'
 import { saveSettings } from '../state/settingsStorage'
-
-const EmotionTrendChart = lazy(async () => {
-  const m = await import('../components/emotion/EmotionTrendChart')
-  return { default: m.EmotionTrendChart }
-})
+import { APP_SELF_INTRO_LONG_COPY } from '../constants/appSelfIntroCopy'
 
 export type AppPanelContentProps = {
   uiState: UiState
@@ -60,6 +44,7 @@ export type AppPanelContentProps = {
       dwellSeconds?: number
       textId?: string | null
       favorite?: boolean
+      toastMode?: 'normal' | 'intro'
     },
   ) => void | Promise<void>
   restartOnboarding: () => void
@@ -182,42 +167,29 @@ export function AppPanelContent({
             void saveSettings(defaultSettings).then(() => broadcastSettingsSync())
           }}
           onOpenFirstRunGuide={restartOnboarding}
+          onReplayAppIntro={() => {
+            void showToastMessage(APP_SELF_INTRO_LONG_COPY, {
+              dwellSeconds: 0,
+              toastMode: 'intro',
+            })
+          }}
         />
       </div>
     </div>
   ) : uiState.activePanel === 'emotion' ? (
-    <div className={panelShellClass}>
+    <div className={`${panelShellClass} [&_.sk-panel-chrome-title]:mb-2`}>
       <h2 className="sk-panel-chrome-title shrink-0">{panelTitle}</h2>
-      <div className="flex min-h-0 flex-1 flex-col gap-3">
-        <EmotionQuickFeedback
-          onSelect={async (label) => {
-            const kind = emotionCnLabelToKind(label)
-            if (!kind) return
-            const next = await appendEmotion({
-              id: `emotion-${Date.now()}`,
-              emotion: kind,
-              createdAt: new Date().toISOString(),
-            })
-            setEmotionRecords(next.emotion.records)
-            void requestCompanionText(undefined, kind)
-          }}
+      <div className="flex min-h-0 flex-1 flex-col">
+        <DailyMoodPanel
+          emotionMoodTab={uiState.emotionMoodTab}
+          onEmotionMoodTabChange={(tab) =>
+            dispatch({ type: 'SET_EMOTION_MOOD_TAB', tab })
+          }
+          settings={settings}
+          emotionRecords={emotionRecords}
+          setEmotionRecords={setEmotionRecords}
+          requestCompanionText={requestCompanionText}
         />
-        <div className="min-h-0 flex-1">
-          <Suspense
-            fallback={
-              <section
-                className="mt-4 flex min-h-[14rem] flex-col rounded-xl border border-slate-200 p-3"
-                aria-busy="true"
-                aria-label="加载情绪趋势"
-              >
-                <div className="mb-3 h-4 w-24 animate-pulse rounded bg-slate-100" />
-                <div className="min-h-0 flex-1 animate-pulse rounded-lg bg-slate-50" />
-              </section>
-            }
-          >
-            <EmotionTrendChart records={emotionRecords} />
-          </Suspense>
-        </div>
       </div>
     </div>
   ) : uiState.activePanel === 'fortune' ? (

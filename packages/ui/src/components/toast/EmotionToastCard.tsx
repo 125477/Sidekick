@@ -8,6 +8,23 @@ import {
   EmotionToastLockedPassthroughSlop,
 } from './EmotionToastLockedChrome'
 import { EmotionToastUnlockedToolbar } from './EmotionToastUnlockedToolbar'
+import { EmotionToastIntroActions } from './EmotionToastIntroActions'
+import { ToastLightFeedbackRow } from './ToastLightFeedbackRow'
+
+function EmotionToastSwitchingRow() {
+  return (
+    <div className="flex h-7 min-h-7 w-full items-center justify-center gap-2 px-0.5 py-0.5">
+      <div
+        className="h-4 w-4 shrink-0 rounded-full border-2 border-violet-400 border-t-transparent will-change-transform motion-safe:animate-spin motion-reduce:animate-pulse motion-reduce:border-t-violet-400"
+        aria-hidden
+      />
+      <span className="whitespace-nowrap text-[13px] font-medium leading-none text-slate-500">
+        切换中…
+      </span>
+      <span className="sr-only">正在换一句</span>
+    </div>
+  )
+}
 
 const TOAST_POP_KEYFRAMES = `
   @keyframes toast-pop-up {
@@ -42,24 +59,54 @@ export function EmotionToastCard({
   onPointerEnteredToastChrome,
   toastToolbarInlineMenu,
   motionEnabled = true,
+  showLightFeedback = false,
+  toastMode = 'normal',
+  onIntroDismiss,
   chrome,
 }: EmotionToastCardProps) {
-  const messageCell = (
+  const introMode = toastMode === 'intro'
+  const messageCell = chrome.regenerating ? (
+    <EmotionToastSwitchingRow />
+  ) : (
     <EmotionToastMessageCell
       message={message}
       messageClickable={chrome.messageClickable}
-      regenerating={chrome.regenerating}
+      regenerating={false}
       toastPassthroughLocked={chrome.toastPassthroughLocked}
+      multiline={introMode}
       {...(maxChars !== undefined ? { maxChars } : {})}
       onRegenerateClick={chrome.runRegenerate}
     />
   )
+  const introActions =
+    introMode && onIntroDismiss ? (
+      <EmotionToastIntroActions
+        disabled={chrome.regenerating}
+        onConfirm={() => onIntroDismiss()}
+      />
+    ) : null
 
   const plainMessageChrome: ReactNode = (
-    <div className="w-fit max-w-full self-start rounded-lg bg-slate-50/55 transition-colors duration-200 ease-out motion-reduce:transition-none">
-      <div className="flex w-full min-w-0 max-w-full flex-row items-center gap-0">
-        {messageCell}
-      </div>
+    <div
+      className={`group/toastbar-plain rounded-lg bg-slate-50/55 transition-colors duration-200 ease-out motion-reduce:transition-none ${
+        chrome.regenerating ? 'w-full' : 'w-fit max-w-full self-start'
+      }`}
+    >
+      <div className="flex w-full min-w-0 flex-col">{messageCell}</div>
+      {showLightFeedback && !chrome.regenerating ? (
+        <div
+          className={`grid min-h-0 overflow-hidden transition-[grid-template-rows,opacity] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+            motionEnabled ? 'duration-200' : 'duration-0'
+          } grid-rows-[0fr] opacity-0 pointer-events-none group-hover/toastbar-plain:pointer-events-auto group-hover/toastbar-plain:grid-rows-[1fr] group-hover/toastbar-plain:opacity-100 group-focus-within/toastbar-plain:pointer-events-auto group-focus-within/toastbar-plain:grid-rows-[1fr] group-focus-within/toastbar-plain:opacity-100`}
+        >
+          <div className="min-h-0 overflow-hidden">
+            <ToastLightFeedbackRow
+              message={message}
+              disabled={chrome.regenerating}
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 
@@ -82,7 +129,7 @@ export function EmotionToastCard({
         } ${
           detached
             ? 'border-slate-200 bg-white shadow-[0_12px_40px_-12px_rgba(15,23,42,0.25)]'
-            : 'border-slate-200/90 bg-white/95 shadow-[0_12px_42px_-14px_rgba(15,23,42,0.22)] backdrop-blur-md'
+            : 'border-slate-200 bg-white shadow-[0_8px_28px_-10px_rgba(15,23,42,0.18)]'
         } ${chrome.motionClass}`}
       >
         <EmotionToastTail pointsDown={chrome.tailPointsDown} />
@@ -100,6 +147,8 @@ export function EmotionToastCard({
                   regenerating={chrome.regenerating}
                   lockedBarOpen={chrome.lockedBarOpen}
                   messageCell={messageCell}
+                  showLightFeedback={showLightFeedback}
+                  lightFeedbackMessage={message}
                   lockedMessageChromeRef={chrome.lockedMessageChromeRef}
                   lockedToolbarRef={chrome.lockedToolbarRef}
                   toastUnlockHitRef={chrome.toastUnlockHitRef}
@@ -137,6 +186,10 @@ export function EmotionToastCard({
                   showSettings={chrome.showSettings}
                   showSpriteMenu={chrome.showSpriteMenu}
                   messageCell={messageCell}
+                  introActions={introActions}
+                  introMode={introMode}
+                  showLightFeedback={showLightFeedback && !introMode}
+                  lightFeedbackMessage={message}
                   {...(onCopy ? { onCopy } : {})}
                   {...(onReplayTts ? { onReplayTts } : {})}
                   {...(onToggleFavorite ? { onToggleFavorite } : {})}
@@ -171,23 +224,6 @@ export function EmotionToastCard({
           setLockedMsgHot={chrome.setLockedMsgHot}
         />
 
-        {chrome.regenerating ? (
-          <div
-            className="pointer-events-auto absolute inset-0 z-30 isolate flex items-center justify-center rounded-2xl bg-white/75"
-            aria-live="polite"
-          >
-            <div className="flex flex-row items-center gap-2">
-              <div
-                className="h-6 w-6 shrink-0 rounded-full border-2 border-violet-400 border-t-transparent will-change-transform motion-safe:animate-spin motion-reduce:animate-pulse motion-reduce:border-t-violet-400"
-                aria-hidden
-              />
-              <span className="text-[11px] font-medium text-slate-500">
-                切换中…
-              </span>
-            </div>
-            <span className="sr-only">正在换一句</span>
-          </div>
-        ) : null}
       </div>
     </div>
   )

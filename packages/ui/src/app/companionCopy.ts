@@ -4,6 +4,7 @@ import {
   type DashScopeTextRequest,
   type EmotionKind,
 } from '@sidekick/core'
+import { getCompanionLightFeedbackHints } from './companionLightFeedbackStorage'
 import type { SidekickSettings } from '../state/settingsState'
 
 export async function fetchCompanionCopy(
@@ -41,6 +42,9 @@ export async function fetchCompanionCopy(
     ...(settings.companionInterests?.length
       ? { companionInterests: settings.companionInterests }
       : {}),
+    ...(getCompanionLightFeedbackHints().length
+      ? { companionLightFeedbackHints: getCompanionLightFeedbackHints() }
+      : {}),
     ...(dashscopeIpc
       ? {
           invokeDashScope: (req: DashScopeTextRequest) => dashscopeIpc(req),
@@ -51,6 +55,14 @@ export async function fetchCompanionCopy(
 }
 
 export function canPushNow(settings: SidekickSettings): boolean {
+  const focusUntil = settings.focusSessionUntilEpochMs
+  if (
+    typeof focusUntil === 'number' &&
+    Number.isFinite(focusUntil) &&
+    Date.now() < focusUntil
+  ) {
+    return false
+  }
   const now = new Date()
   if (
     isWithinQuietHours(now, {

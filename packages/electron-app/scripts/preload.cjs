@@ -1,8 +1,14 @@
 const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('sidekickDesktop', {
-  openPanelWindow(panel) {
+  openPanelWindow(panel, opts) {
+    if (opts && typeof opts === 'object' && opts.emotionTab) {
+      return ipcRenderer.invoke('sidekick:open-panel', { panel, emotionTab: opts.emotionTab })
+    }
     return ipcRenderer.invoke('sidekick:open-panel', panel)
+  },
+  showSystemNotification(payload) {
+    return ipcRenderer.invoke('sidekick:show-system-notification', payload)
   },
   openOnboardingWindow() {
     return ipcRenderer.invoke('sidekick:open-onboarding')
@@ -70,17 +76,87 @@ contextBridge.exposeInMainWorld('sidekickDesktop', {
   moveWidgetBy(payload) {
     return ipcRenderer.invoke('sidekick:move-widget-by', payload)
   },
+  beginDragTrail(payload) {
+    return ipcRenderer.invoke('sidekick:begin-drag-trail', payload ?? {})
+  },
+  pushDragTrailPoint(payload) {
+    ipcRenderer.send('sidekick:drag-trail-point', payload)
+  },
+  endDragTrail() {
+    ipcRenderer.send('sidekick:end-drag-trail')
+  },
+  onDragTrailPoint(callback) {
+    const channel = 'sidekick:drag-trail-point'
+    const listener = (_event, payload) => {
+      if (!payload || typeof payload !== 'object') return
+      const x = Number(payload.x)
+      const y = Number(payload.y)
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return
+      callback({ x, y })
+    }
+    ipcRenderer.on(channel, listener)
+    return () => ipcRenderer.removeListener(channel, listener)
+  },
+  onDragTrailPoints(callback) {
+    const channel = 'sidekick:drag-trail-points'
+    const listener = (_event, batch) => {
+      if (!Array.isArray(batch) || batch.length === 0) return
+      const points = []
+      for (const raw of batch) {
+        if (!raw || typeof raw !== 'object') continue
+        const x = Number(raw.x)
+        const y = Number(raw.y)
+        if (Number.isFinite(x) && Number.isFinite(y)) points.push({ x, y })
+      }
+      if (points.length > 0) callback(points)
+    }
+    ipcRenderer.on(channel, listener)
+    return () => ipcRenderer.removeListener(channel, listener)
+  },
+  onDragTrailShift(callback) {
+    const channel = 'sidekick:drag-trail-shift'
+    const listener = (_event, payload) => {
+      if (!payload || typeof payload !== 'object') return
+      const dx = Number(payload.dx)
+      const dy = Number(payload.dy)
+      if (!Number.isFinite(dx) || !Number.isFinite(dy)) return
+      callback({ dx, dy })
+    }
+    ipcRenderer.on(channel, listener)
+    return () => ipcRenderer.removeListener(channel, listener)
+  },
+  onDragTrailReset(callback) {
+    const channel = 'sidekick:drag-trail-reset'
+    const listener = () => callback()
+    ipcRenderer.on(channel, listener)
+    return () => ipcRenderer.removeListener(channel, listener)
+  },
+  onDragTrailResetSampler(callback) {
+    const channel = 'sidekick:drag-trail-reset-sampler'
+    const listener = () => callback()
+    ipcRenderer.on(channel, listener)
+    return () => ipcRenderer.removeListener(channel, listener)
+  },
+  onDragTrailSync(callback) {
+    const channel = 'sidekick:drag-trail-sync'
+    const listener = (_event, payload) => {
+      if (!payload || typeof payload !== 'object') return
+      callback(payload)
+    }
+    ipcRenderer.on(channel, listener)
+    return () => ipcRenderer.removeListener(channel, listener)
+  },
   resizePanelWindow(payload) {
     return ipcRenderer.invoke('sidekick:resize-panel', payload)
   },
   setSpriteAnchor(anchor) {
-    return ipcRenderer.invoke('sidekick:set-sprite-anchor', anchor)
-  },
-  onWidgetMoved(callback) {
-    const channel = 'sidekick:widget-moved'
-    const listener = () => callback()
-    ipcRenderer.on(channel, listener)
-    return () => ipcRenderer.removeListener(channel, listener)
+    if (!anchor || typeof anchor !== 'object') return Promise.resolve()
+    const { _sync, ...rest } = anchor
+    if (_sync === true) {
+      return ipcRenderer.invoke('sidekick:set-sprite-anchor', rest)
+    }
+    ipcRenderer.send('sidekick:set-sprite-anchor-push', rest)
+    return Promise.resolve()
   },
   getWorkArea() {
     return ipcRenderer.invoke('sidekick:get-work-area')
@@ -122,6 +198,12 @@ contextBridge.exposeInMainWorld('sidekickDesktop', {
   },
   onWidgetSpriteMenuClosed(callback) {
     const channel = 'sidekick:widget-sprite-menu-closed'
+    const listener = () => callback()
+    ipcRenderer.on(channel, listener)
+    return () => ipcRenderer.removeListener(channel, listener)
+  },
+  onSystemResume(callback) {
+    const channel = 'sidekick:system-resume'
     const listener = () => callback()
     ipcRenderer.on(channel, listener)
     return () => ipcRenderer.removeListener(channel, listener)

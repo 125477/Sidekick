@@ -20,6 +20,7 @@ async function sendSpriteAnchor(
     ...(typeof pct === 'number' && Number.isFinite(pct) && pct > 0
       ? { avatarSizePercent: pct }
       : {}),
+    ...(opts?.flush ? { _sync: true as const } : {}),
   })
 }
 

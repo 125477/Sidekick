@@ -19,6 +19,112 @@
     box-shadow: var(--sk-frame-shadow);
   }
 
+  /* 自定义面板背景：底图保持清晰；UI 仅用半透明色，不用 backdrop-filter（会糊化底图） */
+  .sk-panel-outer:has([data-sk-panel-bg='on']) {
+    background: transparent;
+  }
+
+  .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-panel-inner {
+    background: transparent;
+    border-color: rgb(255 255 255 / 0.35);
+    box-shadow: none;
+  }
+
+  .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-settings-nav {
+    background: rgb(255 255 255 / 0.42);
+  }
+
+  .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-settings-nav-btn-active {
+    background: rgb(255 255 255 / 0.72);
+  }
+
+  .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-settings-content {
+    background: transparent;
+    border-color: rgb(255 255 255 / 0.35);
+  }
+
+  .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-settings-page-heading {
+    border-bottom-color: rgb(255 255 255 / 0.4);
+  }
+
+  .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-settings-card {
+    background: rgb(255 255 255 / 0.52);
+    border-color: rgb(255 255 255 / 0.55);
+  }
+
+  .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-callout {
+    background: rgb(255 255 255 / 0.5);
+  }
+
+  .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-segmented {
+    background: rgb(255 255 255 / 0.4);
+  }
+
+  .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-segmented-btn-active {
+    background: rgb(255 255 255 / 0.78);
+  }
+
+  .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-chip {
+    background: rgb(255 255 255 / 0.38);
+  }
+
+  .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-chip-active {
+    background: rgb(255 255 255 / 0.62);
+  }
+
+  .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-input,
+  .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-select,
+  .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-textarea {
+    background: rgb(255 255 255 / 0.62);
+  }
+
+  .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-time-field-muted {
+    background: rgb(255 255 255 / 0.48);
+  }
+
+  /* 换肤/情绪等面板内 Tailwind 白底块 */
+  .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-panel-inner :is(.bg-white, .bg-slate-50) {
+    background-color: rgb(255 255 255 / 0.5) !important;
+  }
+
+  .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-panel-bg-preview-opaque {
+    background-color: rgb(248 250 252 / 0.88) !important;
+  }
+
+  .sk-panel-bg-media {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+
+  html[data-theme='dark'] .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-panel-inner {
+    background: transparent;
+    border-color: rgb(63 63 70 / 0.45);
+  }
+
+  html[data-theme='dark'] .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-settings-nav {
+    background: rgb(24 24 27 / 0.55);
+  }
+
+  html[data-theme='dark'] .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-settings-nav-btn-active {
+    background: rgb(39 39 42 / 0.78);
+  }
+
+  html[data-theme='dark'] .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-settings-card {
+    background: rgb(39 39 42 / 0.58);
+    border-color: rgb(63 63 70 / 0.5);
+  }
+
+  html[data-theme='dark'] .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-callout {
+    background: rgb(39 39 42 / 0.55);
+  }
+
+  html[data-theme='dark']
+    .sk-panel-outer:has([data-sk-panel-bg='on'])
+    .sk-panel-inner
+    :is(.bg-white, .bg-slate-50) {
+    background-color: rgb(39 39 42 / 0.55) !important;
+  }
+
   .sk-panel-chrome-title {
     margin-bottom: 0.75rem;
     flex-shrink: 0;
@@ -346,6 +452,36 @@
 
   .sk-btn-primary:hover {
     background: var(--sk-btn-primary-hover);
+  }
+
+  .sk-btn-primary:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  .sk-btn-ghost {
+    border-radius: var(--sk-radius-md);
+    border: 1px solid var(--sk-input-border);
+    background: transparent;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--sk-text-body);
+    cursor: pointer;
+    transition:
+      background-color 0.2s ease,
+      border-color 0.2s ease,
+      color 0.2s ease;
+  }
+
+  .sk-btn-ghost:hover:not(:disabled) {
+    background: var(--sk-nav-btn-hover-bg);
+    border-color: var(--sk-content-border);
+  }
+
+  .sk-btn-ghost:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
   }
 
   .sk-divider {

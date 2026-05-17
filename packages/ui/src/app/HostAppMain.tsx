@@ -140,6 +140,7 @@ export function HostAppMain({
                   message={uiState.toastMessage}
                   maxChars={settings.textMaxChars}
                   onRegenerate={() => requestCompanionText('换一句')}
+                  showLightFeedback
                   onClose={hideEmotionToast}
                   linkedTextId={toastMeta?.id ?? null}
                   favorite={toastMeta?.favorite ?? false}

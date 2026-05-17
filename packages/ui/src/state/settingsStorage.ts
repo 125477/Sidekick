@@ -34,6 +34,44 @@ export async function loadSettings(): Promise<SidekickSettings> {
   if (typeof merged.allowEmoji !== 'boolean') {
     merged.allowEmoji = defaultSettings.allowEmoji
   }
+  if (typeof merged.dailyMoodEnabled !== 'boolean') {
+    merged.dailyMoodEnabled = defaultSettings.dailyMoodEnabled
+  }
+  if (typeof merged.dailyMoodReminderEnabled !== 'boolean') {
+    merged.dailyMoodReminderEnabled = defaultSettings.dailyMoodReminderEnabled
+  }
+  if (typeof merged.dailyMoodReminderTime !== 'string' || !merged.dailyMoodReminderTime) {
+    merged.dailyMoodReminderTime = defaultSettings.dailyMoodReminderTime
+  }
+  if (
+    merged.focusSessionUntilEpochMs != null &&
+    typeof merged.focusSessionUntilEpochMs !== 'number'
+  ) {
+    merged.focusSessionUntilEpochMs = null
+  }
+  const preset = Number(merged.focusPresetMinutes)
+  merged.focusPresetMinutes =
+    Number.isFinite(preset) && preset >= 5 && preset <= 180
+      ? Math.floor(preset)
+      : defaultSettings.focusPresetMinutes
+  if (typeof merged.panelBackgroundEnabled !== 'boolean') {
+    merged.panelBackgroundEnabled = defaultSettings.panelBackgroundEnabled
+  }
+  const overlay = Number(merged.panelBackgroundOverlayOpacity)
+  merged.panelBackgroundOverlayOpacity =
+    Number.isFinite(overlay) && overlay >= 0.3 && overlay <= 0.7
+      ? overlay
+      : defaultSettings.panelBackgroundOverlayOpacity
+  const blur = Number(merged.panelBackgroundBlurPx)
+  merged.panelBackgroundBlurPx =
+    Number.isFinite(blur) && blur >= 0 && blur <= 12
+      ? Math.floor(blur)
+      : defaultSettings.panelBackgroundBlurPx
+  const imgOp = Number(merged.panelBackgroundImageOpacity)
+  merged.panelBackgroundImageOpacity =
+    Number.isFinite(imgOp) && imgOp >= 0.2 && imgOp <= 1
+      ? imgOp
+      : defaultSettings.panelBackgroundImageOpacity
   return merged
 }
 

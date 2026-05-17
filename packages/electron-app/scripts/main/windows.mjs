@@ -22,6 +22,7 @@ import { closeWidgetSpriteMenuWindow } from './spriteMenu.mjs'
 import { stopToastPassthroughHitTest } from './toastPassthrough.mjs'
 import { computeToastPlacement } from './toastPlacement.mjs'
 import { awaitWebContentsNavigationSettled } from './navigationWait.mjs'
+import { destroyDragTrailWindow, warmDragTrailWindow } from './dragTrail.mjs'
 import {
   persistWidgetBounds,
   resolveInitialWidgetBounds,
@@ -77,12 +78,13 @@ export function createSpriteWindow() {
     }
   })
 
+  window.webContents.once('did-finish-load', () => {
+    void warmDragTrailWindow()
+  })
+
   window.on('move', () => {
     closeWidgetSpriteMenuWindow({ notify: true })
     schedulePersistWidgetBounds(window)
-    if (!window.isDestroyed()) {
-      window.webContents.send('sidekick:widget-moved')
-    }
     if (state.toastWindow && !state.toastWindow.isDestroyed()) {
       applyToastWindowBounds()
     }
@@ -104,9 +106,6 @@ export function createSpriteWindow() {
     if (state.toastWindow && !state.toastWindow.isDestroyed()) {
       applyToastWindowBounds()
     }
-    if (!window.isDestroyed()) {
-      window.webContents.send('sidekick:widget-moved')
-    }
   })
 
   window.on('close', () => {
@@ -118,6 +117,7 @@ export function createSpriteWindow() {
   })
 
   window.on('closed', () => {
+    destroyDragTrailWindow()
     closeWidgetSpriteMenuWindow({ notify: false })
     try {
       if (!window.isDestroyed()) {
@@ -140,9 +140,13 @@ export function createSpriteWindow() {
   tryLoadSprite()
 }
 
-export function openPanelWindow(panel) {
+export function openPanelWindow(panel, opts = {}) {
+  const params = { panel }
+  if (opts.emotionTab === 'summary' || opts.emotionTab === 'moment') {
+    params.emotionTab = opts.emotionTab
+  }
   if (state.panelWindow && !state.panelWindow.isDestroyed()) {
-    void state.panelWindow.loadURL(buildRoute(state.baseUrl, 'panel', { panel }))
+    void state.panelWindow.loadURL(buildRoute(state.baseUrl, 'panel', params))
     state.panelWindow.show()
     state.panelWindow.focus()
     return
@@ -167,7 +171,7 @@ export function openPanelWindow(panel) {
     state.panelWindow.show()
     state.panelWindow.focus()
   })
-  void state.panelWindow.loadURL(buildRoute(state.baseUrl, 'panel', { panel })).catch((err) => {
+  void state.panelWindow.loadURL(buildRoute(state.baseUrl, 'panel', params)).catch((err) => {
     console.error('[sidekick] panel loadURL failed', err)
     if (state.panelWindow && !state.panelWindow.isDestroyed()) {
       state.panelWindow.show()
@@ -228,6 +232,7 @@ export async function showToastWindow(payload) {
       : undefined
   const favorite =
     typeof payload?.favorite === 'boolean' ? payload.favorite : undefined
+  const toastIntro = payload?.toastIntro === true
   state.lastPreferredToastAnchor = payload?.anchor === 'bottom' ? 'bottom' : 'top'
   const dwellSeconds = Number(payload?.dwellSeconds ?? 180)
   state.lastToastSession = null
@@ -280,6 +285,7 @@ export async function showToastWindow(payload) {
       message,
       ...(textId ? { textId } : {}),
       ...(typeof favorite === 'boolean' ? { favorite: favorite ? '1' : '0' } : {}),
+      ...(toastIntro ? { toastIntro: '1' } : {}),
       anchor: effectiveAnchor,
       placement: effectiveAnchor === 'top' ? 'above' : 'below',
       tailDown: effectiveAnchor === 'top' ? '1' : '0',

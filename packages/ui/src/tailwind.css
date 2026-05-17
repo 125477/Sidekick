@@ -10,11 +10,33 @@ body,
   -webkit-user-select: none;
 }
 
+/**
+ * 根节点 user-select:none 在 Electron 透明窗里会让子元素丢失默认手型，统一补回。
+ */
+button:not(:disabled),
+[role="button"]:not(:disabled):not([aria-disabled="true"]),
+[role="tab"]:not(:disabled),
+label.sk-switch:not(.pointer-events-none),
+a[href],
+select:not(:disabled),
+input[type="range"]:not(:disabled),
+summary {
+  cursor: pointer;
+}
+
+button:disabled,
+[role="button"]:disabled,
+[role="button"][aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
 /** Frameless Electron views (widget / detached toast): kill stray scrollbars from 100vw/100vh vs inner size. */
 html.sidekick-widget-root,
 html.sidekick-toast-root,
+html.sidekick-drag-trail-root,
 body.sidekick-widget-root,
-body.sidekick-toast-root {
+body.sidekick-toast-root,
+body.sidekick-drag-trail-root {
   margin: 0;
   height: 100%;
   width: 100%;
@@ -22,7 +44,8 @@ body.sidekick-toast-root {
 }
 
 body.sidekick-widget-root #root,
-body.sidekick-toast-root #root {
+body.sidekick-toast-root #root,
+body.sidekick-drag-trail-root #root {
   height: 100%;
   width: 100%;
   overflow: hidden;

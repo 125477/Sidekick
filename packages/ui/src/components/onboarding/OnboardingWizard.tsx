@@ -25,7 +25,9 @@ const INTEREST_PRESETS = COMPANION_INTEREST_TAG_OPTIONS
 
 export type OnboardingWizardProps = {
   presets: AvatarPreset[]
-  initialAvatarId: string
+  /** 与桌面精灵、换肤面板共用；变更时会持久化并跨窗口广播（Electron 独立引导窗）。 */
+  selectedAvatarId: string
+  onSelectedAvatarIdChange: (avatarId: string) => void
   initialTextStyle: CompanionCopyStyle
   initialInterests: string[]
   onComplete: (payload: {
@@ -37,13 +39,13 @@ export type OnboardingWizardProps = {
 
 export function OnboardingWizard({
   presets,
-  initialAvatarId,
+  selectedAvatarId,
+  onSelectedAvatarIdChange,
   initialTextStyle,
   initialInterests,
   onComplete,
 }: OnboardingWizardProps) {
   const [step, setStep] = useState<OnboardingStep>('avatar')
-  const [selectedAvatarId, setSelectedAvatarId] = useState(initialAvatarId)
   const [textStyle, setTextStyle] = useState<CompanionCopyStyle>(initialTextStyle)
   const [tags, setTags] = useState<Set<string>>(() => new Set(initialInterests))
   const [interestNote, setInterestNote] = useState('')
@@ -103,8 +105,9 @@ export function OnboardingWizard({
     try {
       const defaultAvatarId =
         presets[0]?.id ??
-        presets.find((p) => p.id === initialAvatarId)?.id ??
-        initialAvatarId
+        presets.find((p) => p.id === selectedAvatarId)?.id ??
+        selectedAvatarId
+      onSelectedAvatarIdChange(defaultAvatarId)
       await onComplete({
         selectedAvatarId: defaultAvatarId,
         textStyle: defaultSettings.textStyle,
@@ -123,7 +126,7 @@ export function OnboardingWizard({
             <button
               key={s.id}
               type="button"
-              className={`mb-1 w-full rounded-lg px-2 py-1.5 text-left text-xs sm:px-3 sm:py-2 sm:text-sm ${
+              className={`mb-1 w-full cursor-pointer rounded-lg px-2 py-1.5 text-left text-xs sm:px-3 sm:py-2 sm:text-sm ${
                 step === s.id ? 'bg-white shadow-sm' : 'text-slate-600'
               }`}
               onClick={() => setStep(s.id)}
@@ -147,7 +150,7 @@ export function OnboardingWizard({
               sectionTitle="默认形象"
               presets={presets.filter((p) => p.source === 'builtin')}
               selectedAvatarId={selectedAvatarId}
-              onSelect={setSelectedAvatarId}
+              onSelect={onSelectedAvatarIdChange}
             />
             <AvatarPresetGallery
               sectionTitle="自定义形象"
@@ -155,7 +158,7 @@ export function OnboardingWizard({
                 (p) => p.source === 'upload' || p.source === 'generated',
               )}
               selectedAvatarId={selectedAvatarId}
-              onSelect={setSelectedAvatarId}
+              onSelect={onSelectedAvatarIdChange}
               emptyHint="暂无自定义形象；在换肤中上传后会显示在此处。"
               orderedSlotDisplayNames
             />

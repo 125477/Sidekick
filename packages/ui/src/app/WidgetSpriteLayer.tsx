@@ -1,4 +1,9 @@
-import type { RefObject, Dispatch, SetStateAction, MutableRefObject } from 'react'
+import type {
+  RefObject,
+  Dispatch,
+  SetStateAction,
+  MutableRefObject,
+} from 'react'
 import type {
   AvatarPreset,
   CompanionCopyStyle,
@@ -8,6 +13,11 @@ import { OnboardingWizard } from '../components/onboarding/OnboardingWizard'
 import { SpriteMenu, type MenuAction } from '../components/menu/SpriteMenu'
 import { SpriteShell } from '../components/sprite/SpriteShell'
 import { EmotionToast } from '../components/toast/EmotionToast'
+import {
+  beginDesktopDragTrail,
+  endDesktopDragTrail,
+  pushDesktopDragTrailPoint,
+} from '../utils/desktopDragTrail'
 import { speakCompanionLine } from '../utils/companionTts'
 import type { SidekickSettings } from '../state/settingsState'
 import type { UiAction, UiState, SpriteState } from '../state/uiState'
@@ -20,6 +30,7 @@ export type WidgetSpriteLayerProps = {
   onboardingDone: boolean | null
   avatars: AvatarPreset[]
   selectedAvatarId: string
+  onSelectedAvatarIdChange: (id: string) => void
   textStyle: CompanionCopyStyle
   companionInterests: string[]
   completeOnboarding: (payload: {
@@ -66,6 +77,7 @@ export function WidgetSpriteLayer({
   onboardingDone,
   avatars,
   selectedAvatarId,
+  onSelectedAvatarIdChange,
   textStyle,
   companionInterests,
   completeOnboarding,
@@ -99,6 +111,8 @@ export function WidgetSpriteLayer({
   settingsRef,
   spriteMenuUsesBrowserPopup,
 }: WidgetSpriteLayerProps) {
+  const dragStarTrailEnabled = isWidgetMode && settings.motionEnabled
+
   return (
     <div
       ref={widgetMeasureRef}
@@ -114,7 +128,8 @@ export function WidgetSpriteLayer({
         <div className="max-w-[min(96vw,580px)] [-webkit-app-region:no-drag]">
           <OnboardingWizard
             presets={avatars}
-            initialAvatarId={selectedAvatarId}
+            selectedAvatarId={selectedAvatarId}
+            onSelectedAvatarIdChange={onSelectedAvatarIdChange}
             initialTextStyle={textStyle}
             initialInterests={companionInterests}
             onComplete={completeOnboarding}
@@ -135,6 +150,18 @@ export function WidgetSpriteLayer({
                 avatarSize={spriteAvatarSize}
                 avatarOpacity={settings.avatarOpacity}
                 interactionLocked={spriteInteractionLocked}
+                onDragTrailStart={
+                  dragStarTrailEnabled
+                    ? (screenX, screenY) =>
+                        beginDesktopDragTrail(screenX, screenY)
+                    : undefined
+                }
+                onDragTrailPoint={
+                  dragStarTrailEnabled ? pushDesktopDragTrailPoint : undefined
+                }
+                onDragTrailEnd={
+                  dragStarTrailEnabled ? endDesktopDragTrail : undefined
+                }
                 onToggleMenu={() => {
                   if (
                     menuOpen &&
@@ -186,6 +213,7 @@ export function WidgetSpriteLayer({
                 message={uiState.toastMessage}
                 maxChars={settings.textMaxChars}
                 onRegenerate={() => requestCompanionText('换一句')}
+                showLightFeedback
                 onClose={hideEmotionToast}
                 linkedTextId={toastMeta?.id ?? null}
                 favorite={toastMeta?.favorite ?? false}

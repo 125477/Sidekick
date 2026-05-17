@@ -9,13 +9,16 @@ export const EMOTION_TREND_SCORE: Record<EmotionKind, number> = {
   low: 1,
 }
 
-function startOfWeekMonday(d: Date): Date {
-  const c = new Date(d)
-  const day = c.getDay()
-  const diff = day === 0 ? -6 : 1 - day
-  c.setDate(c.getDate() + diff)
-  c.setHours(0, 0, 0, 0)
-  return c
+function startOfDay(d: Date): Date {
+  const x = new Date(d)
+  x.setHours(0, 0, 0, 0)
+  return x
+}
+
+function addDays(d: Date, n: number): Date {
+  const x = new Date(d)
+  x.setDate(x.getDate() + n)
+  return x
 }
 
 function sameLocalDay(a: Date, b: Date): boolean {
@@ -26,116 +29,95 @@ function sameLocalDay(a: Date, b: Date): boolean {
   )
 }
 
-function addDays(d: Date, n: number): Date {
-  const x = new Date(d)
-  x.setDate(x.getDate() + n)
-  return x
+function averageScore(records: EmotionRecord[]): number {
+  const sum = records.reduce((s, r) => s + EMOTION_TREND_SCORE[r.emotion], 0)
+  return sum / records.length
 }
 
-const WEEKDAY_LABELS = ['一', '二', '三', '四', '五', '六', '日'] as const
-
-/**
- * 本周一至周日：每天当日记录的平均分，无记录则为 null（图表可断开）。
- */
-export function aggregateEmotionWeek(
-  records: EmotionRecord[],
-  now = new Date(),
-): { labels: string[]; values: Array<number | null> } {
-  const monday = startOfWeekMonday(now)
-  const labels = [...WEEKDAY_LABELS]
-  const values: Array<number | null> = []
-
-  for (let i = 0; i < 7; i++) {
-    const day = addDays(monday, i)
-    const dayRecords = records.filter((r) =>
-      sameLocalDay(new Date(r.createdAt), day),
-    )
-    if (dayRecords.length === 0) {
-      values.push(null)
-      continue
-    }
-    const sum = dayRecords.reduce(
-      (s, r) => s + EMOTION_TREND_SCORE[r.emotion],
-      0,
-    )
-    values.push(sum / dayRecords.length)
-  }
-
-  return { labels, values }
-}
-
-function startOfDay(d: Date): Date {
-  const x = new Date(d)
-  x.setHours(0, 0, 0, 0)
-  return x
+function formatShortDate(d: Date): string {
+  return `${d.getMonth() + 1}/${d.getDate()}`
 }
 
 /**
- * 本地「今天」0–23 时：每小时内反馈条目的均分，无记录为 null。
+ * 「日」：最近 7 个自然日（含今天），每天一条均分，无记录为 null。
  */
 export function aggregateEmotionDay(
   records: EmotionRecord[],
   now = new Date(),
 ): { labels: string[]; values: Array<number | null> } {
-  const dayStart = startOfDay(now)
+  const today = startOfDay(now)
   const labels: string[] = []
   const values: Array<number | null> = []
 
-  for (let h = 0; h < 24; h++) {
-    labels.push(`${h}时`)
-    const hourStart = new Date(dayStart)
-    hourStart.setHours(h, 0, 0, 0)
-    const hourEnd = new Date(dayStart)
-    hourEnd.setHours(h, 59, 59, 999)
-
-    const hourRecords = records.filter((r) => {
-      const t = new Date(r.createdAt)
-      return sameLocalDay(t, dayStart) && t >= hourStart && t <= hourEnd
-    })
-    if (hourRecords.length === 0) {
-      values.push(null)
-      continue
-    }
-    const sum = hourRecords.reduce(
-      (s, r) => s + EMOTION_TREND_SCORE[r.emotion],
-      0,
+  for (let i = 6; i >= 0; i--) {
+    const day = addDays(today, -i)
+    labels.push(formatShortDate(day))
+    const dayRecords = records.filter((r) =>
+      sameLocalDay(new Date(r.createdAt), day),
     )
-    values.push(sum / hourRecords.length)
+    values.push(dayRecords.length === 0 ? null : averageScore(dayRecords))
+  }
+
+  return { labels, values }
+}
+
+function monthWeekRanges(year: number, month: number): Array<[number, number]> {
+  const last = new Date(year, month + 1, 0).getDate()
+  return [
+    [1, Math.min(7, last)],
+    [8, Math.min(14, last)],
+    [15, Math.min(21, last)],
+    [22, last],
+  ]
+}
+
+/**
+ * 「周」：当前自然月内按 4 段周汇总（约每 7 天一段）。
+ */
+export function aggregateEmotionWeek(
+  records: EmotionRecord[],
+  now = new Date(),
+): { labels: string[]; values: Array<number | null> } {
+  const year = now.getFullYear()
+  const month = now.getMonth()
+  const labels = ['第1周', '第2周', '第3周', '第4周']
+  const values: Array<number | null> = []
+
+  for (const [startDay, endDay] of monthWeekRanges(year, month)) {
+    const periodStart = new Date(year, month, startDay, 0, 0, 0, 0)
+    const periodEnd = new Date(year, month, endDay, 23, 59, 59, 999)
+    const inPeriod = records.filter((r) => {
+      const t = new Date(r.createdAt).getTime()
+      return t >= periodStart.getTime() && t <= periodEnd.getTime()
+    })
+    values.push(inPeriod.length === 0 ? null : averageScore(inPeriod))
   }
 
   return { labels, values }
 }
 
 /**
- * 从今天往回共 4 段、每段 7 天：左→右为「更早 → 更近」，右端为最近一周。
+ * 「月」：最近 12 个自然月（含本月），每月均分，无记录为 null。
  */
 export function aggregateEmotionMonth(
   records: EmotionRecord[],
   now = new Date(),
 ): { labels: string[]; values: Array<number | null> } {
-  const labels = ['第4周', '第3周', '第2周', '第1周']
+  const labels: string[] = []
   const values: Array<number | null> = []
-  const today = startOfDay(now)
 
-  for (let w = 3; w >= 0; w--) {
-    const periodEnd = addDays(new Date(today), -(w * 7))
-    periodEnd.setHours(23, 59, 59, 999)
-    const periodStart = addDays(new Date(today), -(w * 7 + 6))
-    periodStart.setHours(0, 0, 0, 0)
-
+  for (let offset = 11; offset >= 0; offset--) {
+    const monthAnchor = new Date(now.getFullYear(), now.getMonth() - offset, 1)
+    const y = monthAnchor.getFullYear()
+    const m = monthAnchor.getMonth()
+    labels.push(`${m + 1}月`)
+    const periodStart = new Date(y, m, 1, 0, 0, 0, 0)
+    const periodEnd = new Date(y, m + 1, 0, 23, 59, 59, 999)
     const inPeriod = records.filter((r) => {
       const t = new Date(r.createdAt).getTime()
       return t >= periodStart.getTime() && t <= periodEnd.getTime()
     })
-    if (inPeriod.length === 0) {
-      values.push(null)
-      continue
-    }
-    const sum = inPeriod.reduce(
-      (s, r) => s + EMOTION_TREND_SCORE[r.emotion],
-      0,
-    )
-    values.push(sum / inPeriod.length)
+    values.push(inPeriod.length === 0 ? null : averageScore(inPeriod))
   }
 
   return { labels, values }

@@ -22,5 +22,5 @@ coverage/
 Thumbs.db
 .idea/
 .vscode/
-.cursor/
+# .cursor/
 

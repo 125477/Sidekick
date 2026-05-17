@@ -1,11 +1,12 @@
 import type { MutableRefObject, Dispatch, SetStateAction } from 'react'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { appendText } from '@sidekick/core'
 import { fetchCompanionCopy, canPushNow } from './companionCopy'
 import type { SidekickSettings } from '../state/settingsState'
 import type { SpriteState, UiAction } from '../state/uiState'
 import { reportSpriteAnchorToMain } from '../utils/reportSpriteAnchor'
 import { speakCompanionLine } from '../utils/companionTts'
+import { subscribeAppSelfIntroDismissed } from '../state/appSelfIntroSync'
 
 export type UseScheduledCompanionPushArgs = {
   settings: SidekickSettings
@@ -22,6 +23,7 @@ export type UseScheduledCompanionPushArgs = {
   companionBootstrapDoneRef: MutableRefObject<boolean>
   recentCompanionLinesRef: MutableRefObject<string[]>
   advanceAvatarAfterPushCopy: () => void
+  blockScheduledPushRef: MutableRefObject<boolean>
 }
 
 /** 定时陪伴推送：interval + 推送开关变更时重置会话计数。 */
@@ -40,7 +42,22 @@ export function useScheduledCompanionPush({
   companionBootstrapDoneRef,
   recentCompanionLinesRef,
   advanceAvatarAfterPushCopy,
+  blockScheduledPushRef,
 }: UseScheduledCompanionPushArgs) {
+  const bootstrapPendingRef = useRef(false)
+  const showPushTextRef = useRef<() => void>(() => {})
+
+  useEffect(() => {
+    if (!isWidgetMode) return
+    return subscribeAppSelfIntroDismissed(() => {
+      if (!bootstrapPendingRef.current) return
+      bootstrapPendingRef.current = false
+      if (companionBootstrapDoneRef.current) return
+      companionBootstrapDoneRef.current = true
+      showPushTextRef.current()
+    })
+  }, [isWidgetMode, companionBootstrapDoneRef])
+
   useEffect(() => {
     if (!settings.pushEnabled) {
       pushCopyToastSuccessCountRef.current = 0
@@ -56,6 +73,7 @@ export function useScheduledCompanionPush({
     const showPushText = () => {
       void (async () => {
         const s = settingsRef.current
+        if (blockScheduledPushRef.current) return
         if (!s.pushEnabled || !canPushNow(s)) return
         const avoidPush = recentCompanionLinesRef.current
         const result = await fetchCompanionCopy(
@@ -117,14 +135,20 @@ export function useScheduledCompanionPush({
       })()
     }
 
+    showPushTextRef.current = showPushText
+
     const raw = Number(settings.pushIntervalMinutes)
     const intervalMinutes =
       Number.isFinite(raw) && raw >= 1 && raw <= 60 ? Math.floor(raw) : 10
     const intervalMs = intervalMinutes * 60_000
 
     if (!companionBootstrapDoneRef.current) {
-      companionBootstrapDoneRef.current = true
-      showPushText()
+      if (blockScheduledPushRef.current) {
+        bootstrapPendingRef.current = true
+      } else {
+        companionBootstrapDoneRef.current = true
+        showPushText()
+      }
     }
 
     const intervalId = window.setInterval(showPushText, intervalMs)
@@ -141,6 +165,7 @@ export function useScheduledCompanionPush({
     settings.quietHoursEnabled,
     settings.quietStart,
     settings.quietEnd,
+    settings.focusSessionUntilEpochMs,
     dispatch,
     isWidgetMode,
     onboardingDone,
@@ -152,5 +177,6 @@ export function useScheduledCompanionPush({
     pushCopyToastSuccessCountRef,
     companionBootstrapDoneRef,
     recentCompanionLinesRef,
+    blockScheduledPushRef,
   ])
 }

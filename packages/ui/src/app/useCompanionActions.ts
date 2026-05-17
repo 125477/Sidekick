@@ -16,6 +16,8 @@ import type { SidekickSettings } from '../state/settingsState'
 import type { SpriteState, UiAction, UiState } from '../state/uiState'
 import { speakCompanionLine } from '../utils/companionTts'
 import { reportSpriteAnchorToMain } from '../utils/reportSpriteAnchor'
+import { SIDEKICK_MORE_FEATURES_PLACEHOLDER } from '../constants/toastCopy'
+import { openEmotionPanel } from './openEmotionPanel'
 import { fetchCompanionCopy } from './companionCopy'
 
 export type UseCompanionActionsArgs = {
@@ -77,6 +79,7 @@ export function useCompanionActions({
       dwellSeconds?: number
       textId?: string | null
       favorite?: boolean
+      toastMode?: 'normal' | 'intro'
     },
   ) => {
     if (moreRestoreToastTimerRef.current != null) {
@@ -99,6 +102,7 @@ export function useCompanionActions({
         message,
         anchor: uiState.toastAnchor,
         dwellSeconds,
+        ...(opts?.toastMode === 'intro' ? { toastIntro: true } : {}),
         ...(opts?.textId
           ? {
               textId: opts.textId,
@@ -115,6 +119,7 @@ export function useCompanionActions({
         message,
         anchor: toastDetachAnchor,
         dwellSeconds,
+        ...(opts?.toastMode === 'intro' ? { toastIntro: true } : {}),
         ...(opts?.textId
           ? {
               textId: opts.textId,
@@ -133,7 +138,11 @@ export function useCompanionActions({
     } else {
       setToastMeta(null)
     }
-    dispatch({ type: 'SHOW_TOAST', message })
+    dispatch({
+      type: 'SHOW_TOAST',
+      message,
+      ...(opts?.toastMode ? { toastMode: opts.toastMode } : {}),
+    })
     lastShownToastMessageRef.current = message
   }
 
@@ -177,14 +186,7 @@ export function useCompanionActions({
       }
     }
     if (action === 'emotion') {
-      if (
-        (isWidgetMode || isToastMode) &&
-        window.sidekickDesktop?.openPanelWindow
-      ) {
-        void window.sidekickDesktop.openPanelWindow('emotion')
-      } else {
-        dispatch({ type: 'SET_PANEL', panel: 'emotion' })
-      }
+      openEmotionPanel(dispatch)
     }
     if (action === 'fortune') {
       if (
@@ -201,7 +203,7 @@ export function useCompanionActions({
       }
     }
     if (action === 'more') {
-      const moreCopy = '更多功能将在 V1.1 解锁。'
+      const moreCopy = SIDEKICK_MORE_FEATURES_PLACEHOLDER
       const fromRef = lastShownToastMessageRef.current.trim()
       const fromUi =
         toastVisible &&

@@ -29,6 +29,8 @@ export type GenerateCompanionCopyInput = {
   chatCompletionsUrl?: string
   /** 设置中的兴趣标签；非空时写入通义千问（DashScope）请求的 system 提示，见 `buildCompanionSystemPrompt`。 */
   companionInterests?: string[]
+  /** 轻反馈经模型归纳后的提示行，见 `buildCompanionSystemPrompt`。 */
+  companionLightFeedbackHints?: string[]
 }
 
 function trimToMaxChars(text: string, maxChars: number): string {
@@ -55,6 +57,9 @@ export async function generateCompanionCopy(
     ...(input.avoidRecentOutputs?.length ? { recentOutputsGuard: true } : {}),
     ...(input.companionInterests?.length
       ? { companionInterests: input.companionInterests }
+      : {}),
+    ...(input.companionLightFeedbackHints?.length
+      ? { companionLightFeedbackHints: input.companionLightFeedbackHints }
       : {}),
   })
   const userPrompt = buildCompanionUserPrompt(

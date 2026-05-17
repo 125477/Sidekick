@@ -42,6 +42,18 @@ export function resolveInitialBaseUrl() {
  *   lastAvatarSizePercent: number
  *   lastSpriteInteractionLocked: boolean
  *   widgetBoundsSaveTimer: ReturnType<typeof setTimeout> | null
+ *   dragTrailWindow: import('electron').BrowserWindow | null
+ *   dragTrailOrigin: null | { x: number; y: number }
+ *   dragTrailLoaded: boolean
+ *   dragTrailDragging: boolean
+ *   dragTrailHideTimer: ReturnType<typeof setTimeout> | null
+ *   dragTrailPendingPoints: Array<{ x: number; y: number }>
+ *   dragTrailFlushScheduled: boolean
+ *   dragTrailRepositionLocked: boolean
+ *   dragTrailFlushTimer: ReturnType<typeof setTimeout> | null
+ *   dragTrailStarWidth: number
+ *   dragTrailStarHeight: number
+ *   dragTrailLastRepositionMs: number
  * }}
  */
 export const state = {
@@ -67,6 +79,18 @@ export const state = {
   lastAvatarSizePercent: 80,
   lastSpriteInteractionLocked: false,
   widgetBoundsSaveTimer: null,
+  dragTrailWindow: null,
+  dragTrailOrigin: null,
+  dragTrailLoaded: false,
+  dragTrailDragging: false,
+  dragTrailHideTimer: null,
+  dragTrailPendingPoints: [],
+  dragTrailFlushScheduled: false,
+  dragTrailRepositionLocked: false,
+  dragTrailFlushTimer: null,
+  dragTrailStarWidth: 144,
+  dragTrailStarHeight: 144,
+  dragTrailLastRepositionMs: 0,
 }
 
 state.baseUrl = resolveInitialBaseUrl()

@@ -11,6 +11,11 @@ type SpriteShellProps = {
   avatarSize: number
   /** 为 true 时禁止拖动精灵热区、禁止点击形象与菜单。 */
   interactionLocked?: boolean
+  /** 首次越过拖动阈值时调用（开启 overlay 拖尾，屏幕坐标）。 */
+  onDragTrailStart?: (screenX: number, screenY: number) => void
+  /** 拖动中上报屏幕坐标。 */
+  onDragTrailPoint?: (screenX: number, screenY: number) => void
+  onDragTrailEnd?: () => void
   onToggleMenu: () => void
   onStateChange: (state: SpriteState) => void
 }
@@ -25,6 +30,9 @@ export function SpriteShell({
   avatarOpacity,
   avatarSize,
   interactionLocked = false,
+  onDragTrailStart,
+  onDragTrailPoint,
+  onDragTrailEnd,
   onToggleMenu,
   onStateChange,
 }: SpriteShellProps) {
@@ -66,12 +74,14 @@ export function SpriteShell({
       if (!st.passedThreshold) {
         if (Math.hypot(dx0, dy0) < POINTER_DRAG_THRESHOLD_PX) return
         st.passedThreshold = true
+        onDragTrailStart?.(e.screenX, e.screenY)
       }
+      onDragTrailPoint?.(e.screenX, e.screenY)
       const api = window.sidekickDesktop?.moveWidgetBy
       if (!api) return
       void api({ dx: e.movementX, dy: e.movementY })
     },
-    [interactionLocked],
+    [interactionLocked, onDragTrailStart, onDragTrailPoint],
   )
 
   const finishSpritePointer = useCallback(
@@ -86,7 +96,10 @@ export function SpriteShell({
       const wasTap = st != null && !st.passedThreshold
       const dragged = st != null && st.passedThreshold
       resetDrag()
-      if (dragged) suppressNextClickRef.current = true
+      if (dragged) {
+        suppressNextClickRef.current = true
+        onDragTrailEnd?.()
+      }
       if (fireMenuIfTap && wasTap) {
         suppressNextClickRef.current = true
         onStateChange('tap')
@@ -94,7 +107,7 @@ export function SpriteShell({
         window.setTimeout(() => onStateChange('idle'), 200)
       }
     },
-    [interactionLocked, onStateChange, onToggleMenu],
+    [interactionLocked, onDragTrailEnd, onStateChange, onToggleMenu],
   )
 
   const onSpriteClick = useCallback(
@@ -141,7 +154,7 @@ export function SpriteShell({
           onMouseLeave={() => {
             if (!interactionLocked) onStateChange('idle')
           }}
-          className={`relative h-full w-full overflow-hidden outline-none motion-reduce:transition-none focus:outline-none focus-visible:outline-none [-webkit-app-region:no-drag] disabled:cursor-default ${
+          className={`relative h-full w-full cursor-pointer overflow-hidden outline-none motion-reduce:transition-none focus:outline-none focus-visible:outline-none [-webkit-app-region:no-drag] disabled:cursor-default ${
             interactionLocked ? 'pointer-events-none' : ''
           }`}
           style={{ animation }}

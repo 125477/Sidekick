@@ -16,12 +16,20 @@ export function applyToastWindowBounds() {
   if (!placement) return
   const { x, y, effectiveAnchor } = placement
 
-  state.toastWindow.setBounds({
-    x,
-    y,
-    width: TOAST_WINDOW_WIDTH,
-    height: toastH,
-  })
+  const xi = Math.round(x)
+  const yi = Math.round(y)
+  const w = TOAST_WINDOW_WIDTH
+  const cur = state.toastWindow.getBounds()
+  if (cur.width === w && cur.height === toastH && (cur.x !== xi || cur.y !== yi)) {
+    state.toastWindow.setPosition(xi, yi)
+  } else {
+    state.toastWindow.setBounds({
+      x: xi,
+      y: yi,
+      width: w,
+      height: toastH,
+    })
+  }
 
   const session = state.lastToastSession
   if (!session) return

@@ -5,7 +5,10 @@ type EmotionQuickFeedbackProps = {
   onSelect: (emotion: string) => void | Promise<void>
 }
 
-const EMOTIONS = ['开心', '平静', '焦虑', '低落', '疲惫']
+import {
+  EMOTION_CHIP_LABELS,
+  emotionChipButtonClass,
+} from './emotionChips'
 
 export function EmotionQuickFeedback({ onSelect }: EmotionQuickFeedbackProps) {
   const [selected, setSelected] = useState<string | null>(null)
@@ -51,9 +54,9 @@ export function EmotionQuickFeedback({ onSelect }: EmotionQuickFeedbackProps) {
 
   return (
     <section className="relative rounded-xl">
-      <h3 className="mb-3 text-sm font-medium">现在的情绪是？</h3>
-      <div className="flex flex-wrap gap-2">
-        {EMOTIONS.map((emotion) => {
+      <h3 className="mb-1 text-sm font-medium leading-snug">现在的情绪是？</h3>
+      <div className="flex flex-wrap gap-1.5">
+        {EMOTION_CHIP_LABELS.map((emotion) => {
           const active = selected === emotion
           return (
             <button
@@ -61,22 +64,15 @@ export function EmotionQuickFeedback({ onSelect }: EmotionQuickFeedbackProps) {
               type="button"
               disabled={busy}
               onClick={() => void handleClick(emotion)}
-              className={`rounded-full border px-3 py-1 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 disabled:cursor-not-allowed disabled:opacity-60 ${
-                active
-                  ? 'border-violet-600 bg-violet-600 text-white shadow-sm'
-                  : 'border-violet-200 text-violet-700 hover:bg-violet-50'
-              }`}
+              className={emotionChipButtonClass(active)}
             >
               {emotion}
             </button>
           )
         })}
       </div>
-      {/**
-       * 固定槽高度：避免 busy 时清掉 hint、再用 absolute 遮罩导致整块高度变化，下方「情绪趋势」上下闪动。
-       */}
       <div
-        className="mt-3 flex min-h-[3.25rem] items-start"
+        className={`mt-1 flex items-start ${busy ? 'min-h-5' : ''}`}
         aria-live="polite"
         aria-busy={busy}
       >

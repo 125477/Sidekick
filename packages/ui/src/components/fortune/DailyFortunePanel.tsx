@@ -174,7 +174,7 @@ export function DailyFortunePanel({ fillAvailable = false }: DailyFortunePanelPr
               type="button"
               disabled={shaking}
               onClick={redrawDraw}
-              className="rounded-xl border border-violet-200 bg-white px-5 py-2 text-sm font-medium text-violet-800 shadow-sm transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="cursor-pointer rounded-xl border border-violet-200 bg-white px-5 py-2 text-sm font-medium text-violet-800 shadow-sm transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               重新抽签
             </button>
@@ -187,7 +187,7 @@ export function DailyFortunePanel({ fillAvailable = false }: DailyFortunePanelPr
             <button
               type="button"
               onClick={startDraw}
-              className="rounded-xl bg-violet-600 px-6 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-violet-700"
+              className="cursor-pointer rounded-xl bg-violet-600 px-6 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-violet-700"
             >
               求签
             </button>

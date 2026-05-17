@@ -1,6 +1,9 @@
 # Sidekick 架构说明
 
-本文给**人类**阅读：多包职责、UI 入口形态、Electron 主进程与后续拆分方向。Agent 侧规则仍以 `.cursor/rules/` 为准。
+多包职责、UI 各 **`mode`** 形态、Electron 主进程模块与数据流。**人与 AI 均适用**。
+
+- **换环境 / 新会话**：先读 [AGENTS.md](../AGENTS.md)，再读本文。  
+- **IPC 明细**：[IPC.md](./IPC.md) · **决策与实现差异**：[DECISIONS.md](./DECISIONS.md) · **文档索引**：[README.md](./README.md)
 
 ## 单仓结构（pnpm workspace）
 
@@ -26,6 +29,7 @@ packages/
 | `panel` | 独立设置类面板窗 |
 | `onboarding` | 首次引导窗 |
 | `sprite-menu` | 无独立菜单进程时，用弹窗模拟菜单页 |
+| `drag-trail` | 拖动星星拖尾专用透明 overlay 小窗（仅 Electron） |
 
 **`App.tsx`** 承担：全局状态、设置/形象/推送、与 `window.sidekickDesktop` 的桥接、按 `mode` 分发到 `HostAppMain` / `WidgetSpriteLayer` / `DetachedToastShell` 等。体量已从单文件巨石拆为薄入口 + hooks：
 
@@ -68,6 +72,7 @@ packages/
   - **`spriteMenu.mjs`**：独立精灵菜单小窗
   - **`windows.mjs`**：各 `BrowserWindow` 的创建与 `loadURL`
   - **`ipcHandlers.mjs`**：`ipcMain` 注册（含 DashScope 代理等）
+  - **`dragTrail.mjs`**：拖动星星 overlay 小窗生命周期与打点转发（见 [adr/001](./adr/001-drag-star-trail-overlay.md)）
   - **`geometry.mjs`** / **`route.mjs`**：纯函数（夹取、相交、路由 query 拼装）
 
 - **打包图标**：`packages/electron-app/resources/icon.png`（**须至少 512×512 像素**），`build.icon` 与 **`dmg.icon`** 均指向该文件；electron-builder 会生成 **`.app` 内图标**与 **挂载 DMG 时的卷标图标**。
@@ -87,5 +92,11 @@ packages/
 
 ## 相关文档
 
-- **命令、包边界与编码约定**：`.cursor/rules/sidekick-project.mdc`
-- **Figma 1:1 等 UI 硬规则**：`.cursor/rules/figma-strict-restore.mdc`
+| 文档 | 说明 |
+|------|------|
+| [AGENTS.md](../AGENTS.md) | Agent / 新人入口、功能地图、约定 |
+| [IPC.md](./IPC.md) | `sidekickDesktop` 与 channel 一览 |
+| [FEATURE_PLAN_V1.1.md](./FEATURE_PLAN_V1.1.md) | V1.1 产品与技术方案 |
+| [DECISIONS.md](./DECISIONS.md) | ADR 索引（含与 FEATURE_PLAN 的差异） |
+| [CHANGELOG.md](../CHANGELOG.md) | 实现变更摘要 |
+| `.cursor/rules/*.mdc` | Cursor 可选规则（若未 gitignore） |

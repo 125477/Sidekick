@@ -9,6 +9,8 @@ export type AppUrlState = {
   toastBubblePlacement: ReturnType<typeof parseBubblePlacementFromQuery>
   toastTextIdFromQuery: string | null
   toastFavoriteFromUrl: boolean
+  toastIntroFromQuery: boolean
+  emotionTabFromQuery: 'moment' | 'summary' | null
 }
 
 export function readAppSearchParams(): AppUrlState {
@@ -22,6 +24,8 @@ export function readAppSearchParams(): AppUrlState {
       toastBubblePlacement: parseBubblePlacementFromQuery(''),
       toastTextIdFromQuery: null,
       toastFavoriteFromUrl: false,
+      toastIntroFromQuery: false,
+      emotionTabFromQuery: null,
     }
   }
   const search = window.location.search
@@ -40,5 +44,12 @@ export function readAppSearchParams(): AppUrlState {
       ? sp.get('textId')?.trim() || null
       : null,
     toastFavoriteFromUrl: isToastMode ? sp.get('favorite') === '1' : false,
+    toastIntroFromQuery: isToastMode ? sp.get('toastIntro') === '1' : false,
+    emotionTabFromQuery:
+      sp.get('emotionTab') === 'summary'
+        ? 'summary'
+        : sp.get('emotionTab') === 'moment'
+          ? 'moment'
+          : null,
   }
 }

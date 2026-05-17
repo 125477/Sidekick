@@ -170,9 +170,13 @@ pnpm pack:desktop
 
 | 文档 | 内容 |
 |------|------|
-| [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | 单仓划分、`mode` 路由、主进程模块、气泡与设置数据流。 |
-| `.cursor/rules/sidekick-project.mdc` | 包边界、常用命令、TS/ESLint 约定（若 `.gitignore` 未忽略 `.cursor` 则纳入版本控制）。 |
-| `.cursor/rules/figma-strict-restore.mdc` | 涉及 Figma 级 UI 还原时的硬性流程（若有设计稿对齐需求）。 |
+| [AGENTS.md](./AGENTS.md) | **换电脑 / 换 AI 时先读**：必读顺序、开发命令、功能地图。 |
+| [docs/README.md](./docs/README.md) | 文档索引。 |
+| [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | 单仓划分、`mode` 路由、主进程模块、数据流。 |
+| [docs/IPC.md](./docs/IPC.md) | `window.sidekickDesktop` 与 IPC channel。 |
+| [docs/DECISIONS.md](./docs/DECISIONS.md) | 架构决策（ADR）与 FEATURE_PLAN 差异说明。 |
+| [CHANGELOG.md](./CHANGELOG.md) | 实现变更日志。 |
+| `.cursor/rules/sidekick-project.mdc` | 包边界、常用命令（若仓库内存在）。 |
 
 ---
 
