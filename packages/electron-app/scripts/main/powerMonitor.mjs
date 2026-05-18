@@ -1,11 +1,15 @@
 import { powerMonitor } from 'electron'
+import { evaluateMoodReminderFromMain } from './moodReminderState.mjs'
 import { state } from './state.mjs'
 
 export function registerPowerMonitorResume() {
   const notify = () => {
-    const win = state.spriteWindow
-    if (!win || win.isDestroyed()) return
-    win.webContents.send('sidekick:system-resume')
+    void evaluateMoodReminderFromMain()
+    for (const win of [state.spriteWindow, state.panelWindow]) {
+      if (!win || win.isDestroyed()) continue
+      win.webContents.send('sidekick:system-resume')
+      win.webContents.send('sidekick:mood-reminder-tick')
+    }
   }
   powerMonitor.on('resume', notify)
   powerMonitor.on('unlock-screen', notify)

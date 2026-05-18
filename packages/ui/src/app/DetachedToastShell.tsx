@@ -1,11 +1,15 @@
-import type { RefObject } from 'react'
+import { useEffect, useRef, type RefObject } from 'react'
 import { EmotionToast } from '../components/toast/EmotionToast'
 import { SpriteMenu, type MenuAction } from '../components/menu/SpriteMenu'
-import { speakCompanionLine } from '../utils/companionTts'
+import {
+  replayCompanionSpeech,
+  speakCompanionLine,
+} from '../utils/companionTts'
 import { toggleTextFavorite } from '@sidekick/core'
 import type { SidekickSettings } from '../state/settingsState'
 import { saveAppSelfIntroShown } from '../state/appSelfIntroStorage'
 import { broadcastAppSelfIntroDismissed } from '../state/appSelfIntroSync'
+import { TOAST_CARD_MAX_CLASS_DETACHED } from '../components/toast/toastCardMetrics'
 import { zLayers } from '../state/uiState'
 
 type DetachedToastShellProps = {
@@ -19,7 +23,7 @@ type DetachedToastShellProps = {
   toastTextIdFromQuery: string | null
   toastDetachFavorite: boolean
   setToastDetachFavorite: (v: boolean) => void
-  openFavoritesRecords: () => void
+  openEmotionFromToast: () => void
   openSettingsFromToast: () => void
   openSkinFromToast: () => void
   openSpriteMenuFromToastToolbar: () => void
@@ -44,7 +48,7 @@ export function DetachedToastShell({
   toastTextIdFromQuery,
   toastDetachFavorite,
   setToastDetachFavorite,
-  openFavoritesRecords,
+  openEmotionFromToast,
   openSettingsFromToast,
   openSkinFromToast,
   openSpriteMenuFromToastToolbar,
@@ -57,6 +61,28 @@ export function DetachedToastShell({
   holdToastToolbarForMenu,
 }: DetachedToastShellProps) {
   const introMode = toastIntroFromQuery
+  const lastAutoTtsRef = useRef('')
+
+  useEffect(() => {
+    if (introMode || !settings.companionTtsEnabled) return
+    const msg = toastMessageFromQuery.trim()
+    if (!msg || msg === lastAutoTtsRef.current) return
+    lastAutoTtsRef.current = msg
+    void speakCompanionLine(msg, {
+      enabled: true,
+      model: settings.companionTtsModel,
+      voice: settings.companionTtsVoice,
+      speechRate: settings.companionTtsSpeechRate,
+    })
+  }, [
+    introMode,
+    toastMessageFromQuery,
+    settings.companionTtsEnabled,
+    settings.companionTtsModel,
+    settings.companionTtsVoice,
+    settings.companionTtsSpeechRate,
+  ])
+
   const dismissIntro = () => {
     void saveAppSelfIntroShown()
     broadcastAppSelfIntroDismissed()
@@ -72,7 +98,7 @@ export function DetachedToastShell({
             toastDetachTailPointsDown ? 'pb-2 pt-1.5' : 'pb-1.5 pt-2'
           }`}
         >
-          <div className="relative w-full max-w-[min(355px,calc(100vw-32px))] shrink-0">
+          <div className={`relative w-max max-w-full shrink-0 ${TOAST_CARD_MAX_CLASS_DETACHED}`}>
             <EmotionToast
               anchor={toastDetachAnchor}
               bubblePlacement={toastDetachBubblePlacement}
@@ -83,7 +109,7 @@ export function DetachedToastShell({
               zIndexClass={zLayers.toast}
               dwellSeconds={0}
               message={toastMessageFromQuery}
-              maxChars={introMode ? undefined : settings.textMaxChars}
+              {...(introMode ? {} : { maxChars: settings.textMaxChars })}
               {...(introMode
                 ? { messageRegeneratesOnClick: false }
                 : {
@@ -91,6 +117,7 @@ export function DetachedToastShell({
                       void window.sidekickDesktop?.requestRegenerateCopy?.()
                     },
                     keepRegenerateLoadingUntilUnmount: true,
+                    messageRegeneratesOnClick: true,
                   })}
               linkedTextId={toastTextIdFromQuery}
               favorite={toastDetachFavorite}
@@ -113,14 +140,14 @@ export function DetachedToastShell({
                 navigator.clipboard.writeText(toastMessageFromQuery)
               }
               onReplayTts={() =>
-                void speakCompanionLine(toastMessageFromQuery, {
+                void replayCompanionSpeech(toastMessageFromQuery, {
                   enabled: settings.companionTtsEnabled,
                   model: settings.companionTtsModel,
                   voice: settings.companionTtsVoice,
                   speechRate: settings.companionTtsSpeechRate,
                 })
               }
-              onOpenFavorites={openFavoritesRecords}
+              onOpenEmotion={openEmotionFromToast}
               onOpenSettings={openSettingsFromToast}
               onOpenSkin={openSkinFromToast}
               onOpenMenu={openSpriteMenuFromToastToolbar}
@@ -128,7 +155,7 @@ export function DetachedToastShell({
               onSpriteInteractionLockedChange={onSpriteInteractionLockedChange}
               showLightFeedback={!introMode}
               toastMode={introMode ? 'intro' : 'normal'}
-              onIntroDismiss={introMode ? dismissIntro : undefined}
+              {...(introMode ? { onIntroDismiss: dismissIntro } : {})}
               onClose={() => {
                 if (introMode) {
                   dismissIntro()

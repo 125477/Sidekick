@@ -4,7 +4,7 @@ import { toggleTextFavorite } from '@sidekick/core'
 import { SpriteMenu, type MenuAction } from '../components/menu/SpriteMenu'
 import { SpriteShell } from '../components/sprite/SpriteShell'
 import { EmotionToast } from '../components/toast/EmotionToast'
-import { speakCompanionLine } from '../utils/companionTts'
+import { replayCompanionSpeech } from '../utils/companionTts'
 import type { SidekickSettings } from '../state/settingsState'
 import type { UiAction, UiState, SpriteState } from '../state/uiState'
 import { zLayers } from '../state/uiState'
@@ -33,7 +33,7 @@ export type HostAppMainProps = {
     SetStateAction<{ id: string; favorite: boolean } | null>
   >
   hideEmotionToast: () => void
-  openFavoritesRecords: () => void
+  openEmotionFromToast: () => void
   openSettingsFromToast: () => void
   openSkinFromToast: () => void
   openSpriteMenuFromToastToolbar: () => void
@@ -65,7 +65,7 @@ export function HostAppMain({
   toastMeta,
   setToastMeta,
   hideEmotionToast,
-  openFavoritesRecords,
+  openEmotionFromToast,
   openSettingsFromToast,
   openSkinFromToast,
   openSpriteMenuFromToastToolbar,
@@ -134,7 +134,7 @@ export function HostAppMain({
                   motionEnabled={settings.motionEnabled}
                   zIndexClass={zLayers.toast}
                   dwellSeconds={
-                    settings.toastAlwaysVisible ? 0 : settings.dwellSeconds
+                    settings.toastAlwaysVisible ? 0 : settings.dwellMinutes * 60
                   }
                   avatarSizePercent={settings.avatarSize}
                   message={uiState.toastMessage}
@@ -165,14 +165,14 @@ export function HostAppMain({
                     navigator.clipboard.writeText(uiState.toastMessage)
                   }
                   onReplayTts={() =>
-                    void speakCompanionLine(uiState.toastMessage, {
+                    void replayCompanionSpeech(uiState.toastMessage, {
                       enabled: settingsRef.current.companionTtsEnabled,
                       model: settingsRef.current.companionTtsModel,
                       voice: settingsRef.current.companionTtsVoice,
                       speechRate: settingsRef.current.companionTtsSpeechRate,
                     })
                   }
-                  onOpenFavorites={openFavoritesRecords}
+                  onOpenEmotion={openEmotionFromToast}
                   onOpenSettings={openSettingsFromToast}
                   onOpenSkin={openSkinFromToast}
                   onOpenMenu={openSpriteMenuFromToastToolbar}

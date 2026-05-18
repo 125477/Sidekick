@@ -13,6 +13,9 @@
     "dev:ui": "pnpm --filter ui dev",
     "build:ui": "pnpm --filter ui build",
     "pack:desktop": "pnpm build:ui && pnpm --filter @sidekick/electron-app run pack",
+    "pack:desktop:mac": "pnpm build:ui && pnpm --filter @sidekick/electron-app run pack:mac",
+    "pack:desktop:win": "pnpm build:ui && pnpm --filter @sidekick/electron-app run pack:win",
+    "pack:desktop:all": "pnpm build:ui && pnpm --filter @sidekick/electron-app run pack:all",
     "lint:ui": "pnpm --filter ui lint"
   },
   "devDependencies": {

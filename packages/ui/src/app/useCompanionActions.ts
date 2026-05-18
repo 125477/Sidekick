@@ -14,14 +14,23 @@ import { broadcastSettingsSync } from '../state/settingsSync'
 import { saveOnboardingComplete, saveSettings } from '../state/settingsStorage'
 import type { SidekickSettings } from '../state/settingsState'
 import type { SpriteState, UiAction, UiState } from '../state/uiState'
-import { speakCompanionLine } from '../utils/companionTts'
+import {
+  speakCompanionLine,
+  usesDetachedToastWindow,
+} from '../utils/companionTts'
 import { reportSpriteAnchorToMain } from '../utils/reportSpriteAnchor'
 import { SIDEKICK_MORE_FEATURES_PLACEHOLDER } from '../constants/toastCopy'
 import { openEmotionPanel } from './openEmotionPanel'
 import { fetchCompanionCopy } from './companionCopy'
+import { RECENT_COMPANION_LINES_MAX } from './recentCompanionLines'
+import {
+  shouldApplyCompanionCopyResult,
+  startCompanionCopyRequest,
+} from './companionCopySession'
 
 export type UseCompanionActionsArgs = {
   isWidgetMode: boolean
+  isPanelMode: boolean
   isToastMode: boolean
   isOnboardingMode: boolean
   toastVisible: boolean
@@ -50,6 +59,7 @@ export type UseCompanionActionsArgs = {
 
 export function useCompanionActions({
   isWidgetMode,
+  isPanelMode,
   isToastMode,
   isOnboardingMode,
   toastVisible,
@@ -91,7 +101,7 @@ export function useCompanionActions({
         ? opts.dwellSeconds
         : settingsRef.current.toastAlwaysVisible
           ? 0
-          : settingsRef.current.dwellSeconds
+          : settingsRef.current.dwellMinutes * 60
     if (isWidgetMode && window.sidekickDesktop?.showToastWindow) {
       setToastMeta(null)
       await reportSpriteAnchorToMain(widgetMeasureRef.current, {
@@ -118,6 +128,24 @@ export function useCompanionActions({
       await window.sidekickDesktop.showToastWindow({
         message,
         anchor: toastDetachAnchor,
+        dwellSeconds,
+        ...(opts?.toastMode === 'intro' ? { toastIntro: true } : {}),
+        ...(opts?.textId
+          ? {
+              textId: opts.textId,
+              favorite: opts.favorite ?? false,
+            }
+          : {}),
+      })
+      lastShownToastMessageRef.current = message
+      return
+    }
+    /** 独立设置/换肤等 Panel 窗：须走主进程独立气泡，本地 dispatch 用户看不见。 */
+    if (isPanelMode && window.sidekickDesktop?.showToastWindow) {
+      setToastMeta(null)
+      await window.sidekickDesktop.showToastWindow({
+        message,
+        anchor: settingsRef.current.toastAnchor,
         dwellSeconds,
         ...(opts?.toastMode === 'intro' ? { toastIntro: true } : {}),
         ...(opts?.textId
@@ -187,6 +215,16 @@ export function useCompanionActions({
     }
     if (action === 'emotion') {
       openEmotionPanel(dispatch)
+    }
+    if (action === 'favorites') {
+      if (
+        (isWidgetMode || isToastMode) &&
+        window.sidekickDesktop?.openPanelWindow
+      ) {
+        void window.sidekickDesktop.openPanelWindow('favorites')
+      } else {
+        dispatch({ type: 'SET_PANEL', panel: 'favorites' })
+      }
     }
     if (action === 'fortune') {
       if (
@@ -281,6 +319,7 @@ export function useCompanionActions({
   )
 
   async function requestCompanionText(keyword?: string, emotion?: EmotionKind) {
+    const fetchId = startCompanionCopyRequest()
     const avoid = recentCompanionLinesRef.current
     const result = await fetchCompanionCopy(
       settingsRef.current,
@@ -288,6 +327,7 @@ export function useCompanionActions({
       emotion,
       avoid.length > 0 ? avoid : undefined,
     )
+    if (!shouldApplyCompanionCopyResult(fetchId, result.source)) return
 
     const next = await appendText({
       id: `text-${Date.now()}`,
@@ -297,6 +337,7 @@ export function useCompanionActions({
       favorite: false,
     })
     const newId = next.texts.history[0]?.id
+    const detachedToast = isWidgetMode && usesDetachedToastWindow()
     await showToastMessage(
       result.text,
       newId ? { textId: newId, favorite: false } : undefined,
@@ -304,14 +345,16 @@ export function useCompanionActions({
     recentCompanionLinesRef.current = [
       ...recentCompanionLinesRef.current,
       result.text,
-    ].slice(-6)
-    const tts = settingsRef.current
-    void speakCompanionLine(result.text, {
-      enabled: tts.companionTtsEnabled,
-      model: tts.companionTtsModel,
-      voice: tts.companionTtsVoice,
-      speechRate: tts.companionTtsSpeechRate,
-    })
+    ].slice(-RECENT_COMPANION_LINES_MAX)
+    if (!detachedToast) {
+      const tts = settingsRef.current
+      void speakCompanionLine(result.text, {
+        enabled: tts.companionTtsEnabled,
+        model: tts.companionTtsModel,
+        voice: tts.companionTtsVoice,
+        speechRate: tts.companionTtsSpeechRate,
+      })
+    }
     setSpriteState('notify')
     window.setTimeout(() => setSpriteState('idle'), 520)
   }

@@ -98,7 +98,7 @@ export function PanelBackgroundPicker({
       <h3 className="sk-settings-card-title">面板背景</h3>
       <div className="sk-settings-card-body grid gap-3">
       <p className="sk-muted text-xs leading-relaxed">
-        设置、换肤、情绪、抽签、收藏等辅窗共用同一张图或短视频背景（精灵与气泡窗不受影响）。
+        设置、更换形象、情绪、抽签、收藏等辅窗共用同一张图或短视频背景（精灵与气泡窗不受影响）。
       </p>
       <div className={`sk-settings-row ${!media || busy ? 'opacity-50' : ''}`}>
         <span id="settings-panel-bg-enabled-lbl" className="sk-settings-row-label">

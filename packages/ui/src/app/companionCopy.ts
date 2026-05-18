@@ -6,7 +6,6 @@ import {
 } from '@sidekick/core'
 import { getCompanionLightFeedbackHints } from './companionLightFeedbackStorage'
 import type { SidekickSettings } from '../state/settingsState'
-
 export async function fetchCompanionCopy(
   settings: SidekickSettings,
   keyword?: string,
@@ -27,11 +26,16 @@ export async function fetchCompanionCopy(
     }
   }
 
+  const modelFallbackEnv = import.meta.env.VITE_DASHSCOPE_MODEL_FALLBACK as
+    | string
+    | undefined
+
   return generateCompanionCopy({
     apiKey: import.meta.env.VITE_DASHSCOPE_API_KEY as string | undefined,
     model:
       (import.meta.env.VITE_DASHSCOPE_MODEL as string | undefined) ??
       'qwen-turbo',
+    ...(modelFallbackEnv !== undefined ? { modelFallbackEnv } : {}),
     style: settings.textStyle,
     keyword,
     allowEmoji: settings.allowEmoji,
@@ -47,7 +51,11 @@ export async function fetchCompanionCopy(
       : {}),
     ...(dashscopeIpc
       ? {
-          invokeDashScope: (req: DashScopeTextRequest) => dashscopeIpc(req),
+          invokeDashScope: (req: DashScopeTextRequest) =>
+            dashscopeIpc({
+              ...req,
+              ...(modelFallbackEnv !== undefined ? { modelFallbackEnv } : {}),
+            }),
         }
       : {}),
     ...(chatCompletionsUrl !== undefined ? { chatCompletionsUrl } : {}),

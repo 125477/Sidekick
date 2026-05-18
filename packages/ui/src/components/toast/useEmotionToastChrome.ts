@@ -9,6 +9,7 @@ import {
 import { DEFAULT_PUSH_INTERVAL_MINUTES } from '../../state/settingsState'
 import { parseBubblePlacementFromQuery } from '../../utils/toastPlacementFromQuery'
 import type { EmotionToastProps } from './emotionToastTypes'
+import { resolveCompactMessageLayout } from './toastMessageLayout'
 
 export type EmotionToastChrome = {
   regenerating: boolean
@@ -19,6 +20,7 @@ export type EmotionToastChrome = {
   copyResetTimerRef: RefObject<number | null>
   toastUnlockHitRef: RefObject<HTMLDivElement | null>
   toastHitRootRef: RefObject<HTMLDivElement | null>
+  lockedChromeGroupRef: RefObject<HTMLDivElement | null>
   lockedMessageChromeRef: RefObject<HTMLDivElement | null>
   lockedToolbarRef: RefObject<HTMLDivElement | null>
   lockedPassthroughSlopRef: RefObject<HTMLDivElement | null>
@@ -31,7 +33,7 @@ export type EmotionToastChrome = {
   showCopy: boolean
   showFavorite: boolean
   showReplay: boolean
-  showFavoritesRecord: boolean
+  showEmotionFeedback: boolean
   showSettings: boolean
   showSkin: boolean
   showSpriteMenu: boolean
@@ -48,6 +50,7 @@ export type EmotionToastChrome = {
   positionClass: string
   toastOffsetStyle: CSSProperties | undefined
   motionClass: string
+  compactMessageLayout: boolean
   runRegenerate: () => Promise<void>
 }
 
@@ -66,7 +69,7 @@ export function useEmotionToastChrome({
   onCopy,
   messageRegeneratesOnClick = true,
   onReplayTts,
-  onOpenFavorites,
+  onOpenEmotion,
   onOpenSettings,
   onOpenSkin,
   onOpenMenu,
@@ -126,7 +129,7 @@ export function useEmotionToastChrome({
   const showFavorite =
     !introMode && Boolean(linkedTextId && onToggleFavorite)
   const showReplay = !introMode && Boolean(onReplayTts)
-  const showFavoritesRecord = !introMode && Boolean(onOpenFavorites)
+  const showEmotionFeedback = !introMode && Boolean(onOpenEmotion)
   const showSettings = !introMode && Boolean(onOpenSettings)
   const showSkin = !introMode && Boolean(onOpenSkin)
   const showSpriteMenu = !introMode && Boolean(onOpenMenu)
@@ -137,7 +140,7 @@ export function useEmotionToastChrome({
     showCopy ||
     showFavorite ||
     showReplay ||
-    showFavoritesRecord ||
+    showEmotionFeedback ||
     showSkin ||
     showSettings ||
     showSpriteMenu ||
@@ -158,6 +161,7 @@ export function useEmotionToastChrome({
   const [unlockedToolbarHot, setUnlockedToolbarHot] = useState(false)
   const [detachedEntranceConsumed, setDetachedEntranceConsumed] =
     useState(false)
+  const lockedChromeGroupRef = useRef<HTMLDivElement>(null)
   const lockedMessageChromeRef = useRef<HTMLDivElement>(null)
   const lockedToolbarRef = useRef<HTMLDivElement>(null)
   const lockedPassthroughSlopRef = useRef<HTMLDivElement>(null)
@@ -405,6 +409,10 @@ export function useEmotionToastChrome({
     }
   }
 
+  const compactMessageLayout = resolveCompactMessageLayout(message, {
+    introMode,
+  })
+
   return {
     regenerating,
     setRegenerating,
@@ -414,6 +422,7 @@ export function useEmotionToastChrome({
     copyResetTimerRef,
     toastUnlockHitRef,
     toastHitRootRef,
+    lockedChromeGroupRef,
     lockedMessageChromeRef,
     lockedToolbarRef,
     lockedPassthroughSlopRef,
@@ -426,7 +435,7 @@ export function useEmotionToastChrome({
     showCopy,
     showFavorite,
     showReplay,
-    showFavoritesRecord,
+    showEmotionFeedback,
     showSettings,
     showSkin,
     showSpriteMenu,
@@ -443,6 +452,7 @@ export function useEmotionToastChrome({
     positionClass,
     toastOffsetStyle,
     motionClass,
+    compactMessageLayout,
     runRegenerate,
   }
 }

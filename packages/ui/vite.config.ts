@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { dashscopeAudioProxyPlugin } from './scripts/viteDashscopeAudioProxy'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -12,7 +13,7 @@ export default defineConfig({
   publicDir: path.resolve(__dirname, 'src/static'),
   /** 与 Electron `file://` 打包加载一致（`extraResources` 下的静态 `index.html`）。 */
   base: './',
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), dashscopeAudioProxyPlugin()],
   server: {
     proxy: {
       /** Renderer → DashScope is blocked by CORS; dev server forwards same-origin `/dashscope/*`. */

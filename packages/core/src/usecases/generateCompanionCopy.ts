@@ -1,12 +1,19 @@
 import {
-  requestDashScopeText,
+  requestDashScopeTextWithFallback,
   type DashScopeTextRequest,
 } from '../clients/dashscopeTextClient'
 import type { EmotionKind } from '../schema/data'
 import {
   buildCompanionSystemPrompt,
-  buildCompanionUserPrompt,
+  buildCompanionUserPromptWithInterests,
+  buildDesktopClicheRetryUserSuffix,
+  buildMotivationalParallelRetryUserSuffix,
+  buildPoeticTemplateRetryUserSuffix,
   companionStyleForEmotion,
+  companionTextHasDesktopCliche,
+  companionTextHasMotivationalParallelTemplate,
+  companionTextHasPoeticTemplate,
+  parseCompanionInterestTags,
   type CompanionCopyStyle,
 } from '../prompts/textPrompt'
 import { getCompanionText, type CompanionTextResult } from './getCompanionText'
@@ -25,6 +32,8 @@ export type GenerateCompanionCopyInput = {
   avoidRecentOutputs?: string[]
   /** Electron main etc.: avoids renderer CORS blocking DashScope. */
   invokeDashScope?: (input: DashScopeTextRequest) => Promise<string>
+  /** 逗号分隔的额外 model 候选（如 VITE_DASHSCOPE_MODEL_FALLBACK）。 */
+  modelFallbackEnv?: string
   /** Browser dev: same-origin proxy path (see Vite config). */
   chatCompletionsUrl?: string
   /** 设置中的兴趣标签；非空时写入通义千问（DashScope）请求的 system 提示，见 `buildCompanionSystemPrompt`。 */
@@ -33,11 +42,28 @@ export type GenerateCompanionCopyInput = {
   companionLightFeedbackHints?: string[]
 }
 
+function stripEmojisFromText(text: string): string {
+  return text
+    .replace(/\p{Extended_Pictographic}/gu, '')
+    .replace(/\uFE0F/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 function trimToMaxChars(text: string, maxChars: number): string {
   const normalized = text.replace(/\s+/g, ' ').trim()
   return normalized.length <= maxChars
     ? normalized
     : `${normalized.slice(0, Math.max(1, maxChars - 1))}…`
+}
+
+function finalizeCompanionText(
+  text: string,
+  maxChars: number,
+  allowEmoji: boolean,
+): string {
+  const raw = allowEmoji ? text : stripEmojisFromText(text)
+  return trimToMaxChars(raw, maxChars)
 }
 
 export async function generateCompanionCopy(
@@ -53,6 +79,7 @@ export async function generateCompanionCopy(
     keyword: input.keyword,
     allowEmoji: input.allowEmoji,
     maxChars: input.maxChars,
+    now: new Date(),
     ...(input.emotion !== undefined ? { emotion: input.emotion } : {}),
     ...(input.avoidRecentOutputs?.length ? { recentOutputsGuard: true } : {}),
     ...(input.companionInterests?.length
@@ -62,12 +89,16 @@ export async function generateCompanionCopy(
       ? { companionLightFeedbackHints: input.companionLightFeedbackHints }
       : {}),
   })
-  const userPrompt = buildCompanionUserPrompt(
+  const { tags: interestTags } = parseCompanionInterestTags(
+    input.companionInterests,
+  )
+  const userPrompt = buildCompanionUserPromptWithInterests(
     input.keyword,
     input.emotion,
     input.avoidRecentOutputs && input.avoidRecentOutputs.length > 0
       ? { avoidRecentOutputs: input.avoidRecentOutputs }
       : undefined,
+    interestTags,
   )
 
   const recentCount = input.avoidRecentOutputs?.length ?? 0
@@ -75,12 +106,12 @@ export async function generateCompanionCopy(
   const effectiveTemperature =
     recentCount > 0 ? Math.min(1.05, baseTemperature + 0.12) : baseTemperature
 
-  const result = await getCompanionText(async () => {
+  const requestModelLine = async (userPromptLine: string): Promise<string> => {
     const req: DashScopeTextRequest = {
       apiKey: input.apiKey,
       model: input.model,
       systemPrompt,
-      userPrompt,
+      userPrompt: userPromptLine,
       temperature: effectiveTemperature,
       ...(input.chatCompletionsUrl !== undefined
         ? { chatCompletionsUrl: input.chatCompletionsUrl }
@@ -88,13 +119,47 @@ export async function generateCompanionCopy(
     }
     const raw = input.invokeDashScope
       ? await input.invokeDashScope(req)
-      : await requestDashScopeText(req)
-    return trimToMaxChars(raw, input.maxChars)
-  })
+      : (
+          await requestDashScopeTextWithFallback(
+            req,
+            input.modelFallbackEnv
+              ? { envFallbackList: input.modelFallbackEnv }
+              : {},
+          )
+        ).content
+    return finalizeCompanionText(raw, input.maxChars, input.allowEmoji)
+  }
+
+  const result = await getCompanionText(async () => {
+    let line = await requestModelLine(userPrompt)
+    if (companionTextHasPoeticTemplate(line)) {
+      line = await requestModelLine(
+        `${userPrompt}\n${buildPoeticTemplateRetryUserSuffix()}`,
+      )
+    }
+    if (companionTextHasDesktopCliche(line)) {
+      line = await requestModelLine(
+        `${userPrompt}\n${buildDesktopClicheRetryUserSuffix()}`,
+      )
+    }
+    if (companionTextHasMotivationalParallelTemplate(line)) {
+      line = await requestModelLine(
+        `${userPrompt}\n${buildMotivationalParallelRetryUserSuffix()}`,
+      )
+    }
+    if (
+      companionTextHasPoeticTemplate(line) ||
+      companionTextHasDesktopCliche(line) ||
+      companionTextHasMotivationalParallelTemplate(line)
+    ) {
+      throw new Error('companion copy still matches banned template')
+    }
+    return line
+  }, { maxChars: input.maxChars })
 
   return {
     ...result,
-    text: trimToMaxChars(result.text, input.maxChars),
+    text: finalizeCompanionText(result.text, input.maxChars, input.allowEmoji),
   }
 }
 

@@ -15,8 +15,8 @@ export type DragStarParticle = {
   color: DragStarColor
 }
 
-const MIN_SAMPLE_DIST_PX = 14
-const MAX_PARTICLES = 56
+const MIN_SAMPLE_DIST_PX = 3
+const MAX_PARTICLES = 50
 const LIFE_MS_MIN = 900
 const LIFE_MS_MAX = 1600
 const STAMP_SIZE = 20
@@ -92,7 +92,7 @@ function makeStar(x: number, y: number, born: number): DragStarParticle {
 }
 
 function sampleDensity(): number {
-  return Math.random() < 0.78 ? 1 : 2
+  return Math.random() < 0.78 ? 3 : 5
 }
 
 export function spawnStarsAlongSegment(
@@ -127,8 +127,12 @@ export type DragTrailSampler = {
 
 export function createDragTrailSampler(): DragTrailSampler & {
   reset: () => void
+  shift: (dx: number, dy: number) => void
 } {
-  const sampler: DragTrailSampler & { reset: () => void } = {
+  const sampler: DragTrailSampler & {
+    reset: () => void
+    shift: (dx: number, dy: number) => void
+  } = {
     last: null,
     push(particles, x, y, now) {
       const prev = sampler.last
@@ -147,6 +151,13 @@ export function createDragTrailSampler(): DragTrailSampler & {
     },
     reset() {
       sampler.last = null
+    },
+    shift(dx, dy) {
+      if (dx === 0 && dy === 0) return
+      if (sampler.last) {
+        sampler.last.x += dx
+        sampler.last.y += dy
+      }
     },
   }
   return sampler

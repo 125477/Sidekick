@@ -1,10 +1,30 @@
 /**
- * Electron 主进程拉取 DashScope TTS（与 packages/core `dashscopeTtsClient` 保持同步）。
+ * Electron 主进程拉取 DashScope TTS（与 packages/core dashscopeTtsClient 保持同步）。
  */
 const BEIJING_ORIGIN = 'https://dashscope.aliyuncs.com'
 const MULTIMODAL_PATH =
   '/api/v1/services/aigc/multimodal-generation/generation'
 const SPEECH_SYNTH_PATH = '/api/v1/services/audio/tts/SpeechSynthesizer'
+
+const QWEN_MULTIMODAL_TTS = new Set([
+  'qwen-tts-2025-05-22',
+  'qwen3-tts-flash',
+])
+
+/** qwen-tts-2025-05-22 当前仅支持这 7 个 voice（与 ui/constants/qwenTtsVoices 一致） */
+const QWEN_TTS_2025_VOICES = new Set([
+  'Cherry',
+  'Serena',
+  'Ethan',
+  'Chelsie',
+  'Dylan',
+  'Jada',
+  'Sunny',
+])
+
+function usesQwenMultimodalTts(model) {
+  return QWEN_MULTIMODAL_TTS.has(model)
+}
 
 function joinBase(base, path) {
   const b = String(base).replace(/\/$/, '')
@@ -27,17 +47,49 @@ function extractSpeechSynthPayload(data) {
   throw new Error('DashScope TTS: SpeechSynthesizer response missing audio')
 }
 
+function resolveQwenVoice(modelId, rawVoice) {
+  let voice = String(rawVoice ?? '').trim()
+  if (!voice) voice = 'Chelsie'
+  if (modelId === 'qwen-tts-2025-05-22' && !QWEN_TTS_2025_VOICES.has(voice)) {
+    voice = 'Chelsie'
+  }
+  return voice
+}
+
+async function synthesizeQwenMultimodal(input, modelId) {
+  const voice = resolveQwenVoice(modelId, input.voice)
+
+  const base = String(input.requestBasePath ?? '').trim() || BEIJING_ORIGIN
+  const res = await fetch(joinBase(base, MULTIMODAL_PATH), {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${String(input.apiKey ?? '').trim()}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: modelId,
+      input: {
+        text: String(input.text ?? '').trim(),
+        voice,
+        language_type: input.languageType ?? 'Chinese',
+      },
+    }),
+  })
+
+  const raw = await res.text()
+  if (!res.ok) {
+    throw new Error(
+      `DashScope TTS ${res.status} (model=${modelId})${raw ? `: ${raw.slice(0, 320)}` : ''}`,
+    )
+  }
+  const data = JSON.parse(raw)
+  const audioUrl = extractMultimodalAudioUrl(data)
+  return { url: audioUrl }
+}
+
 /**
- * @param {{
- *   apiKey: string
- *   model: 'qwen3-tts-flash' | 'cosyvoice-v3.5-flash'
- *   text: string
- *   voice: string
- *   languageType?: string
- *   speechRate?: number
- *   requestBasePath?: string
- * }} input
- * @returns {Promise<ArrayBuffer>}
+ * @param {object} input
+ * @returns {Promise<{ url?: string, base64?: string, mimeType?: string }>}
  */
 export async function dashscopeTtsFetch(input) {
   const key = String(input.apiKey ?? '').trim()
@@ -45,42 +97,10 @@ export async function dashscopeTtsFetch(input) {
   const text = String(input.text ?? '').trim()
   if (!text) throw new Error('Empty TTS text')
 
-  const base = String(input.requestBasePath ?? '').trim() || BEIJING_ORIGIN
-  const headers = {
-    Authorization: `Bearer ${key}`,
-    'Content-Type': 'application/json',
-  }
+  const model = String(input.model ?? 'qwen-tts-2025-05-22').trim()
 
-  if (input.model === 'qwen3-tts-flash') {
-    const voice = String(input.voice ?? '').trim()
-    if (!voice) throw new Error('Missing voice for qwen3-tts-flash')
-
-    const res = await fetch(joinBase(base, MULTIMODAL_PATH), {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        model: 'qwen3-tts-flash',
-        input: {
-          text,
-          voice,
-          language_type: input.languageType ?? 'Chinese',
-        },
-      }),
-    })
-
-    const raw = await res.text()
-    if (!res.ok) {
-      throw new Error(
-        `DashScope TTS ${res.status}${raw ? `: ${raw.slice(0, 320)}` : ''}`,
-      )
-    }
-    const data = JSON.parse(raw)
-    const audioUrl = extractMultimodalAudioUrl(data)
-    const audioRes = await fetch(audioUrl)
-    if (!audioRes.ok) {
-      throw new Error(`DashScope TTS: failed to download audio (${audioRes.status})`)
-    }
-    return await audioRes.arrayBuffer()
+  if (usesQwenMultimodalTts(model)) {
+    return synthesizeQwenMultimodal(input, model)
   }
 
   const voice = String(input.voice ?? '').trim()
@@ -90,13 +110,17 @@ export async function dashscopeTtsFetch(input) {
     )
   }
 
+  const base = String(input.requestBasePath ?? '').trim() || BEIJING_ORIGIN
   const rawRate = Number(input.speechRate)
   const rate =
     Number.isFinite(rawRate) ? Math.min(2, Math.max(0.5, rawRate)) : 1
 
   const res = await fetch(joinBase(base, SPEECH_SYNTH_PATH), {
     method: 'POST',
-    headers,
+    headers: {
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify({
       model: 'cosyvoice-v3.5-flash',
       input: {
@@ -119,14 +143,9 @@ export async function dashscopeTtsFetch(input) {
     }
     const data = JSON.parse(raw)
     const { url, base64 } = extractSpeechSynthPayload(data)
+    if (url) return { url }
     if (base64) {
-      const buf = Buffer.from(base64, 'base64')
-      return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)
-    }
-    if (url) {
-      const ar = await fetch(url)
-      if (!ar.ok) throw new Error('DashScope TTS: failed to fetch audio URL')
-      return await ar.arrayBuffer()
+      return { base64, mimeType: 'audio/mpeg' }
     }
     throw new Error('DashScope TTS: could not parse SpeechSynthesizer JSON')
   }
@@ -137,5 +156,9 @@ export async function dashscopeTtsFetch(input) {
       `DashScope TTS ${res.status}${errText ? `: ${errText.slice(0, 320)}` : ''}`,
     )
   }
-  return await res.arrayBuffer()
+  const buf = await res.arrayBuffer()
+  return {
+    base64: Buffer.from(buf).toString('base64'),
+    mimeType: 'audio/mpeg',
+  }
 }

@@ -2,10 +2,18 @@ import type { MutableRefObject, Dispatch, SetStateAction } from 'react'
 import { useEffect, useRef } from 'react'
 import { appendText } from '@sidekick/core'
 import { fetchCompanionCopy, canPushNow } from './companionCopy'
+import { RECENT_COMPANION_LINES_MAX } from './recentCompanionLines'
+import {
+  shouldApplyCompanionCopyResult,
+  startCompanionCopyRequest,
+} from './companionCopySession'
 import type { SidekickSettings } from '../state/settingsState'
 import type { SpriteState, UiAction } from '../state/uiState'
 import { reportSpriteAnchorToMain } from '../utils/reportSpriteAnchor'
-import { speakCompanionLine } from '../utils/companionTts'
+import {
+  speakCompanionLine,
+  usesDetachedToastWindow,
+} from '../utils/companionTts'
 import { subscribeAppSelfIntroDismissed } from '../state/appSelfIntroSync'
 
 export type UseScheduledCompanionPushArgs = {
@@ -75,6 +83,7 @@ export function useScheduledCompanionPush({
         const s = settingsRef.current
         if (blockScheduledPushRef.current) return
         if (!s.pushEnabled || !canPushNow(s)) return
+        const fetchId = startCompanionCopyRequest()
         const avoidPush = recentCompanionLinesRef.current
         const result = await fetchCompanionCopy(
           s,
@@ -82,6 +91,7 @@ export function useScheduledCompanionPush({
           undefined,
           avoidPush.length > 0 ? avoidPush : undefined,
         )
+        if (!shouldApplyCompanionCopyResult(fetchId, result.source)) return
         const next = await appendText({
           id: `text-${Date.now()}`,
           content: result.text,
@@ -91,13 +101,14 @@ export function useScheduledCompanionPush({
         })
         const newId = next.texts.history[0]?.id
         const anchor = s.toastAnchor
-        const dwell = s.toastAlwaysVisible ? 0 : s.dwellSeconds
-        if (isWidgetMode && window.sidekickDesktop?.showToastWindow) {
+        const dwell = s.toastAlwaysVisible ? 0 : s.dwellMinutes * 60
+        const detachedToast = isWidgetMode && usesDetachedToastWindow()
+        if (detachedToast) {
           await reportSpriteAnchorToMain(widgetMeasureRef.current, {
             flush: true,
             avatarSizePercent: settingsRef.current.avatarSize,
           })
-          await window.sidekickDesktop.showToastWindow({
+          await window.sidekickDesktop!.showToastWindow({
             message: result.text,
             anchor,
             dwellSeconds: dwell,
@@ -122,14 +133,16 @@ export function useScheduledCompanionPush({
         recentCompanionLinesRef.current = [
           ...recentCompanionLinesRef.current,
           result.text,
-        ].slice(-6)
-        const tts = settingsRef.current
-        void speakCompanionLine(result.text, {
-          enabled: tts.companionTtsEnabled,
-          model: tts.companionTtsModel,
-          voice: tts.companionTtsVoice,
-          speechRate: tts.companionTtsSpeechRate,
-        })
+        ].slice(-RECENT_COMPANION_LINES_MAX)
+        if (!detachedToast) {
+          const tts = settingsRef.current
+          void speakCompanionLine(result.text, {
+            enabled: tts.companionTtsEnabled,
+            model: tts.companionTtsModel,
+            voice: tts.companionTtsVoice,
+            speechRate: tts.companionTtsSpeechRate,
+          })
+        }
         setSpriteState('notify')
         window.setTimeout(() => setSpriteState('idle'), 520)
       })()

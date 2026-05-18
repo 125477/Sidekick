@@ -18,7 +18,33 @@ const TRAIL_EDGE_MARGIN = 52
 
 function shiftTrailParticles(dx, dy) {
   if (dx === 0 && dy === 0) return
+  shiftPendingTrailPoints(dx, dy)
   sendToDragTrail('sidekick:drag-trail-shift', { dx, dy })
+}
+
+/** 小窗 reposition 时，尚未 flush 的局部坐标须与 origin 同步平移。 */
+function shiftPendingTrailPoints(dx, dy) {
+  if (dx === 0 && dy === 0) return
+  const batch = state.dragTrailPendingPoints
+  if (!batch || batch.length === 0) return
+  for (const p of batch) {
+    p.x += dx
+    p.y += dy
+  }
+}
+
+/** 拖尾小窗 setBounds / show 后须把精灵窗压回最前，避免星星叠在形象上。 */
+export function keepSpriteAboveDragTrail() {
+  const sprite = state.spriteWindow
+  const trail = state.dragTrailWindow
+  if (!sprite || sprite.isDestroyed()) return
+  if (trail && !trail.isDestroyed()) {
+    trail.setAlwaysOnTop(true, 'normal')
+  }
+  sprite.setAlwaysOnTop(true, 'screen-saver')
+  if (typeof sprite.moveTop === 'function') {
+    sprite.moveTop()
+  }
 }
 
 function getDisplayForSpriteWindow() {
@@ -112,7 +138,7 @@ async function getOrCreateDragTrailWindow() {
     },
   })
   win.setIgnoreMouseEvents(true, { forward: true })
-  win.setAlwaysOnTop(true, 'floating')
+  win.setAlwaysOnTop(true, 'normal')
   applyTrailFrameRate(win)
   win.on('closed', () => {
     state.dragTrailWindow = null
@@ -173,6 +199,7 @@ function positionTrailWindowAt(screenX, screenY) {
     width: w,
     height: h,
   })
+  if (state.dragTrailDragging) keepSpriteAboveDragTrail()
   return true
 }
 
@@ -218,6 +245,7 @@ export async function ensureDragTrailWindow(screenX, screenY) {
   positionTrailWindowAt(sx, sy)
 
   if (!win.isVisible()) win.showInactive()
+  if (state.dragTrailDragging) keepSpriteAboveDragTrail()
   return true
 }
 
@@ -227,7 +255,10 @@ export async function beginDragTrailSession(screenX, screenY) {
   state.dragTrailDragging = true
   state.dragTrailPendingPoints = []
   const ok = await ensureDragTrailWindow(screenX, screenY)
-  if (ok) sendToDragTrail('sidekick:drag-trail-reset')
+  if (ok) {
+    keepSpriteAboveDragTrail()
+    sendToDragTrail('sidekick:drag-trail-reset')
+  }
   return ok
 }
 

@@ -28,3 +28,22 @@ export function toastWebContentsUrlIsDetachedToastMode(wc) {
   }
   return /[?&]mode=toast(?:&|$)/.test(raw) || /[?&]mode%3Dtoast(?:&|%26|$)/i.test(raw)
 }
+
+/**
+ * @param {import('electron').WebContents | null | undefined} wc
+ */
+export function cornerNotificationWebContentsReady(wc) {
+  if (!wc || wc.isDestroyed()) return false
+  const raw = wc.getURL()
+  if (!raw || raw === 'about:blank') return false
+  try {
+    const u = new URL(raw)
+    if (u.searchParams.get('mode') === 'corner-notification') return true
+  } catch {
+    // ignore
+  }
+  return (
+    /[?&]mode=corner-notification(?:&|$)/.test(raw) ||
+    /[?&]mode%3Dcorner-notification(?:&|%26|$)/i.test(raw)
+  )
+}

@@ -1,66 +1,71 @@
 import { useEffect, useRef } from 'react'
 import { getMoodEntryForDay, localDayKey } from '../state/moodJournalStorage'
+import { subscribeSettingsSync } from '../state/settingsSync'
 import type { SidekickSettings } from '../state/settingsState'
 
-function parseHm(hm: string): { h: number; m: number } | null {
-  const parts = hm.split(':')
-  if (parts.length < 2) return null
-  const h = Number(parts[0])
-  const m = Number(parts[1])
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return null
-  if (h < 0 || h > 23 || m < 0 || m > 59) return null
-  return { h, m }
-}
+const TICK_MS = 10_000
 
 export function useDailyMoodReminder(
   settings: SidekickSettings,
   settingsReady: boolean,
-  runsInWidget: boolean,
+  runsReminderScheduler: boolean,
   onboardingDone: boolean | null,
 ): void {
-  const lastFiredDayRef = useRef<string | null>(null)
+  const settingsRef = useRef(settings)
+  settingsRef.current = settings
+  const publishRef = useRef<(() => Promise<void>) | null>(null)
 
   useEffect(() => {
-    if (!settingsReady || !runsInWidget || onboardingDone !== true) return
-    if (!settings.dailyMoodEnabled || !settings.dailyMoodReminderEnabled) return
-    const show = window.sidekickDesktop?.showSystemNotification
-    if (!show) return
+    if (!runsReminderScheduler) return
+    if (!window.sidekickDesktop?.updateMoodReminderSnapshot) return
 
-    const target = parseHm(settings.dailyMoodReminderTime)
-    if (!target) return
-
-    const tick = async () => {
-      const now = new Date()
-      const day = localDayKey(now)
-      if (lastFiredDayRef.current === day) return
-      if (now.getHours() !== target.h || now.getMinutes() !== target.m) return
-
-      const existing = await getMoodEntryForDay(day)
-      if (existing) {
-        lastFiredDayRef.current = day
-        return
-      }
-
-      const ok = await show({
-        title: 'Sidekick · 今日心情',
-        body: '花一分钟记下今天的心情与日记吧。',
-        panel: 'emotion',
-        emotionTab: 'summary',
+    const publish = async () => {
+      const s = settingsRef.current
+      const day = localDayKey()
+      const existing = settingsReady ? await getMoodEntryForDay(day) : null
+      window.sidekickDesktop?.updateMoodReminderSnapshot?.({
+        settingsReady,
+        onboardingComplete: settingsReady && onboardingDone !== false,
+        dailyMoodEnabled: s.dailyMoodEnabled,
+        dailyMoodReminderEnabled: s.dailyMoodReminderEnabled,
+        dailyMoodReminderTime: s.dailyMoodReminderTime,
+        hasMoodEntryToday: Boolean(existing),
       })
-      if (ok) lastFiredDayRef.current = day
     }
 
-    void tick()
-    const id = window.setInterval(() => {
-      void tick()
-    }, 45_000)
-    return () => window.clearInterval(id)
+    publishRef.current = publish
+
+    void publish()
+    const intervalId = window.setInterval(() => {
+      void publish()
+    }, TICK_MS)
+
+    const unsubMainTick = window.sidekickDesktop?.onMoodReminderTick?.(() => {
+      void publish()
+    })
+    const unsubResume = window.sidekickDesktop?.onSystemResume?.(() => {
+      void publish()
+    })
+
+    return () => {
+      window.clearInterval(intervalId)
+      unsubMainTick?.()
+      unsubResume?.()
+      publishRef.current = null
+    }
   }, [
+    runsReminderScheduler,
     settingsReady,
-    runsInWidget,
     onboardingDone,
     settings.dailyMoodEnabled,
     settings.dailyMoodReminderEnabled,
     settings.dailyMoodReminderTime,
   ])
+
+  useEffect(() => {
+    if (!runsReminderScheduler || !settingsReady) return
+    return subscribeSettingsSync(() => {
+      void publishRef.current?.()
+    })
+  }, [runsReminderScheduler, settingsReady])
 }

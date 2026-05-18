@@ -3,6 +3,7 @@ type SidekickPanel = 'skin' | 'settings' | 'emotion' | 'fortune' | 'favorites'
 type SidekickSpriteMenuAction =
   | 'skin'
   | 'settings'
+  | 'favorites'
   | 'emotion'
   | 'fortune'
   | 'more'
@@ -46,11 +47,13 @@ type DashScopeChatPayload = {
   userPrompt: string
   temperature: number | undefined
   chatCompletionsUrl?: string
+  /** 逗号分隔的额外 model 候选（VITE_DASHSCOPE_MODEL_FALLBACK）。 */
+  modelFallbackEnv?: string
 }
 
 type DashScopeTtsPayload = {
   apiKey: string
-  model: 'qwen3-tts-flash' | 'cosyvoice-v3.5-flash'
+  model: 'qwen-tts-2025-05-22' | 'qwen3-tts-flash' | 'cosyvoice-v3.5-flash'
   text: string
   voice: string
   languageType?: string
@@ -59,8 +62,10 @@ type DashScopeTtsPayload = {
 }
 
 type DashScopeTtsResult = {
-  base64: string
-  mimeType: string
+  /** OSS 直链：渲染进程用 `<audio src>` 播放 */
+  url?: string
+  base64?: string
+  mimeType?: string
 }
 
 type SidekickDesktopApi = {
@@ -75,6 +80,23 @@ type SidekickDesktopApi = {
     panel?: 'emotion'
     emotionTab?: 'moment' | 'summary'
   }) => Promise<boolean>
+  /** 屏幕右下角自定义提醒（不依赖 macOS 系统通知）。 */
+  showCornerNotification?: (payload: {
+    title?: string
+    body: string
+    panel?: 'emotion'
+    emotionTab?: 'moment' | 'summary'
+  }) => Promise<boolean>
+  hideCornerNotification?: () => Promise<void>
+  openCornerNotificationTarget?: () => Promise<void>
+  updateMoodReminderSnapshot?: (snapshot: {
+    settingsReady: boolean
+    onboardingComplete: boolean
+    dailyMoodEnabled: boolean
+    dailyMoodReminderEnabled: boolean
+    dailyMoodReminderTime: string
+    hasMoodEntryToday: boolean
+  }) => void
   /** 打开独立「首次引导」窗口（与精灵悬浮窗分离）。 */
   openOnboardingWindow?: () => Promise<void>
   /** 引导窗内保存完成后调用：通知精灵窗并关闭引导窗口。 */
@@ -103,6 +125,8 @@ type SidekickDesktopApi = {
   hideToastWindow: () => Promise<void>
   /** 系统休眠恢复 / 解锁屏幕（仅 Electron 桌面端）。 */
   onSystemResume?: (callback: () => void) => () => void
+  /** 主进程定时唤醒，用于今日心情提醒（macOS 休眠后 renderer 计时可能滞后）。 */
+  onMoodReminderTick?: (callback: () => void) => () => void
   /**
    * Electron 独立气泡：锁定后整窗 `setIgnoreMouseEvents(forward)` 穿透；
    * 渲染进程上报解锁按钮（或换句 loading 时整张卡）的视口矩形，主进程轮询光标是否在矩形内。
@@ -127,7 +151,10 @@ type SidekickDesktopApi = {
       placement: 'above' | 'below'
     }) => void,
   ) => () => void
-  resizeToastWindow?: (payload: { height: number }) => Promise<void>
+  resizeToastWindow?: (payload: {
+    height: number
+    width?: number
+  }) => Promise<void>
   /** Fit desktop sprite window to measured content (avatar + menu). `width` 用于引导等需加宽的场景；省略则恢复紧凑宽度。 */
   resizeWidgetWindow?: (payload: { height: number; width?: number }) => Promise<void>
   /** 挂件精灵窗：在形象 `no-drag` 热区内拖动时，由主进程按增量平移窗口（避免 `-webkit-app-region: drag` 吞点击）。 */

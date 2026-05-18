@@ -4,6 +4,7 @@ import { moodEntryDisplayLabel } from './emotionChips'
 
 type MoodHistoryPanelProps = {
   entries: MoodJournalEntry[]
+  onDeleteEntry?: (id: string) => Promise<void>
 }
 
 function notePreview(note: string, maxLen = 72): string {
@@ -12,7 +13,10 @@ function notePreview(note: string, maxLen = 72): string {
   return t.length <= maxLen ? t : `${t.slice(0, maxLen)}…`
 }
 
-export function MoodHistoryPanel({ entries }: MoodHistoryPanelProps) {
+export function MoodHistoryPanel({
+  entries,
+  onDeleteEntry,
+}: MoodHistoryPanelProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const selected =
     selectedId != null ? entries.find((e) => e.id === selectedId) ?? null : null
@@ -26,9 +30,19 @@ export function MoodHistoryPanel({ entries }: MoodHistoryPanelProps) {
   }
 
   if (selected) {
-    return (
-      <MoodHistoryDetail entry={selected} onBack={() => setSelectedId(null)} />
-    )
+    const detailProps = {
+      entry: selected,
+      onBack: () => setSelectedId(null),
+      ...(onDeleteEntry
+        ? {
+            onDelete: async () => {
+              await onDeleteEntry(selected.id)
+              setSelectedId(null)
+            },
+          }
+        : {}),
+    }
+    return <MoodHistoryDetail {...detailProps} />
   }
 
   return (
@@ -63,22 +77,52 @@ export function MoodHistoryPanel({ entries }: MoodHistoryPanelProps) {
 function MoodHistoryDetail({
   entry,
   onBack,
+  onDelete,
 }: {
   entry: MoodJournalEntry
   onBack: () => void
+  onDelete?: () => Promise<void>
 }) {
   const mood = moodEntryDisplayLabel(entry)
   const attachments = entry.attachments ?? []
+  const [deleting, setDeleting] = useState(false)
+
+  const handleDelete = async () => {
+    if (!onDelete || deleting) return
+    const ok = window.confirm(
+      `确定删除 ${entry.dayKey} 的心情小结吗？此操作不可恢复。`,
+    )
+    if (!ok) return
+    setDeleting(true)
+    try {
+      await onDelete()
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   return (
     <div className="flex max-h-[min(420px,60vh)] flex-col overflow-y-auto p-3">
-      <button
-        type="button"
-        className="mb-3 self-start rounded-full border border-violet-200 px-3 py-1 text-sm text-violet-700 hover:bg-violet-50"
-        onClick={onBack}
-      >
-        返回列表
-      </button>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className="rounded-full border border-violet-200 px-3 py-1 text-sm text-violet-700 hover:bg-violet-50"
+          onClick={onBack}
+          disabled={deleting}
+        >
+          返回列表
+        </button>
+        {onDelete ? (
+          <button
+            type="button"
+            className="rounded-full border border-rose-200 px-3 py-1 text-sm text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+            onClick={() => void handleDelete()}
+            disabled={deleting}
+          >
+            {deleting ? '删除中…' : '删除这条记录'}
+          </button>
+        ) : null}
+      </div>
       <div className="grid gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="inline-flex rounded-full border border-violet-300 bg-violet-600 px-3 py-0.5 text-sm font-medium text-white">

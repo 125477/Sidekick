@@ -17,6 +17,7 @@ import { WidgetSpriteMenuPage } from './components/menu/WidgetSpriteMenuPage'
 import { defaultSettings, type SidekickSettings } from './state/settingsState'
 import { initialUiState, uiReducer, type SpriteState } from './state/uiState'
 import { openAuxPanelFromBridgeOrDispatch } from './app/openAuxPanelFromBridgeOrDispatch'
+import { openEmotionPanel } from './app/openEmotionPanel'
 import { useScheduledCompanionPush } from './app/useScheduledCompanionPush'
 import { useDailyMoodReminder } from './app/useDailyMoodReminder'
 import { useAppBootstrap } from './app/useAppBootstrap'
@@ -34,6 +35,7 @@ import { DetachedToastShell } from './app/DetachedToastShell'
 import { FortuneWidgetModal } from './app/FortuneWidgetModal'
 import { HostAppMain } from './app/HostAppMain'
 import { DragTrailOverlayPage } from './app/DragTrailOverlayPage'
+import { CornerNotificationPage } from './app/CornerNotificationPage'
 import type { MenuAction } from './components/menu/SpriteMenu'
 
 function App() {
@@ -136,7 +138,7 @@ function App() {
   }, [])
 
   const panelTitle = useMemo(() => {
-    if (uiState.activePanel === 'skin') return '换肤'
+    if (uiState.activePanel === 'skin') return '更换形象'
     if (uiState.activePanel === 'settings') return '设置'
     if (uiState.activePanel === 'emotion') return '情绪反馈'
     if (uiState.activePanel === 'fortune') return '每日抽签'
@@ -144,8 +146,8 @@ function App() {
     return ''
   }, [uiState.activePanel])
 
-  const openFavoritesRecords = useCallback(() => {
-    openAuxPanelFromBridgeOrDispatch('favorites', dispatch)
+  const openEmotionFromToast = useCallback(() => {
+    openEmotionPanel(dispatch)
   }, [dispatch])
 
   const openSettingsFromToast = useCallback(() => {
@@ -167,6 +169,8 @@ function App() {
     toastFavoriteFromUrl,
     toastIntroFromQuery,
     emotionTabFromQuery,
+    cornerNotificationTitle,
+    cornerNotificationMessage,
   } = readAppSearchParams()
 
   const [detachPlacementFromMain, setDetachPlacementFromMain] = useState<{
@@ -183,6 +187,7 @@ function App() {
   const isOnboardingMode = mode === 'onboarding'
   const isSpriteMenuMode = mode === 'sprite-menu'
   const isDragTrailMode = mode === 'drag-trail'
+  const isCornerNotificationMode = mode === 'corner-notification'
   const themeSyncApplies =
     isPanelMode ||
     isOnboardingMode ||
@@ -203,6 +208,7 @@ function App() {
     uiState.toastState === 'entering' || uiState.toastState === 'visible'
 
   useAppBootstrap({
+    recentCompanionLinesRef,
     dispatch,
     settings,
     settingsRef,
@@ -288,7 +294,12 @@ function App() {
     moreRestoreToastTimerRef,
   })
 
-  useDailyMoodReminder(settings, settingsReady, isWidgetMode, onboardingDone)
+  useDailyMoodReminder(
+    settings,
+    settingsReady,
+    isWidgetMode || isPanelMode,
+    onboardingDone,
+  )
 
   const {
     showToastMessage,
@@ -299,6 +310,7 @@ function App() {
     requestCompanionText,
   } = useCompanionActions({
     isWidgetMode,
+    isPanelMode,
     isToastMode,
     isOnboardingMode,
     toastVisible,
@@ -433,7 +445,7 @@ function App() {
       toastMeta={toastMeta}
       setToastMeta={setToastMeta}
       hideEmotionToast={hideEmotionToast}
-      openFavoritesRecords={openFavoritesRecords}
+      openEmotionFromToast={openEmotionFromToast}
       openSettingsFromToast={openSettingsFromToast}
       openSkinFromToast={openSkinFromToast}
       openSpriteMenuFromToastToolbar={openSpriteMenuFromToastToolbar}
@@ -443,6 +455,15 @@ function App() {
       spriteMenuUsesBrowserPopup={spriteMenuUsesBrowserPopup}
     />
   )
+
+  if (isCornerNotificationMode) {
+    return (
+      <CornerNotificationPage
+        title={cornerNotificationTitle}
+        message={cornerNotificationMessage}
+      />
+    )
+  }
 
   if (isToastMode) {
     return (
@@ -457,7 +478,7 @@ function App() {
         toastTextIdFromQuery={toastTextIdFromQuery}
         toastDetachFavorite={toastDetachFavorite}
         setToastDetachFavorite={setToastDetachFavorite}
-        openFavoritesRecords={openFavoritesRecords}
+        openEmotionFromToast={openEmotionFromToast}
         openSettingsFromToast={openSettingsFromToast}
         openSkinFromToast={openSkinFromToast}
         openSpriteMenuFromToastToolbar={openSpriteMenuFromToastToolbar}
@@ -566,7 +587,7 @@ function App() {
           imageOpacity={settings.panelBackgroundImageOpacity}
           blurPx={settings.panelBackgroundBlurPx}
         >
-          <div className="sk-panel-inner box-border flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden p-3 sm:p-4">
+          <div className="sk-panel-inner sk-panel-inner--electron box-border flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden">
             {panelContent}
           </div>
         </PanelBackgroundLayer>
@@ -596,7 +617,7 @@ function App() {
       toastMeta={toastMeta}
       setToastMeta={setToastMeta}
       hideEmotionToast={hideEmotionToast}
-      openFavoritesRecords={openFavoritesRecords}
+      openEmotionFromToast={openEmotionFromToast}
       openSettingsFromToast={openSettingsFromToast}
       openSkinFromToast={openSkinFromToast}
       openSpriteMenuFromToastToolbar={openSpriteMenuFromToastToolbar}

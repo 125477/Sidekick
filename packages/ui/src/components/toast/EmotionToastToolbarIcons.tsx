@@ -112,6 +112,27 @@ export function IconToolbarFavoritesHistory({
   )
 }
 
+/** 气泡工具栏：情绪反馈（原收藏历史位）。 */
+export function IconToolbarEmotion({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+      <circle cx="9" cy="10" r="0.5" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="10" r="0.5" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
 export function IconToolbarMenu({ className }: { className?: string }) {
   return (
     <svg

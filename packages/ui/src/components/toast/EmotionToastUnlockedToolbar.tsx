@@ -4,7 +4,7 @@ import { EmotionToastToolbarIconButton } from './EmotionToastToolbarButton'
 import {
   IconToolbarClose,
   IconToolbarCopy,
-  IconToolbarFavoritesHistory,
+  IconToolbarEmotion,
   IconToolbarLockOpen,
   IconToolbarMenu,
   IconToolbarRefresh,
@@ -14,6 +14,12 @@ import {
   IconToolbarStar,
   IconToolbarStarFilled,
 } from './EmotionToastToolbarIcons'
+import { toastCollapseRevealClass } from './toastChromeReveal'
+import {
+  toastBarGroupClass,
+  toastMessageChromeClass,
+  toastMessageInnerClass,
+} from './toastMessageLayout'
 
 const toastToolbarChromeClassName = (detached: boolean) =>
   `flex w-full min-w-0 flex-col rounded-b-2xl border-t border-slate-200/70 ${
@@ -21,17 +27,7 @@ const toastToolbarChromeClassName = (detached: boolean) =>
   }`
 
 const toastToolbarIconsRowClassName =
-  'flex min-h-7 min-w-0 shrink-0 cursor-pointer flex-nowrap items-center justify-center gap-0 px-0.5 py-1'
-
-function toastHoverRevealClass(motionEnabled: boolean, revealed: boolean): string {
-  return `grid min-h-0 overflow-hidden transition-[grid-template-rows,opacity] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
-    motionEnabled ? 'duration-200' : 'duration-0'
-  } ${
-    revealed
-      ? 'grid-rows-[1fr] pointer-events-auto opacity-100'
-      : 'grid-rows-[0fr] pointer-events-none opacity-0 group-hover/toastbar:pointer-events-auto group-hover/toastbar:grid-rows-[1fr] group-hover/toastbar:opacity-100 group-focus-within/toastbar:pointer-events-auto group-focus-within/toastbar:grid-rows-[1fr] group-focus-within/toastbar:opacity-100'
-  }`
-}
+  'flex min-h-7 min-w-0 shrink-0 flex-nowrap items-center justify-center gap-0 px-0.5 py-1'
 
 export type EmotionToastUnlockedToolbarProps = {
   detached: boolean
@@ -53,7 +49,7 @@ export type EmotionToastUnlockedToolbarProps = {
   showCopy: boolean
   showReplay: boolean
   showFavorite: boolean
-  showFavoritesRecord: boolean
+  showEmotionFeedback: boolean
   showLockControl: boolean
   showSkin: boolean
   showSettings: boolean
@@ -63,10 +59,11 @@ export type EmotionToastUnlockedToolbarProps = {
   introMode?: boolean
   showLightFeedback?: boolean
   lightFeedbackMessage?: string
+  compactMessageLayout?: boolean
   onCopy?: () => void | Promise<void>
   onReplayTts?: () => void | Promise<void>
   onToggleFavorite?: () => void | Promise<void>
-  onOpenFavorites?: () => void | Promise<void>
+  onOpenEmotion?: () => void | Promise<void>
   onOpenSkin?: () => void | Promise<void>
   onOpenSettings?: () => void | Promise<void>
   onOpenMenu?: () => void | Promise<void>
@@ -95,7 +92,7 @@ export function EmotionToastUnlockedToolbar({
   showCopy,
   showReplay,
   showFavorite,
-  showFavoritesRecord,
+  showEmotionFeedback,
   showLockControl,
   showSkin,
   showSettings,
@@ -105,10 +102,11 @@ export function EmotionToastUnlockedToolbar({
   introMode = false,
   showLightFeedback = false,
   lightFeedbackMessage = '',
+  compactMessageLayout = false,
   onCopy,
   onReplayTts,
   onToggleFavorite,
-  onOpenFavorites,
+  onOpenEmotion,
   onOpenSkin,
   onOpenSettings,
   onOpenMenu,
@@ -125,7 +123,7 @@ export function EmotionToastUnlockedToolbar({
   return (
     <div
       ref={unlockedToastbarGroupRef}
-      className="group/toastbar flex w-full min-w-0 flex-col"
+      className={toastBarGroupClass(compactMessageLayout, 'group/toastbar')}
       onPointerLeave={(e) => {
         const t = e.relatedTarget
         if (
@@ -138,11 +136,12 @@ export function EmotionToastUnlockedToolbar({
       }}
     >
       <div
-        className={`rounded-lg bg-slate-50/55 transition-colors duration-200 ease-out motion-reduce:transition-none ${
-          regenerating ? 'w-full' : 'w-fit max-w-full self-start'
-        }`}
+        className={`rounded-lg bg-slate-50/55 transition-colors duration-200 ease-out motion-reduce:transition-none ${toastMessageChromeClass(
+          compactMessageLayout,
+          regenerating,
+        )}`}
       >
-        <div className="flex w-full min-w-0 max-w-full flex-col">
+        <div className={toastMessageInnerClass(compactMessageLayout)}>
           {messageCell}
         </div>
       </div>
@@ -151,25 +150,34 @@ export function EmotionToastUnlockedToolbar({
       ) : null}
       {showLightFeedback && !regenerating ? (
         <div
-          className={`emotion-toast-light-feedback relative z-[1] -mt-0.5 ${toastHoverRevealClass(motionEnabled, chromeRevealed)}`}
+          className={`emotion-toast-light-feedback relative z-[1] -mt-0.5 ${toastCollapseRevealClass(
+            motionEnabled,
+            chromeRevealed,
+            'toastbar',
+          )}`}
         >
           <div className="min-h-0 overflow-hidden">
             <ToastLightFeedbackRow
               message={lightFeedbackMessage}
               disabled={regenerating}
+              centered={compactMessageLayout}
             />
           </div>
         </div>
       ) : null}
       {!introMode && !regenerating ? (
         <>
-      <div aria-hidden className="h-1.5 w-full shrink-0" />
-      <div
-        className={`emotion-toast-toolbar relative z-[1] -mt-1.5 overflow-hidden rounded-b-2xl ${toastHoverRevealClass(motionEnabled, chromeRevealed)}`}
-      >
-        <div className="min-h-0 overflow-hidden">
-          <div className={toastToolbarChromeClassName(detached)}>
-          <div className={toastToolbarIconsRowClassName}>
+          <div aria-hidden className="h-1.5 w-full shrink-0" />
+          <div
+            className={`emotion-toast-toolbar relative z-[1] -mt-1.5 overflow-hidden rounded-b-2xl ${toastCollapseRevealClass(
+              motionEnabled,
+              chromeRevealed,
+              'toastbar',
+            )}`}
+          >
+            <div className="min-h-0 overflow-hidden">
+              <div className={toastToolbarChromeClassName(detached)}>
+                <div className={toastToolbarIconsRowClassName}>
             {regenInToolbar ? (
               <EmotionToastToolbarIconButton
                 title={
@@ -243,17 +251,17 @@ export function EmotionToastUnlockedToolbar({
                 )}
               </EmotionToastToolbarIconButton>
             ) : null}
-            {showFavoritesRecord ? (
+            {showEmotionFeedback ? (
               <EmotionToastToolbarIconButton
-                title="收藏历史"
-                ariaLabel="收藏历史"
+                title="情绪反馈"
+                ariaLabel="打开情绪反馈"
                 disabled={regenerating}
                 onClick={(event) => {
                   event.stopPropagation()
-                  void Promise.resolve(onOpenFavorites?.())
+                  void Promise.resolve(onOpenEmotion?.())
                 }}
               >
-                <IconToolbarFavoritesHistory className="h-[15px] w-[15px] shrink-0" />
+                <IconToolbarEmotion className="h-[15px] w-[15px] shrink-0" />
               </EmotionToastToolbarIconButton>
             ) : null}
             {showLockControl ? (
@@ -273,8 +281,8 @@ export function EmotionToastUnlockedToolbar({
             ) : null}
             {showSkin ? (
               <EmotionToastToolbarIconButton
-                title="换肤"
-                ariaLabel="打开换肤"
+                title="更换形象"
+                ariaLabel="打开更换形象"
                 disabled={regenerating}
                 onClick={(event) => {
                   event.stopPropagation()
@@ -324,10 +332,10 @@ export function EmotionToastUnlockedToolbar({
             >
               <IconToolbarClose className="h-[15px] w-[15px] shrink-0" />
             </EmotionToastToolbarIconButton>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-        </div>
-      </div>
         </>
       ) : null}
     </div>

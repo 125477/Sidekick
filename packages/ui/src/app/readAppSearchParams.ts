@@ -11,6 +11,8 @@ export type AppUrlState = {
   toastFavoriteFromUrl: boolean
   toastIntroFromQuery: boolean
   emotionTabFromQuery: 'moment' | 'summary' | null
+  cornerNotificationTitle: string
+  cornerNotificationMessage: string
 }
 
 export function readAppSearchParams(): AppUrlState {
@@ -26,6 +28,8 @@ export function readAppSearchParams(): AppUrlState {
       toastFavoriteFromUrl: false,
       toastIntroFromQuery: false,
       emotionTabFromQuery: null,
+      cornerNotificationTitle: '灵伴 · 今日心情',
+      cornerNotificationMessage: '',
     }
   }
   const search = window.location.search
@@ -51,5 +55,7 @@ export function readAppSearchParams(): AppUrlState {
         : sp.get('emotionTab') === 'moment'
           ? 'moment'
           : null,
+    cornerNotificationTitle: sp.get('title')?.trim() || '灵伴 · 今日心情',
+    cornerNotificationMessage: sp.get('message') ?? '',
   }
 }

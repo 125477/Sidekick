@@ -131,7 +131,7 @@ export function SpriteShell({
    */
   return (
     <div
-      className={`inline-flex items-center justify-center p-6 pb-3 outline-none ${
+      className={`inline-flex items-center justify-center  outline-none ${
         interactionLocked
           ? 'pointer-events-none cursor-default [-webkit-app-region:no-drag]'
           : '[-webkit-app-region:drag]'

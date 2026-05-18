@@ -17,10 +17,6 @@ type MoodSummaryMediaPickerProps = {
 const MOOD_MEDIA_TILE =
   'relative min-w-0 w-[9.5rem] shrink-0 sm:w-[10.5rem]'
 
-function truncateMediaName(name: string): string {
-  return name.length > 18 ? `${name.slice(0, 17)}\u2026` : name
-}
-
 function MoodMediaDeleteButton({
   label,
   disabled,
@@ -68,7 +64,7 @@ function MoodMediaPreviewTile({
   disabled: boolean
   onRemove: () => void
 }) {
-  const displayName = truncateMediaName(att.name)
+  const a11yLabel = att.type === 'video' ? '视频' : '图片'
   return (
     <li className={`group/moodmedia ${MOOD_MEDIA_TILE}`}>
       <div className="overflow-hidden rounded-xl border border-slate-200 p-1 sm:p-1.5">
@@ -81,22 +77,19 @@ function MoodMediaPreviewTile({
               playsInline
               loop
               preload="metadata"
-              aria-label={displayName}
+              aria-label={a11yLabel}
             />
           ) : (
             <img
               src={att.dataUrl}
-              alt={displayName}
+              alt={a11yLabel}
               className="max-h-full max-w-full rounded-lg object-contain"
             />
           )}
         </div>
-        <span className="mt-1 block truncate text-xs leading-tight text-slate-600 sm:text-sm">
-          {displayName}
-        </span>
       </div>
       <MoodMediaDeleteButton
-        label={displayName}
+        label={a11yLabel}
         disabled={disabled}
         onClick={onRemove}
       />

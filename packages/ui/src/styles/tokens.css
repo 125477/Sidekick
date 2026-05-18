@@ -52,8 +52,15 @@
 
   --sk-switch-off-bg: rgb(226 232 240);
 
+  --sk-chip-off-border: rgb(226 232 240);
+  --sk-chip-off-bg: rgb(255 255 255);
+  --sk-chip-off-text: rgb(71 85 105);
+  --sk-chip-on-border: rgb(167 139 250);
+  --sk-chip-on-bg: rgb(245 243 255);
+  --sk-chip-on-text: rgb(91 33 182);
+
   --sk-input-bg: rgb(255 255 255);
-  --sk-input-border: rgb(226 232 240);
+  --sk-input-border: var(--sk-chip-off-border);
   --sk-input-text: rgb(15 23 42);
   --sk-input-disabled-bg: rgb(241 245 249);
   --sk-input-disabled-text: rgb(148 163 184);
@@ -61,13 +68,6 @@
 
   --sk-segmented-bg: rgb(241 245 249);
   --sk-segmented-active-bg: rgb(255 255 255);
-
-  --sk-chip-off-border: rgb(226 232 240);
-  --sk-chip-off-bg: rgb(255 255 255);
-  --sk-chip-off-text: rgb(71 85 105);
-  --sk-chip-on-border: rgb(167 139 250);
-  --sk-chip-on-bg: rgb(245 243 255);
-  --sk-chip-on-text: rgb(91 33 182);
 
   --sk-callout-border: rgb(221 214 254);
   --sk-callout-bg: rgb(245 243 255 / 0.72);
@@ -143,8 +143,15 @@ html[data-theme='dark'] {
 
   --sk-switch-off-bg: rgb(63 63 70 / 0.9);
 
+  --sk-chip-off-border: rgb(63 63 70 / 0.55);
+  --sk-chip-off-bg: rgb(39 39 42 / 0.5);
+  --sk-chip-off-text: rgb(212 212 216);
+  --sk-chip-on-border: rgb(167 139 250 / 0.45);
+  --sk-chip-on-bg: rgb(91 33 182 / 0.25);
+  --sk-chip-on-text: rgb(237 233 254);
+
   --sk-input-bg: rgb(24 24 27);
-  --sk-input-border: rgb(63 63 70 / 0.55);
+  --sk-input-border: var(--sk-chip-off-border);
   --sk-input-text: rgb(250 250 250);
   --sk-input-disabled-bg: rgb(39 39 42 / 0.7);
   --sk-input-disabled-text: rgb(113 113 122);
@@ -152,13 +159,6 @@ html[data-theme='dark'] {
 
   --sk-segmented-bg: rgb(24 24 27);
   --sk-segmented-active-bg: rgb(39 39 42);
-
-  --sk-chip-off-border: rgb(63 63 70 / 0.55);
-  --sk-chip-off-bg: rgb(39 39 42 / 0.5);
-  --sk-chip-off-text: rgb(212 212 216);
-  --sk-chip-on-border: rgb(167 139 250 / 0.45);
-  --sk-chip-on-bg: rgb(91 33 182 / 0.25);
-  --sk-chip-on-text: rgb(237 233 254);
 
   --sk-callout-border: rgb(139 92 246 / 0.3);
   --sk-callout-bg: rgb(91 33 182 / 0.16);

@@ -20,6 +20,17 @@ export function resolveInitialBaseUrl() {
  *   panelWindow: import('electron').BrowserWindow | null
  *   onboardingWindow: import('electron').BrowserWindow | null
  *   toastWindow: import('electron').BrowserWindow | null
+ *   cornerNotificationWindow: import('electron').BrowserWindow | null
+ *   cornerNotificationPayload: null | { panel: string; emotionTab: string }
+ *   moodReminderSnapshot: null | {
+ *     settingsReady: boolean
+ *     onboardingComplete: boolean
+ *     dailyMoodEnabled: boolean
+ *     dailyMoodReminderEnabled: boolean
+ *     dailyMoodReminderTime: string
+ *     hasMoodEntryToday: boolean
+ *     updatedAt: number
+ *   }
  *   spriteMenuWindow: import('electron').BrowserWindow | null
  *   lastSpriteMenuInvoker: 'sprite' | 'toast' | null
  *   toastTimerId: ReturnType<typeof setTimeout> | null
@@ -63,6 +74,9 @@ export const state = {
   panelWindow: null,
   onboardingWindow: null,
   toastWindow: null,
+  cornerNotificationWindow: null,
+  cornerNotificationPayload: null,
+  moodReminderSnapshot: null,
   spriteMenuWindow: null,
   lastSpriteMenuInvoker: null,
   toastTimerId: null,

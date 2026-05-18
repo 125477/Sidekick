@@ -1,4 +1,5 @@
 import type { Dispatch, MutableRefObject, RefObject, SetStateAction } from 'react'
+import { clampToastWindowWidthPx } from '../components/toast/toastCardMetrics'
 import { useEffect, useLayoutEffect } from 'react'
 import type { AvatarPreset } from '@sidekick/core'
 import { APP_DISPLAY_NAME } from '../constants/brand'
@@ -85,31 +86,72 @@ export function useAppModeShell({
     const shell = toastShellRef.current
     if (!shell) return
     let roRaf = 0
+    let debounceTimer: number | null = null
+    const lastAppliedRef = { w: 0, h: 0 }
+    const TOAST_RESIZE_DEBOUNCE_MS = 220
     const applySize = () => {
-      const h = Math.ceil(shell.getBoundingClientRect().height) + 8
+      const shellRect = shell.getBoundingClientRect()
+      const cardEl = shell.querySelector('[data-emotion-toast-menu-fallback]')
+      const cardW =
+        cardEl instanceof HTMLElement
+          ? cardEl.getBoundingClientRect().width
+          : shell.firstElementChild instanceof HTMLElement
+            ? shell.firstElementChild.getBoundingClientRect().width
+            : shellRect.width
+      const h = Math.ceil(shellRect.height) + 8
+      const w = clampToastWindowWidthPx(cardW)
+      if (
+        Math.abs(w - lastAppliedRef.w) <= 1 &&
+        Math.abs(h - lastAppliedRef.h) <= 1
+      ) {
+        return
+      }
+      lastAppliedRef.w = w
+      lastAppliedRef.h = h
       void window.sidekickDesktop?.resizeToastWindow?.({
         height: Math.min(480, Math.max(52, h)),
+        width: w,
       })
     }
-    const scheduleSize = () => {
-      if (roRaf) return
-      roRaf = requestAnimationFrame(() => {
-        roRaf = 0
+    const scheduleSize = (immediate = false) => {
+      if (immediate) {
+        if (debounceTimer != null) {
+          window.clearTimeout(debounceTimer)
+          debounceTimer = null
+        }
+        if (roRaf) {
+          window.cancelAnimationFrame(roRaf)
+          roRaf = 0
+        }
         applySize()
+        return
+      }
+      if (roRaf) return
+      roRaf = window.requestAnimationFrame(() => {
+        roRaf = 0
+        if (debounceTimer != null) window.clearTimeout(debounceTimer)
+        debounceTimer = window.setTimeout(() => {
+          debounceTimer = null
+          applySize()
+        }, TOAST_RESIZE_DEBOUNCE_MS)
       })
     }
-    applySize()
+    scheduleSize(true)
     const ro = new ResizeObserver(() => {
-      scheduleSize()
+      scheduleSize(false)
     })
     ro.observe(shell)
+    const cardEl = shell.querySelector('[data-emotion-toast-menu-fallback]')
+    if (cardEl instanceof HTMLElement) {
+      ro.observe(cardEl)
+    }
     const id = requestAnimationFrame(() => {
-      applySize()
-      requestAnimationFrame(applySize)
+      scheduleSize(true)
     })
     return () => {
       cancelAnimationFrame(id)
-      if (roRaf) cancelAnimationFrame(roRaf)
+      if (roRaf) window.cancelAnimationFrame(roRaf)
+      if (debounceTimer != null) window.clearTimeout(debounceTimer)
       ro.disconnect()
     }
   }, [isToastMode, toastMessageFromQuery, toastDetachTailPointsDown, menuOpen, spriteMenuSurface, toastShellRef])

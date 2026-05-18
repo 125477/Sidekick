@@ -38,7 +38,7 @@ export function useYesterdayEmotionGreeting({
 }: UseYesterdayEmotionGreetingArgs) {
   const greetingBusyRef = useRef(false)
 
-  const tryYesterdayGreeting = (reason: 'day-open' | 'resume') => {
+  const tryYesterdayGreeting = (_reason: 'day-open' | 'resume') => {
     void (async () => {
       if (!isWidgetMode || !settingsReady) return
       if (blockScheduledPushRef.current || greetingBusyRef.current) return
@@ -56,7 +56,7 @@ export function useYesterdayEmotionGreeting({
       try {
         const text = buildYesterdayGreetingText(ctx)
         await showToastMessage(text, {
-          dwellSeconds: s.toastAlwaysVisible ? 0 : s.dwellSeconds,
+          dwellSeconds: s.toastAlwaysVisible ? 0 : s.dwellMinutes * 60,
         })
         await saveLastYesterdayGreetingDayKey(today)
       } finally {

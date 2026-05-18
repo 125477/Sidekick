@@ -19,7 +19,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "icons:transparent": "node ./scripts/transparentize-app-icon.mjs",
     "icons:mac-icns": "node ./scripts/build-mac-icns.mjs",
-    "pack": "electron-builder"
+    "pack": "electron-builder",
+    "pack:mac": "electron-builder --mac dmg",
+    "pack:win": "node ./scripts/prepare-nsis-makensis.mjs && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win nsis",
+    "pack:all": "node ./scripts/prepare-nsis-makensis.mjs && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg --win nsis"
   },
   "build": {
     "appId": "app.lingban.companion",
@@ -57,8 +60,14 @@
     "win": {
       "executableName": "Sidekick",
       "asar": false,
+      "signAndEditExecutable": false,
       "target": [
-        "nsis"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
     },
     "linux": {

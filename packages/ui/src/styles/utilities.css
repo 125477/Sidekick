@@ -19,6 +19,19 @@
     box-shadow: var(--sk-frame-shadow);
   }
 
+  /** Electron 独立辅窗：内层贴满内容区，避免圆角卡片与系统窗圆角之间露出渐变三角。 */
+  .sk-panel-inner--electron {
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+    background: var(--sk-frame-bg);
+    padding: 0;
+  }
+
+  .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-panel-inner--electron {
+    background: transparent;
+  }
+
   /* 自定义面板背景：底图保持清晰；UI 仅用半透明色，不用 backdrop-filter（会糊化底图） */
   .sk-panel-outer:has([data-sk-panel-bg='on']) {
     background: transparent;
@@ -273,12 +286,26 @@
   .sk-select,
   .sk-textarea {
     border-radius: var(--sk-radius-md);
-    border: 1px solid var(--sk-input-border);
+    border: 1px solid var(--sk-chip-off-border);
     background: var(--sk-input-bg);
     color: var(--sk-input-text);
     padding: 0.25rem 0.5rem;
     font-size: 0.875rem;
     line-height: 1.25rem;
+    outline: none;
+    box-shadow: none;
+    transition: border-color 0.15s ease;
+  }
+
+  .sk-input:focus,
+  .sk-select:focus,
+  .sk-textarea:focus,
+  .sk-input:focus-visible,
+  .sk-select:focus-visible,
+  .sk-textarea:focus-visible {
+    outline: none;
+    box-shadow: none;
+    border-color: var(--sk-chip-off-border);
   }
 
   .sk-textarea {
@@ -525,5 +552,15 @@
   .sk-label-disabled {
     cursor: not-allowed;
     color: var(--sk-input-disabled-text);
+  }
+
+  /** Electron 气泡窗：no-drag 区域须显式 cursor，macOS 上否则不显示手型 */
+  .sk-toast-clickable {
+    -webkit-app-region: no-drag;
+    cursor: pointer;
+  }
+
+  .sk-toast-clickable:disabled {
+    cursor: not-allowed;
   }
 }

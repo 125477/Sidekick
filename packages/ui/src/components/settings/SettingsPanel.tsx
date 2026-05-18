@@ -2,41 +2,23 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { CompanionCopyStyle } from '@sidekick/core'
 import { APP_DISPLAY_NAME } from '../../constants/brand'
 import { PanelBackgroundPicker } from '../panel/PanelBackgroundPicker'
-import { defaultSettings, type SidekickSettings } from '../../state/settingsState'
+import {
+  clampDwellMinutes,
+  clampIntervalMinutes,
+  isFocusPresetMinutesValid,
+  defaultSettings,
+  type SidekickSettings,
+} from '../../state/settingsState'
 import {
   COMPANION_INTEREST_TAG_OPTIONS,
   buildCompanionInterestsPayload,
   parseCompanionInterestNote,
 } from '../../constants/companionInterestTags'
-
-/**
- * Qwen3-TTS-Flash 系统音色：`id` 为接口必填英文名；`label` 仅作界面展示（中文说明）。
- */
-const QWEN_TTS_VOICES: ReadonlyArray<{ id: string; label: string }> = [
-  { id: 'Cherry', label: 'Cherry（芊悦）· 女｜阳光、亲切自然' },
-  { id: 'Serena', label: 'Serena（苏瑶）· 女｜温柔舒缓' },
-  { id: 'Chelsie', label: 'Chelsie（千雪）· 女｜甜系、偏二次元' },
-  { id: 'Momo', label: 'Momo（茉兔）· 女｜活泼搞怪' },
-  { id: 'Vivian', label: 'Vivian（十三）· 女｜俏皮、小暴躁感' },
-  { id: 'Maia', label: 'Maia（四月）· 女｜知性温柔' },
-  { id: 'Bella', label: 'Bella（萌宝）· 女｜萝莉感' },
-  { id: 'Jennifer', label: 'Jennifer（詹妮弗）· 女｜偏美语、质感女声' },
-  { id: 'Katerina', label: 'Katerina（卡捷琳娜）· 女｜御姐、韵律感' },
-  { id: 'Ethan', label: 'Ethan（晨煦）· 男｜标准普通话、阳光温暖' },
-  { id: 'Moon', label: 'Moon（月白）· 男｜清爽帅气' },
-  { id: 'Kai', label: 'Kai（凯）· 男｜干净、松弛' },
-  { id: 'Nofish', label: 'Nofish（不吃鱼）· 男｜平实、偏设计师口吻' },
-  { id: 'Ryan', label: 'Ryan（甜茶）· 男｜节奏强、戏感' },
-  { id: 'Aiden', label: 'Aiden（艾登）· 男｜美语、偏大男孩' },
-  { id: 'Dylan', label: 'Dylan · 男｜年轻、清爽' },
-  { id: 'Sunny', label: 'Sunny · 女｜明亮、轻快' },
-  { id: 'Luna', label: 'Luna · 女｜柔和、安静' },
-  { id: 'Jada', label: 'Jada · 女｜沉稳、利落' },
-]
-
-const QWEN_VOICE_MANUAL = '__manual__'
-
-const qwenPresetSet = new Set(QWEN_TTS_VOICES.map((v) => v.id))
+import {
+  PRIVACY_POLICY_LAST_UPDATED,
+  PRIVACY_POLICY_SECTIONS,
+} from '../../constants/privacyPolicyCopy'
+import { QWEN_TTS_VOICES } from '../../constants/qwenTtsVoices'
 
 const COPY_STYLE_OPTIONS: CompanionCopyStyle[] = [
   '治愈',
@@ -49,7 +31,6 @@ const COPY_STYLE_OPTIONS: CompanionCopyStyle[] = [
 type SettingsPanelProps = {
   settings: SidekickSettings
   onSettingsChange: (next: SidekickSettings) => void
-  imageGenRemaining?: number
   onRestoreDefaults: () => void
   /** 桌面端打开独立引导窗；纯 Web 则切回全屏引导。 */
   onOpenFirstRunGuide?: () => void
@@ -59,7 +40,14 @@ type SettingsPanelProps = {
   onToastAnchorInteraction?: (anchor: SidekickSettings['toastAnchor']) => void
 }
 
-type SettingTab = 'push' | 'copy' | 'speech' | 'avatar' | 'ai' | 'general'
+type SettingTab =
+  | 'push'
+  | 'copy'
+  | 'speech'
+  | 'avatar'
+  | 'ai'
+  | 'general'
+  | 'privacy'
 
 /** 侧栏顺序：按日常使用频率（文案与形象 → 推送 → 通用 → 进阶）。 */
 const TABS: Array<{ id: SettingTab; label: string }> = [
@@ -69,6 +57,7 @@ const TABS: Array<{ id: SettingTab; label: string }> = [
   { id: 'general', label: '通用' },
   { id: 'speech', label: '语音' },
   { id: 'ai', label: 'AI' },
+  { id: 'privacy', label: '隐私政策' },
 ]
 
 function openTimePicker(input: HTMLInputElement) {
@@ -245,7 +234,6 @@ function SettingsTimeField({
 export function SettingsPanel({
   settings,
   onSettingsChange,
-  imageGenRemaining,
   onRestoreDefaults,
   onOpenFirstRunGuide,
   onReplayAppIntro,
@@ -267,6 +255,10 @@ export function SettingsPanel({
   ) => {
     onSettingsChange({ ...settings, [key]: value })
   }
+
+  const focusSessionActive =
+    settings.focusSessionUntilEpochMs != null &&
+    Date.now() < settings.focusSessionUntilEpochMs
 
   return (
     <div className="sk-settings-layout">
@@ -303,9 +295,19 @@ export function SettingsPanel({
                   min={1}
                   max={60}
                   value={settings.pushIntervalMinutes}
-                  onChange={(event) =>
-                    update('pushIntervalMinutes', Number(event.target.value))
-                  }
+                  onChange={(event) => {
+                    const minutes = Number(event.target.value)
+                    const clamped = clampIntervalMinutes(
+                      Number.isFinite(minutes)
+                        ? minutes
+                        : defaultSettings.pushIntervalMinutes,
+                    )
+                    onSettingsChange({
+                      ...settings,
+                      pushIntervalMinutes: clamped,
+                      dwellMinutes: clamped,
+                    })
+                  }}
                   className="sk-input"
                 />
               </label>
@@ -333,23 +335,26 @@ export function SettingsPanel({
                 <span className="sk-label">默认时长（分钟）</span>
                 <input
                   type="number"
-                  min={5}
-                  max={180}
+                  min={0}
+                  step={1}
                   value={settings.focusPresetMinutes}
-                  onChange={(event) =>
-                    update(
-                      'focusPresetMinutes',
-                      Math.min(180, Math.max(5, Number(event.target.value) || 25)),
-                    )
-                  }
+                  onChange={(event) => {
+                    const raw = event.target.value
+                    if (raw === '') {
+                      update('focusPresetMinutes', 0)
+                      return
+                    }
+                    const n = Number(raw)
+                    if (!Number.isFinite(n)) return
+                    update('focusPresetMinutes', n)
+                  }}
                   className="sk-input"
                 />
               </label>
-              {settings.focusSessionUntilEpochMs != null &&
-              Date.now() < settings.focusSessionUntilEpochMs ? (
+              {focusSessionActive ? (
                 <p className="text-xs text-violet-700">
                   专注进行中，至{' '}
-                  {new Date(settings.focusSessionUntilEpochMs).toLocaleTimeString(
+                  {new Date(settings.focusSessionUntilEpochMs!).toLocaleTimeString(
                     'zh-CN',
                     { hour: '2-digit', minute: '2-digit' },
                   )}
@@ -359,31 +364,36 @@ export function SettingsPanel({
                 <p className="sk-muted text-xs">当前未在专注时段。</p>
               )}
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="rounded-lg bg-violet-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-700"
-                  onClick={() =>
-                    onSettingsChange({
-                      ...settings,
-                      focusSessionUntilEpochMs:
-                        Date.now() + settings.focusPresetMinutes * 60_000,
-                    })
-                  }
-                >
-                  开始专注
-                </button>
-                <button
-                  type="button"
-                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
-                  onClick={() =>
-                    onSettingsChange({
-                      ...settings,
-                      focusSessionUntilEpochMs: null,
-                    })
-                  }
-                >
-                  结束专注
-                </button>
+                {focusSessionActive ? (
+                  <button
+                    type="button"
+                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+                    onClick={() =>
+                      onSettingsChange({
+                        ...settings,
+                        focusSessionUntilEpochMs: null,
+                      })
+                    }
+                  >
+                    结束专注
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={!isFocusPresetMinutesValid(settings.focusPresetMinutes)}
+                    className="rounded-lg bg-violet-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={() => {
+                      if (!isFocusPresetMinutesValid(settings.focusPresetMinutes)) return
+                      onSettingsChange({
+                        ...settings,
+                        focusSessionUntilEpochMs:
+                          Date.now() + settings.focusPresetMinutes * 60_000,
+                      })
+                    }}
+                  >
+                    开始专注
+                  </button>
+                )}
               </div>
               <p className="sk-muted text-xs leading-relaxed">
                 专注是你主动开始的一段会话，期间暂停定时陪伴推送。
@@ -427,7 +437,7 @@ export function SettingsPanel({
               <SettingsSwitchRow
                 id="settings-daily-mood-reminder"
                 labelId="settings-daily-mood-reminder-lbl"
-                label="到点系统通知提醒"
+                label="到点右下角提醒"
                 checked={settings.dailyMoodReminderEnabled}
                 onCheckedChange={(v) => update('dailyMoodReminderEnabled', v)}
                 disabled={!settings.dailyMoodEnabled}
@@ -441,8 +451,25 @@ export function SettingsPanel({
                   !settings.dailyMoodEnabled || !settings.dailyMoodReminderEnabled
                 }
               />
+              {window.sidekickDesktop?.showCornerNotification ? (
+                <button
+                  type="button"
+                  className="sk-btn-secondary sk-toast-clickable w-fit cursor-pointer text-sm"
+                  disabled={!settings.dailyMoodEnabled || !settings.dailyMoodReminderEnabled}
+                  onClick={() => {
+                    void window.sidekickDesktop?.showCornerNotification?.({
+                      title: '灵伴 · 今日心情',
+                      body: '花一分钟记下今天的心情与日记吧。',
+                      panel: 'emotion',
+                      emotionTab: 'summary',
+                    })
+                  }}
+                >
+                  预览右下角提醒
+                </button>
+              ) : null}
               <p className="sk-muted text-xs leading-relaxed">
-                通知点击会打开情绪反馈并定位到「今日小结」；记录仅存本机 IndexedDB。
+                到点会在屏幕右下角弹出提醒卡片（使用应用图标），需手动关闭；点击「去写小结」打开情绪反馈并定位到「今日小结」。修改提醒时间会重新触发；记录仅存本机 IndexedDB。
               </p>
             </SettingsSubsection>
 
@@ -503,18 +530,18 @@ export function SettingsPanel({
               <label
                 className={`grid gap-1 ${settings.toastAlwaysVisible ? 'opacity-50' : ''}`}
               >
-                <span className="sk-label">停留时长（秒）</span>
+                <span className="sk-label">停留时长（分钟）</span>
                 <input
                   type="number"
-                  min={60}
-                  step={10}
-                  value={settings.dwellSeconds}
+                  min={1}
+                  max={60}
+                  step={1}
+                  value={settings.dwellMinutes}
                   onChange={(event) =>
                     update(
-                      'dwellSeconds',
-                      Math.max(
-                        60,
-                        Number(event.target.value) || defaultSettings.dwellSeconds,
+                      'dwellMinutes',
+                      clampDwellMinutes(
+                        Number(event.target.value) || defaultSettings.dwellMinutes,
                       ),
                     )
                   }
@@ -556,7 +583,7 @@ export function SettingsPanel({
 
             <SettingsSubsection title="兴趣偏好（可选）">
               <p className="sk-muted leading-relaxed">
-                生成陪伴句时会轻微参考，不必每句都写兴趣本身。
+                选「影视/书籍」时会化用台词或名句神韵（贴合语气类型）；场景在电脑前，不会写「合上书」等读纸书动作。
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {COMPANION_INTEREST_TAG_OPTIONS.map((t) => {
@@ -625,19 +652,10 @@ export function SettingsPanel({
               <label className="grid gap-1">
                 <span className="sk-label">音色</span>
                 <select
-                  value={
-                    qwenPresetSet.has(settings.companionTtsVoice.trim())
-                      ? settings.companionTtsVoice.trim()
-                      : QWEN_VOICE_MANUAL
+                  value={settings.companionTtsVoice}
+                  onChange={(event) =>
+                    update('companionTtsVoice', event.target.value)
                   }
-                  onChange={(event) => {
-                    const v = event.target.value
-                    if (v === QWEN_VOICE_MANUAL) {
-                      update('companionTtsVoice', '')
-                    } else {
-                      update('companionTtsVoice', v)
-                    }
-                  }}
                   className="sk-select max-w-full"
                 >
                   {QWEN_TTS_VOICES.map((v) => (
@@ -645,25 +663,8 @@ export function SettingsPanel({
                       {v.label}
                     </option>
                   ))}
-                  <option value={QWEN_VOICE_MANUAL}>
-                    其他（手动输入英文 id）
-                  </option>
                 </select>
               </label>
-              {!qwenPresetSet.has(settings.companionTtsVoice.trim()) ? (
-                <label className="grid gap-1">
-                  <span className="sk-label">自定义英文 id</span>
-                  <input
-                    type="text"
-                    value={settings.companionTtsVoice}
-                    onChange={(event) =>
-                      update('companionTtsVoice', event.target.value)
-                    }
-                    placeholder="与文档一致，区分大小写"
-                    className="sk-input"
-                  />
-                </label>
-              ) : null}
               <label className="grid gap-1">
                 <span className="sk-label">语速（0.5～2）</span>
                 <div className="flex items-center gap-2">
@@ -715,12 +716,6 @@ export function SettingsPanel({
                   className="sk-range w-full"
                 />
               </label>
-            </SettingsSubsection>
-            <SettingsSubsection title="当前与额度">
-              <p className="sk-body-sm">当前皮肤：默认皮肤 A</p>
-              {imageGenRemaining !== undefined ? (
-                <p className="sk-muted">剩余文生图次数：{imageGenRemaining}</p>
-              ) : null}
             </SettingsSubsection>
           </div>
         )}
@@ -850,6 +845,18 @@ export function SettingsPanel({
                 </button>
               </div>
             ) : null}
+            <div className="sk-callout">
+              <p className="sk-muted leading-relaxed">
+                了解应用如何收集、存储与使用您的数据。
+              </p>
+              <button
+                type="button"
+                onClick={() => setActiveTab('privacy')}
+                className="sk-callout-btn"
+              >
+                查看隐私政策
+              </button>
+            </div>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
@@ -859,6 +866,26 @@ export function SettingsPanel({
                 恢复默认
               </button>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'privacy' && (
+          <div className="grid gap-4 text-sm text-[var(--sk-text-body)]">
+            <SettingsTabHeading>隐私政策</SettingsTabHeading>
+            <p className="sk-muted text-xs leading-relaxed">
+              最后更新 {PRIVACY_POLICY_LAST_UPDATED}
+            </p>
+            {PRIVACY_POLICY_SECTIONS.map((section) => (
+              <SettingsSubsection key={section.title} title={section.title}>
+                <div className="grid gap-2">
+                  {section.paragraphs.map((paragraph, index) => (
+                    <p key={index} className="sk-muted leading-relaxed">
+                      {paragraph}
+                    </p>
+                  ))}
+                </div>
+              </SettingsSubsection>
+            ))}
           </div>
         )}
       </div>

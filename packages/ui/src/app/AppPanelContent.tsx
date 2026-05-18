@@ -200,7 +200,7 @@ export function AppPanelContent({
       </div>
     </div>
   ) : uiState.activePanel === 'favorites' ? (
-    <div className={panelShellClass}>
+    <div className={`${panelShellClass} [&_.sk-panel-chrome-title]:mb-2`}>
       <h2 className="sk-panel-chrome-title shrink-0">{panelTitle}</h2>
       <div className="flex min-h-0 flex-1 flex-col">
         <FavoriteTextsPanel fillAvailable={isPanelMode} />

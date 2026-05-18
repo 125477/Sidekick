@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-/** 「关闭」列固定 `w-[42px]`…独立窗内卡片 `w-full` 占满；内嵌挂件仍 `w-max`。 */
+/** 卡片 `w-max` 随内容；独立窗 IPC 缩宽高，避免工具栏两侧留白。 */
 export type EmotionToastProps = {
   anchor: 'top' | 'bottom'
   bubblePlacement?: 'above' | 'below'
@@ -21,7 +21,7 @@ export type EmotionToastProps = {
   onCopy?: () => void | Promise<void>
   messageRegeneratesOnClick?: boolean
   onReplayTts?: () => void | Promise<void>
-  onOpenFavorites?: () => void | Promise<void>
+  onOpenEmotion?: () => void | Promise<void>
   onOpenSettings?: () => void | Promise<void>
   onOpenSkin?: () => void | Promise<void>
   onOpenMenu?: () => void | Promise<void>

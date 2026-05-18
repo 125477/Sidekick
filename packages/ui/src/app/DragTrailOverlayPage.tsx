@@ -115,6 +115,7 @@ export function DragTrailOverlayPage() {
     })
     const unsubShift = d.onDragTrailShift?.(({ dx, dy }) => {
       shiftParticles(particlesRef.current, dx, dy)
+      samplerRef.current.shift(dx, dy)
     })
     const unsubSync = d.onDragTrailSync?.(() => {
       resizeCanvas()

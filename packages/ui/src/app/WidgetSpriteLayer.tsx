@@ -18,7 +18,7 @@ import {
   endDesktopDragTrail,
   pushDesktopDragTrailPoint,
 } from '../utils/desktopDragTrail'
-import { speakCompanionLine } from '../utils/companionTts'
+import { replayCompanionSpeech } from '../utils/companionTts'
 import type { SidekickSettings } from '../state/settingsState'
 import type { UiAction, UiState, SpriteState } from '../state/uiState'
 import { zLayers } from '../state/uiState'
@@ -61,7 +61,7 @@ export type WidgetSpriteLayerProps = {
     SetStateAction<{ id: string; favorite: boolean } | null>
   >
   hideEmotionToast: () => void
-  openFavoritesRecords: () => void
+  openEmotionFromToast: () => void
   openSettingsFromToast: () => void
   openSkinFromToast: () => void
   openSpriteMenuFromToastToolbar: () => void
@@ -102,7 +102,7 @@ export function WidgetSpriteLayer({
   toastMeta,
   setToastMeta,
   hideEmotionToast,
-  openFavoritesRecords,
+  openEmotionFromToast,
   openSettingsFromToast,
   openSkinFromToast,
   openSpriteMenuFromToastToolbar,
@@ -150,18 +150,14 @@ export function WidgetSpriteLayer({
                 avatarSize={spriteAvatarSize}
                 avatarOpacity={settings.avatarOpacity}
                 interactionLocked={spriteInteractionLocked}
-                onDragTrailStart={
-                  dragStarTrailEnabled
-                    ? (screenX, screenY) =>
-                        beginDesktopDragTrail(screenX, screenY)
-                    : undefined
-                }
-                onDragTrailPoint={
-                  dragStarTrailEnabled ? pushDesktopDragTrailPoint : undefined
-                }
-                onDragTrailEnd={
-                  dragStarTrailEnabled ? endDesktopDragTrail : undefined
-                }
+                {...(dragStarTrailEnabled
+                  ? {
+                      onDragTrailStart: (screenX: number, screenY: number) =>
+                        beginDesktopDragTrail(screenX, screenY),
+                      onDragTrailPoint: pushDesktopDragTrailPoint,
+                      onDragTrailEnd: endDesktopDragTrail,
+                    }
+                  : {})}
                 onToggleMenu={() => {
                   if (
                     menuOpen &&
@@ -207,7 +203,7 @@ export function WidgetSpriteLayer({
                 motionEnabled={settings.motionEnabled}
                 zIndexClass={zLayers.toast}
                 dwellSeconds={
-                  settings.toastAlwaysVisible ? 0 : settings.dwellSeconds
+                  settings.toastAlwaysVisible ? 0 : settings.dwellMinutes * 60
                 }
                 avatarSizePercent={settings.avatarSize}
                 message={uiState.toastMessage}
@@ -238,14 +234,14 @@ export function WidgetSpriteLayer({
                   navigator.clipboard.writeText(uiState.toastMessage)
                 }
                 onReplayTts={() =>
-                  void speakCompanionLine(uiState.toastMessage, {
+                  void replayCompanionSpeech(uiState.toastMessage, {
                     enabled: settingsRef.current.companionTtsEnabled,
                     model: settingsRef.current.companionTtsModel,
                     voice: settingsRef.current.companionTtsVoice,
                     speechRate: settingsRef.current.companionTtsSpeechRate,
                   })
                 }
-                onOpenFavorites={openFavoritesRecords}
+                onOpenEmotion={openEmotionFromToast}
                 onOpenSettings={openSettingsFromToast}
                 onOpenSkin={openSkinFromToast}
                 onOpenMenu={openSpriteMenuFromToastToolbar}

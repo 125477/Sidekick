@@ -1,7 +1,13 @@
-import { requestDashScopeText, type DashScopeTextRequest } from '@sidekick/core'
-import { appendCompanionLightFeedbackHint } from './companionLightFeedbackStorage'
+import {
+  requestDashScopeTextWithFallback,
+  type DashScopeTextRequest,
+} from '@sidekick/core'
+import {
+  setLightFeedbackForMessage,
+  type LightFeedbackKind,
+} from './companionLightFeedbackStorage'
 
-export type LightFeedbackKind = 'like' | 'neutral' | 'less'
+export type { LightFeedbackKind } from './companionLightFeedbackStorage'
 
 const LABELS: Record<LightFeedbackKind, string> = {
   like: '喜欢',
@@ -24,18 +30,29 @@ async function completeLightFeedbackWithDashScope(
 ): Promise<string> {
   const ipc = window.sidekickDesktop?.dashscopeChat
   if (ipc) {
+    const modelFallbackEnv = import.meta.env.VITE_DASHSCOPE_MODEL_FALLBACK as
+      | string
+      | undefined
     return ipc({
       apiKey: req.apiKey,
       model: req.model,
       systemPrompt: req.systemPrompt,
       userPrompt: req.userPrompt,
       temperature: req.temperature,
+      ...(modelFallbackEnv !== undefined ? { modelFallbackEnv } : {}),
       ...(req.chatCompletionsUrl
         ? { chatCompletionsUrl: req.chatCompletionsUrl }
         : {}),
     })
   }
-  return requestDashScopeText(req)
+  const fallbackEnv = import.meta.env.VITE_DASHSCOPE_MODEL_FALLBACK as
+    | string
+    | undefined
+  const result = await requestDashScopeTextWithFallback(
+    req,
+    fallbackEnv ? { envFallbackList: fallbackEnv } : {},
+  )
+  return result.content
 }
 
 /**
@@ -44,7 +61,7 @@ async function completeLightFeedbackWithDashScope(
 export async function submitCompanionLightFeedback(args: {
   message: string
   kind: LightFeedbackKind
-}): Promise<void> {
+}): Promise<string> {
   const apiKey = import.meta.env.VITE_DASHSCOPE_API_KEY as string | undefined
   if (!apiKey?.trim()) {
     throw new Error('缺少 VITE_DASHSCOPE_API_KEY，无法调用通义归纳轻反馈')
@@ -52,7 +69,7 @@ export async function submitCompanionLightFeedback(args: {
   const model =
     (import.meta.env.VITE_DASHSCOPE_MODEL as string | undefined) ?? 'qwen-turbo'
   const snippet = args.message.replace(/\s+/g, ' ').trim().slice(0, 220)
-  if (!snippet) return
+  if (!snippet) return ''
 
   const label = LABELS[args.kind]
   const systemPrompt = [
@@ -64,18 +81,18 @@ export async function submitCompanionLightFeedback(args: {
 
   const userPrompt = `原文：${snippet}`
 
+  const chatCompletionsUrl = dashscopeChatCompletionsUrl()
   const req: DashScopeTextRequest = {
     apiKey,
     model,
     systemPrompt,
     userPrompt,
     temperature: 0.35,
-    ...(dashscopeChatCompletionsUrl() !== undefined
-      ? { chatCompletionsUrl: dashscopeChatCompletionsUrl() }
-      : {}),
+    ...(chatCompletionsUrl !== undefined ? { chatCompletionsUrl } : {}),
   }
 
   const line = (await completeLightFeedbackWithDashScope(req)).trim()
   if (!line) throw new Error('通义返回为空')
-  appendCompanionLightFeedbackHint(line)
+  setLightFeedbackForMessage(args.message, args.kind, line)
+  return line
 }

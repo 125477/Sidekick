@@ -1,10 +1,12 @@
 import { app, ipcMain, screen } from 'electron'
 import { dashscopeTtsFetch } from '../dashscopeTtsFetch.mjs'
+import { dashscopeChatCompleteWithFallback } from './dashscopeChat.mjs'
 import { clamp } from './geometry.mjs'
 import {
   AUX_WINDOW_HEIGHT,
   AUX_WINDOW_WIDTH,
   SPRITE_MENU_ACTIONS,
+  TOAST_WINDOW_MIN_WIDTH,
   TOAST_WINDOW_WIDTH,
   WIDGET_WINDOW_WIDTH,
 } from './constants.mjs'
@@ -24,10 +26,17 @@ import {
   stopToastPassthroughHitTest,
   tickToastPassthroughHitTest,
 } from './toastPassthrough.mjs'
+import {
+  hideCornerNotificationWindow,
+  openCornerNotificationTarget,
+  showCornerNotificationWindow,
+} from './cornerNotification.mjs'
+import { updateMoodReminderSnapshot } from './moodReminderState.mjs'
 import { showSidekickSystemNotification } from './notification.mjs'
 import {
   beginDragTrailSession,
   endDragTrailSession,
+  keepSpriteAboveDragTrail,
   pushDragTrailScreenPoint,
 } from './dragTrail.mjs'
 import {
@@ -67,6 +76,24 @@ export function registerSidekickIpcHandlers() {
   })
   ipcMain.handle('sidekick:show-system-notification', (_event, payload) => {
     return showSidekickSystemNotification(payload ?? {})
+  })
+  ipcMain.handle('sidekick:show-corner-notification', async (_event, payload) => {
+    return showCornerNotificationWindow(payload ?? {})
+  })
+  ipcMain.handle('sidekick:hide-corner-notification', () => {
+    hideCornerNotificationWindow()
+    return undefined
+  })
+  ipcMain.handle('sidekick:corner-notification-open-target', () => {
+    openCornerNotificationTarget()
+    return undefined
+  })
+  ipcMain.on('sidekick:update-mood-reminder-snapshot', (_event, snapshot) => {
+    try {
+      updateMoodReminderSnapshot(snapshot ?? {})
+    } catch (err) {
+      console.warn('[sidekick] mood reminder snapshot failed', err)
+    }
   })
   ipcMain.handle('sidekick:open-onboarding', () => {
     openOnboardingWindow()
@@ -177,7 +204,10 @@ export function registerSidekickIpcHandlers() {
   })
   ipcMain.handle('sidekick:widget-sprite-menu-submit', (event, action) => {
     const a = typeof action === 'string' ? action : ''
-    if (!SPRITE_MENU_ACTIONS.has(a)) return undefined
+    if (!SPRITE_MENU_ACTIONS.has(a)) {
+      console.warn('[sidekick] sprite menu action ignored (restart app if you added a new item):', a)
+      return undefined
+    }
     if (
       !state.spriteMenuWindow ||
       state.spriteMenuWindow.isDestroyed() ||
@@ -244,6 +274,7 @@ export function registerSidekickIpcHandlers() {
     ny = clamp(ny, wa.y - b.height + margin, wa.y + wa.height - margin)
     state.spriteWindow.setBounds({ ...b, x: nx, y: ny })
     persistWidgetBounds(state.spriteWindow)
+    if (state.dragTrailDragging) keepSpriteAboveDragTrail()
     // 气泡位置由 `spriteWindow` 的 `move` 事件里 `applyToastWindowBounds` 同步，避免与 `move` 重复 setBounds。
     return undefined
   })
@@ -296,26 +327,32 @@ export function registerSidekickIpcHandlers() {
     applySetSpriteAnchorFromRenderer(anchor)
   })
   ipcMain.handle('sidekick:resize-toast', (_event, payload) => {
-    const raw = Number(payload?.height)
-    if (!state.toastWindow || state.toastWindow.isDestroyed() || !Number.isFinite(raw)) return
+    const rawH = Number(payload?.height)
+    if (!state.toastWindow || state.toastWindow.isDestroyed() || !Number.isFinite(rawH)) {
+      return
+    }
     const minH = 52
     const maxH = 480
-    const newH = clamp(Math.round(raw), minH, maxH)
+    const minW = TOAST_WINDOW_MIN_WIDTH
+    const maxW = 360
+    const newH = clamp(Math.round(rawH), minH, maxH)
     const b = state.toastWindow.getBounds()
-    if (state.lastToastTailDown) {
-      const bottom = b.y + b.height
-      state.toastWindow.setBounds({
-        x: b.x,
-        y: bottom - newH,
-        width: TOAST_WINDOW_WIDTH,
-        height: newH,
-      })
-    } else {
-      state.toastWindow.setBounds({
-        ...b,
-        height: newH,
-      })
-    }
+    const rawW = Number(payload?.width)
+    const newW = Number.isFinite(rawW)
+      ? clamp(Math.round(rawW), minW, maxW)
+      : b.width
+    const centerX = state.lastSpriteAnchor?.centerX
+    const newX =
+      typeof centerX === 'number' && Number.isFinite(centerX)
+        ? Math.round(centerX - newW / 2)
+        : b.x
+    // 顶边锚定：悬停展开/收起只改变高度，避免底边固定导致文案区跳动。
+    state.toastWindow.setBounds({
+      x: newX,
+      y: b.y,
+      width: newW,
+      height: newH,
+    })
     applyToastWindowBounds()
   })
   ipcMain.on('sidekick:toast-regenerate-request', () => {
@@ -338,55 +375,12 @@ export function registerSidekickIpcHandlers() {
   })
 
   ipcMain.handle('sidekick:dashscope-chat', async (_event, payload) => {
-    const apiKey = String(payload?.apiKey ?? '').trim()
-    if (!apiKey) throw new Error('Missing DASHSCOPE_API_KEY')
-
-    const systemPrompt = String(payload?.systemPrompt ?? '')
-    const userPrompt = String(payload?.userPrompt ?? '')
-    const model = payload?.model ?? 'qwen-turbo'
-    const temperature =
-      typeof payload?.temperature === 'number' && Number.isFinite(payload.temperature)
-        ? payload.temperature
-        : 0.7
-
-    const response = await fetch(
-      'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model,
-          temperature,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt },
-          ],
-        }),
-      },
-    )
-
-    if (!response.ok) {
-      const detail = await response.text().catch(() => '')
-      throw new Error(
-        `DashScope ${response.status}${detail ? `: ${detail.slice(0, 240)}` : ''}`,
-      )
-    }
-
-    const data = await response.json()
-    const content = data.choices?.[0]?.message?.content?.trim()
-    if (!content) throw new Error('Empty content from DashScope')
+    const { content } = await dashscopeChatCompleteWithFallback(payload)
     return content
   })
 
   ipcMain.handle('sidekick:dashscope-tts', async (_event, payload) => {
-    const buf = await dashscopeTtsFetch(payload)
-    return {
-      base64: Buffer.from(buf).toString('base64'),
-      mimeType: 'audio/mpeg',
-    }
+    return dashscopeTtsFetch(payload)
   })
   ipcMain.handle('sidekick:quit-app', () => {
     app.quit()

@@ -8,6 +8,7 @@ import {
 import type { SidekickSettings } from '../../state/settingsState'
 import type { EmotionMoodTab } from '../../state/uiState'
 import {
+  deleteMoodJournalEntryById,
   getMoodEntryForDay,
   listMoodJournalEntries,
   localDayKey,
@@ -91,6 +92,29 @@ export function DailyMoodPanel({
       setSummaryView('form')
     }
   }, [emotionMoodTab])
+
+  const handleDeleteEntry = useCallback(
+    async (id: string) => {
+      const ok = await deleteMoodJournalEntryById(id)
+      if (!ok) return
+      await refresh()
+    },
+    [refresh],
+  )
+
+  async function handleDeleteToday() {
+    if (!todayEntry || busy) return
+    const ok = window.confirm('确定删除今日的心情小结吗？此操作不可恢复。')
+    if (!ok) return
+    setBusy(true)
+    setSaveHint(null)
+    try {
+      await handleDeleteEntry(todayEntry.id)
+      setSaveHint('已删除今日记录。')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   async function handleSubmitToday() {
     if (!settings.dailyMoodEnabled) {
@@ -186,7 +210,10 @@ export function DailyMoodPanel({
             </button>
           </div>
           <div className="min-h-0 flex-1 overflow-hidden">
-            <MoodHistoryPanel entries={entries} />
+            <MoodHistoryPanel
+              entries={entries}
+              onDeleteEntry={handleDeleteEntry}
+            />
           </div>
         </div>
       ) : (
@@ -198,7 +225,7 @@ export function DailyMoodPanel({
           ) : null}
           <div className="flex flex-wrap items-start justify-between gap-2">
             <p className="sk-body-sm min-w-0 flex-1 text-[color:var(--sk-text-muted)]">
-              一天一记：选今日整体心情，可写日记并添加图片或短视频（仅存本机）。
+              一天一记：选今日整体心情，可写日记并添加图片或短视频。
             </p>
             <button
               type="button"
@@ -260,6 +287,16 @@ export function DailyMoodPanel({
             >
               确定
             </button>
+            {todayEntry ? (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void handleDeleteToday()}
+                className="rounded-full border border-rose-200 px-4 py-1.5 text-sm text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+              >
+                删除今日记录
+              </button>
+            ) : null}
             {saveHint ? (
               <span className="text-xs text-slate-500">{saveHint}</span>
             ) : null}

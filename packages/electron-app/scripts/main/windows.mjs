@@ -52,6 +52,7 @@ export function createSpriteWindow() {
       preload: preloadPath,
       contextIsolation: true,
       sandbox: true,
+      backgroundThrottling: false,
     },
   })
 

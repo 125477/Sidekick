@@ -10,6 +10,16 @@ import {
 import { EmotionToastUnlockedToolbar } from './EmotionToastUnlockedToolbar'
 import { EmotionToastIntroActions } from './EmotionToastIntroActions'
 import { ToastLightFeedbackRow } from './ToastLightFeedbackRow'
+import {
+  TOAST_CARD_MAX_CLASS,
+  TOAST_CARD_MAX_CLASS_DETACHED,
+  TOAST_CARD_MIN_CLASS,
+} from './toastCardMetrics'
+import {
+  toastBarGroupClass,
+  toastMessageChromeClass,
+  toastMessageInnerClass,
+} from './toastMessageLayout'
 
 function EmotionToastSwitchingRow() {
   return (
@@ -51,7 +61,7 @@ export function EmotionToastCard({
   onToggleFavorite,
   onCopy,
   onReplayTts,
-  onOpenFavorites,
+  onOpenEmotion,
   onOpenSettings,
   onOpenSkin,
   onOpenMenu,
@@ -74,6 +84,7 @@ export function EmotionToastCard({
       regenerating={false}
       toastPassthroughLocked={chrome.toastPassthroughLocked}
       multiline={introMode}
+      compactLayout={chrome.compactMessageLayout}
       {...(maxChars !== undefined ? { maxChars } : {})}
       onRegenerateClick={chrome.runRegenerate}
     />
@@ -88,11 +99,14 @@ export function EmotionToastCard({
 
   const plainMessageChrome: ReactNode = (
     <div
-      className={`group/toastbar-plain rounded-lg bg-slate-50/55 transition-colors duration-200 ease-out motion-reduce:transition-none ${
-        chrome.regenerating ? 'w-full' : 'w-fit max-w-full self-start'
-      }`}
+      className={`${toastBarGroupClass(chrome.compactMessageLayout, 'group/toastbar-plain')} rounded-lg bg-slate-50/55 transition-colors duration-200 ease-out motion-reduce:transition-none ${toastMessageChromeClass(
+        chrome.compactMessageLayout,
+        chrome.regenerating,
+      )}`}
     >
-      <div className="flex w-full min-w-0 flex-col">{messageCell}</div>
+      <div className={toastMessageInnerClass(chrome.compactMessageLayout)}>
+        {messageCell}
+      </div>
       {showLightFeedback && !chrome.regenerating ? (
         <div
           className={`grid min-h-0 overflow-hidden transition-[grid-template-rows,opacity] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
@@ -103,6 +117,7 @@ export function EmotionToastCard({
             <ToastLightFeedbackRow
               message={message}
               disabled={chrome.regenerating}
+              centered={chrome.compactMessageLayout}
             />
           </div>
         </div>
@@ -120,16 +135,16 @@ export function EmotionToastCard({
         ref={chrome.toastHitRootRef}
         data-emotion-toast-menu-fallback
         aria-busy={chrome.regenerating}
-        className={`relative flex min-w-[228px] max-w-[min(355px,calc(100vw-32px))] items-start gap-2.5 rounded-2xl border px-2.5 py-1 text-[13px] leading-relaxed text-slate-600 [-webkit-app-region:no-drag] ${
-          detached ? 'w-full' : 'w-max'
-        } ${
+        className={`relative flex ${TOAST_CARD_MIN_CLASS} ${
+          detached ? TOAST_CARD_MAX_CLASS_DETACHED : TOAST_CARD_MAX_CLASS
+        } w-max items-start gap-2.5 rounded-2xl border px-2.5 py-1 text-[13px] leading-relaxed text-slate-600 [-webkit-app-region:no-drag] ${
           chrome.toastPassthroughLocked
             ? 'pointer-events-none'
             : 'pointer-events-auto'
         } ${
           detached
-            ? 'border-slate-200 bg-white shadow-[0_12px_40px_-12px_rgba(15,23,42,0.25)]'
-            : 'border-slate-200 bg-white shadow-[0_8px_28px_-10px_rgba(15,23,42,0.18)]'
+            ? 'border-slate-200 bg-white shadow-[0_4px_14px_-6px_rgba(15,23,42,0.10)]'
+            : 'border-slate-200 bg-white shadow-[0_2px_10px_-3px_rgba(15,23,42,0.08)]'
         } ${chrome.motionClass}`}
       >
         <EmotionToastTail pointsDown={chrome.tailPointsDown} />
@@ -147,8 +162,10 @@ export function EmotionToastCard({
                   regenerating={chrome.regenerating}
                   lockedBarOpen={chrome.lockedBarOpen}
                   messageCell={messageCell}
-                  showLightFeedback={showLightFeedback}
+                  showLightFeedback={false}
                   lightFeedbackMessage={message}
+                  compactMessageLayout={chrome.compactMessageLayout}
+                  lockedChromeGroupRef={chrome.lockedChromeGroupRef}
                   lockedMessageChromeRef={chrome.lockedMessageChromeRef}
                   lockedToolbarRef={chrome.lockedToolbarRef}
                   toastUnlockHitRef={chrome.toastUnlockHitRef}
@@ -180,7 +197,7 @@ export function EmotionToastCard({
                   showCopy={chrome.showCopy}
                   showReplay={chrome.showReplay}
                   showFavorite={chrome.showFavorite}
-                  showFavoritesRecord={chrome.showFavoritesRecord}
+                  showEmotionFeedback={chrome.showEmotionFeedback}
                   showLockControl={chrome.showLockControl}
                   showSkin={chrome.showSkin}
                   showSettings={chrome.showSettings}
@@ -190,10 +207,11 @@ export function EmotionToastCard({
                   introMode={introMode}
                   showLightFeedback={showLightFeedback && !introMode}
                   lightFeedbackMessage={message}
+                  compactMessageLayout={chrome.compactMessageLayout}
                   {...(onCopy ? { onCopy } : {})}
                   {...(onReplayTts ? { onReplayTts } : {})}
                   {...(onToggleFavorite ? { onToggleFavorite } : {})}
-                  {...(onOpenFavorites ? { onOpenFavorites } : {})}
+                  {...(onOpenEmotion ? { onOpenEmotion } : {})}
                   {...(onOpenSkin ? { onOpenSkin } : {})}
                   {...(onOpenSettings ? { onOpenSettings } : {})}
                   {...(onOpenMenu ? { onOpenMenu } : {})}

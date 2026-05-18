@@ -34,9 +34,11 @@ button:disabled,
 html.sidekick-widget-root,
 html.sidekick-toast-root,
 html.sidekick-drag-trail-root,
+html.sidekick-corner-notification-root,
 body.sidekick-widget-root,
 body.sidekick-toast-root,
-body.sidekick-drag-trail-root {
+body.sidekick-drag-trail-root,
+body.sidekick-corner-notification-root {
   margin: 0;
   height: 100%;
   width: 100%;
@@ -45,10 +47,16 @@ body.sidekick-drag-trail-root {
 
 body.sidekick-widget-root #root,
 body.sidekick-toast-root #root,
-body.sidekick-drag-trail-root #root {
+body.sidekick-drag-trail-root #root,
+body.sidekick-corner-notification-root #root {
   height: 100%;
   width: 100%;
   overflow: hidden;
+}
+
+body.sidekick-corner-notification-root button:not(:disabled),
+body.sidekick-corner-notification-root .sk-toast-clickable {
+  cursor: pointer;
 }
 
 img {

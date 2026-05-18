@@ -1,4 +1,4 @@
-import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
+import type { Dispatch, MutableRefObject, RefObject, SetStateAction } from 'react'
 import { useCallback, useEffect } from 'react'
 import { loadData, saveData, type AvatarPreset, type EmotionRecord } from '@sidekick/core'
 import { broadcastAvatarSync, subscribeAvatarSync } from '../state/avatarSync'
@@ -11,8 +11,10 @@ import {
 } from '../state/settingsStorage'
 import type { UiAction } from '../state/uiState'
 import { mergeLoadedSettings } from './mergeLoadedSettings'
+import { seedRecentCompanionLinesFromTextHistory } from './recentCompanionLines'
 
 export type UseAppBootstrapArgs = {
+  recentCompanionLinesRef: RefObject<string[]>
   dispatch: Dispatch<UiAction>
   settings: SidekickSettings
   settingsRef: MutableRefObject<SidekickSettings>
@@ -33,6 +35,7 @@ export type UseAppBootstrapArgs = {
 }
 
 export function useAppBootstrap({
+  recentCompanionLinesRef,
   dispatch,
   settings,
   settingsRef,
@@ -72,11 +75,25 @@ export function useAppBootstrap({
       setAvatars(data.avatar.presets)
       setSelectedAvatarId(data.avatar.selectedAvatarId)
       setEmotionRecords(data.emotion.records)
+      if (recentCompanionLinesRef.current.length === 0) {
+        recentCompanionLinesRef.current =
+          seedRecentCompanionLinesFromTextHistory(data.texts.history)
+      }
       dispatch({ type: 'SET_TOAST_ANCHOR', anchor: saved.toastAnchor })
       setSettingsReady(true)
       setAvatarHydrated(true)
     })
-  }, [dispatch, setAvatarHydrated, setAvatars, setEmotionRecords, setOnboardingDone, setSelectedAvatarId, setSettings, setSettingsReady])
+  }, [
+    dispatch,
+    recentCompanionLinesRef,
+    setAvatarHydrated,
+    setAvatars,
+    setEmotionRecords,
+    setOnboardingDone,
+    setSelectedAvatarId,
+    setSettings,
+    setSettingsReady,
+  ])
 
   useEffect(() => {
     if (uiStateActivePanel !== 'emotion') return

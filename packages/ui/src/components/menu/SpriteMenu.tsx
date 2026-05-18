@@ -4,6 +4,7 @@ import { widgetMenuPlacementClasses } from '../../utils/widgetMenuPlacement'
 export type MenuAction =
   | 'skin'
   | 'settings'
+  | 'favorites'
   | 'emotion'
   | 'fortune'
   | 'more'
@@ -22,12 +23,13 @@ type SpriteMenuProps = {
   onAction: (action: MenuAction) => void
 }
 
-/** 按日常使用频率：互动功能在上，换肤/设置偏下，退出置底。 */
+/** 按日常使用频率：换肤在上；情绪与收藏紧邻；退出置底。 */
 const ITEMS: Array<{ id: MenuAction; label: string }> = [
+  { id: 'skin', label: '更换形象' },
   { id: 'emotion', label: '情绪反馈' },
-  { id: 'skin', label: '换肤' },
-  { id: 'settings', label: '设置' },
+  { id: 'favorites', label: '收藏历史' },
   { id: 'fortune', label: '每日抽签' },
+  { id: 'settings', label: '设置' },
   { id: 'more', label: '更多...' },
   { id: 'exit', label: '退出' },
 ]

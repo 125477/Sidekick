@@ -4,6 +4,38 @@ import type { CompanionCopyStyle, DashScopeTtsModel } from '@sidekick/core'
 /** 默认推送间隔（分钟）；气泡默认停留时长与之相同。 */
 export const DEFAULT_PUSH_INTERVAL_MINUTES = 3
 
+export const MIN_INTERVAL_MINUTES = 1
+export const MAX_INTERVAL_MINUTES = 60
+
+/** 旧版持久化字段：停留秒数。 */
+export const LEGACY_DEFAULT_DWELL_SECONDS = 60
+
+export function clampIntervalMinutes(minutes: number): number {
+  const m = Number(minutes)
+  if (!Number.isFinite(m)) return DEFAULT_PUSH_INTERVAL_MINUTES
+  return Math.min(MAX_INTERVAL_MINUTES, Math.max(MIN_INTERVAL_MINUTES, Math.floor(m)))
+}
+
+export function clampDwellMinutes(minutes: number): number {
+  return clampIntervalMinutes(minutes)
+}
+
+export function isFocusPresetMinutesValid(minutes: number): boolean {
+  return Number.isFinite(minutes) && minutes > 0
+}
+
+/** 加载设置时：无效或非正数回退默认；不设上限。 */
+export function normalizeFocusPresetMinutes(minutes: number): number {
+  const m = Number(minutes)
+  if (!isFocusPresetMinutesValid(m)) return defaultSettings.focusPresetMinutes
+  return m
+}
+
+/** 气泡 / IPC 计时仍用秒，由分钟设置换算。 */
+export function dwellMinutesToSeconds(minutes: number): number {
+  return clampDwellMinutes(minutes) * 60
+}
+
 export type SidekickSettings = {
   pushEnabled: boolean
   pushIntervalMinutes: number
@@ -13,7 +45,8 @@ export type SidekickSettings = {
   quietStart: string
   quietEnd: string
   toastAnchor: ToastAnchor
-  dwellSeconds: number
+  /** 气泡停留时长（分钟）；与推送间隔默认同值。 */
+  dwellMinutes: number
   toastAlwaysVisible: boolean
   clickToFetchEnabled: boolean
   avatarSize: number
@@ -125,7 +158,7 @@ export const defaultSettings: SidekickSettings = {
   quietStart: '22:00',
   quietEnd: '08:00',
   toastAnchor: 'bottom',
-  dwellSeconds: DEFAULT_PUSH_INTERVAL_MINUTES * 60,
+  dwellMinutes: DEFAULT_PUSH_INTERVAL_MINUTES,
   toastAlwaysVisible: false,
   clickToFetchEnabled: true,
   avatarSize: 80,
@@ -133,20 +166,20 @@ export const defaultSettings: SidekickSettings = {
   textTemperature: 0.85,
   imageTemperature: 0.5,
   textStyle: '治愈',
-  allowEmoji: true,
+  allowEmoji: false,
   textMaxChars: 32,
   darkMode: false,
   motionEnabled: true,
   language: 'zh-CN',
-  companionTtsEnabled: true,
-  companionTtsModel: 'qwen3-tts-flash',
-  companionTtsVoice: 'Cherry',
+  companionTtsEnabled: false,
+  companionTtsModel: 'qwen-tts-2025-05-22',
+  companionTtsVoice: 'Chelsie',
   companionTtsSpeechRate: 1,
   pushAutoSwitchAvatar: false,
   companionInterests: [],
   dailyMoodEnabled: true,
-  dailyMoodReminderEnabled: false,
-  dailyMoodReminderTime: '21:00',
+  dailyMoodReminderEnabled: true,
+  dailyMoodReminderTime: '17:00',
   focusSessionUntilEpochMs: null,
   focusPresetMinutes: 25,
   panelBackgroundEnabled: false,

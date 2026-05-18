@@ -10,6 +10,18 @@ contextBridge.exposeInMainWorld('sidekickDesktop', {
   showSystemNotification(payload) {
     return ipcRenderer.invoke('sidekick:show-system-notification', payload)
   },
+  showCornerNotification(payload) {
+    return ipcRenderer.invoke('sidekick:show-corner-notification', payload)
+  },
+  hideCornerNotification() {
+    return ipcRenderer.invoke('sidekick:hide-corner-notification')
+  },
+  openCornerNotificationTarget() {
+    return ipcRenderer.invoke('sidekick:corner-notification-open-target')
+  },
+  updateMoodReminderSnapshot(snapshot) {
+    ipcRenderer.send('sidekick:update-mood-reminder-snapshot', snapshot)
+  },
   openOnboardingWindow() {
     return ipcRenderer.invoke('sidekick:open-onboarding')
   },
@@ -204,6 +216,12 @@ contextBridge.exposeInMainWorld('sidekickDesktop', {
   },
   onSystemResume(callback) {
     const channel = 'sidekick:system-resume'
+    const listener = () => callback()
+    ipcRenderer.on(channel, listener)
+    return () => ipcRenderer.removeListener(channel, listener)
+  },
+  onMoodReminderTick(callback) {
+    const channel = 'sidekick:mood-reminder-tick'
     const listener = () => callback()
     ipcRenderer.on(channel, listener)
     return () => ipcRenderer.removeListener(channel, listener)

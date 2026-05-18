@@ -143,7 +143,7 @@ export function OnboardingWizard({
             <p className="font-medium text-slate-800">选择陪伴形象</p>
             {/* 说明文案已按产品要求暂时注释
             <p className="text-xs leading-relaxed text-slate-600">
-              选好后才会在桌面显示精灵；之后可在菜单「换肤」里随时更换。
+              选好后才会在桌面显示精灵；之后可在菜单「更换形象」里随时更换。
             </p>
             */}
             <AvatarPresetGallery
@@ -159,7 +159,7 @@ export function OnboardingWizard({
               )}
               selectedAvatarId={selectedAvatarId}
               onSelect={onSelectedAvatarIdChange}
-              emptyHint="暂无自定义形象；在换肤中上传后会显示在此处。"
+              emptyHint="暂无自定义形象；在更换形象中上传后会显示在此处。"
               orderedSlotDisplayNames
             />
             <div className="flex flex-wrap justify-end gap-2 pt-1">
@@ -264,7 +264,7 @@ export function OnboardingWizard({
                 rows={2}
                 maxLength={120}
                 placeholder=""
-                className="resize-none rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-800 placeholder:text-slate-400"
+                className="sk-textarea resize-none"
               />
             </label>
             {/* 原 placeholder：例如：最近在听周杰伦、重温《星际穿越》 */}

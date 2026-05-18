@@ -110,3 +110,13 @@ export async function upsertMoodJournalEntry(input: {
   await store.setItem(ENTRIES_KEY, filtered.slice(0, 400))
   return next
 }
+
+export async function deleteMoodJournalEntryById(id: string): Promise<boolean> {
+  const targetId = id.trim()
+  if (!targetId) return false
+  const all = await readAll()
+  const next = all.filter((e) => e.id !== targetId)
+  if (next.length === all.length) return false
+  await store.setItem(ENTRIES_KEY, next)
+  return true
+}

@@ -2,6 +2,11 @@ import type { ReactNode, RefObject } from 'react'
 import { EmotionToastToolbarIconButton } from './EmotionToastToolbarButton'
 import { IconToolbarLockClosed } from './EmotionToastToolbarIcons'
 import { ToastLightFeedbackRow } from './ToastLightFeedbackRow'
+import {
+  toastBarGroupClass,
+  toastMessageChromeClass,
+  toastMessageInnerClass,
+} from './toastMessageLayout'
 
 function toastHoverRevealClass(motionEnabled: boolean, revealed: boolean): string {
   return `grid min-h-0 overflow-hidden transition-[grid-template-rows,opacity] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
@@ -19,7 +24,7 @@ const toastToolbarChromeClassName = (detached: boolean) =>
   }`
 
 const toastToolbarIconsRowClassName =
-  'flex min-h-7 min-w-0 shrink-0 cursor-pointer flex-nowrap items-center justify-center gap-0 px-0.5 py-1'
+  'flex min-h-7 min-w-0 shrink-0 flex-nowrap items-center justify-center gap-0 px-0.5 py-1'
 
 export type EmotionToastLockedChromeProps = {
   detached: boolean
@@ -29,6 +34,8 @@ export type EmotionToastLockedChromeProps = {
   messageCell: ReactNode
   showLightFeedback?: boolean
   lightFeedbackMessage?: string
+  compactMessageLayout?: boolean
+  lockedChromeGroupRef: RefObject<HTMLDivElement | null>
   lockedMessageChromeRef: RefObject<HTMLDivElement | null>
   lockedToolbarRef: RefObject<HTMLDivElement | null>
   toastUnlockHitRef: RefObject<HTMLDivElement | null>
@@ -46,6 +53,8 @@ export function EmotionToastLockedChrome({
   messageCell,
   showLightFeedback = false,
   lightFeedbackMessage = '',
+  compactMessageLayout = false,
+  lockedChromeGroupRef,
   lockedMessageChromeRef,
   lockedToolbarRef,
   toastUnlockHitRef,
@@ -54,8 +63,23 @@ export function EmotionToastLockedChrome({
   setUnlockedToolbarHot,
   onSpriteInteractionLockedChange,
 }: EmotionToastLockedChromeProps) {
+  const closeLockedChrome = () => {
+    setLockedMsgHot(false)
+    setLockedToolbarHot(false)
+  }
+
   return (
-    <>
+    <div
+      ref={lockedChromeGroupRef}
+      className={toastBarGroupClass(compactMessageLayout, 'group/toastbar-locked')}
+      onPointerLeave={(e) => {
+        const t = e.relatedTarget
+        if (t instanceof Node && lockedChromeGroupRef.current?.contains(t)) {
+          return
+        }
+        closeLockedChrome()
+      }}
+    >
       <div
         ref={lockedMessageChromeRef}
         className="flex w-full min-w-0 flex-col"
@@ -66,17 +90,20 @@ export function EmotionToastLockedChrome({
         onPointerLeave={(e) => {
           const t = e.relatedTarget
           if (t instanceof Node && lockedToolbarRef.current?.contains(t)) {
+            setLockedMsgHot(false)
+            setLockedToolbarHot(true)
             return
           }
           setLockedMsgHot(false)
         }}
       >
         <div
-          className={`rounded-lg bg-slate-50/55 transition-colors duration-200 ease-out motion-reduce:transition-none ${
-            regenerating ? 'w-full' : 'w-fit max-w-full self-start'
-          }`}
+          className={`rounded-lg bg-slate-50/55 transition-colors duration-200 ease-out motion-reduce:transition-none ${toastMessageChromeClass(
+            compactMessageLayout,
+            regenerating,
+          )}`}
         >
-          <div className="flex w-full min-w-0 max-w-full flex-col">
+          <div className={toastMessageInnerClass(compactMessageLayout)}>
             {messageCell}
           </div>
         </div>
@@ -88,6 +115,7 @@ export function EmotionToastLockedChrome({
               <ToastLightFeedbackRow
                 message={lightFeedbackMessage}
                 disabled={regenerating}
+                centered={compactMessageLayout}
               />
             </div>
           </div>
@@ -116,6 +144,7 @@ export function EmotionToastLockedChrome({
             return
           }
           setLockedToolbarHot(false)
+          setLockedMsgHot(false)
         }}
       >
         <div className="min-h-0 overflow-hidden">
@@ -139,7 +168,7 @@ export function EmotionToastLockedChrome({
         </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }
 
@@ -166,7 +195,11 @@ export function EmotionToastLockedPassthroughSlop({
       ref={lockedPassthroughSlopRef}
       aria-hidden
       className="pointer-events-auto absolute inset-x-0 bottom-0 z-[5] h-11 rounded-b-2xl bg-transparent"
-      onPointerEnter={() => {
+      onPointerEnter={(e) => {
+        const t = e.relatedTarget
+        if (t instanceof Node && lockedToolbarRef.current?.contains(t)) {
+          return
+        }
         setLockedToolbarHot(true)
         setLockedMsgHot(false)
       }}
@@ -179,6 +212,7 @@ export function EmotionToastLockedPassthroughSlop({
           return
         }
         setLockedToolbarHot(false)
+        setLockedMsgHot(false)
       }}
     />
   )
