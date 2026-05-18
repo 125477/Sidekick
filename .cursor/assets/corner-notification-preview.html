@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>灵伴 · 右下角提醒弹窗预览</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family:
+          'PingFang SC',
+          'Hiragino Sans GB',
+          system-ui,
+          -apple-system,
+          sans-serif;
+        background: linear-gradient(
+          145deg,
+          rgb(245 243 255) 0%,
+          rgb(248 250 252) 45%,
+          rgb(237 233 254 / 0.5) 100%
+        );
+        color: rgb(30 41 59);
+      }
+
+      .desktop-hint {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 10px 16px;
+        border-radius: 12px;
+        border: 1px solid rgb(226 232 240);
+        background: rgb(255 255 255 / 0.92);
+        font-size: 13px;
+        color: rgb(71 85 105);
+        box-shadow: 0 2px 10px -3px rgb(15 23 42 / 0.08);
+        z-index: 1;
+      }
+
+      .controls {
+        position: fixed;
+        top: 68px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 8px;
+        z-index: 1;
+      }
+
+      .controls button {
+        cursor: pointer;
+        border: 1px solid rgb(196 181 253);
+        background: rgb(255 255 255);
+        color: rgb(91 33 182);
+        border-radius: 10px;
+        padding: 8px 14px;
+        font-size: 13px;
+        font-weight: 500;
+        transition: background 200ms ease;
+      }
+
+      .controls button:hover {
+        background: rgb(237 233 254);
+      }
+
+      .dock {
+        position: fixed;
+        left: 50%;
+        bottom: 10px;
+        transform: translateX(-50%);
+        width: min(520px, 90vw);
+        height: 56px;
+        border-radius: 18px;
+        background: rgb(255 255 255 / 0.55);
+        border: 1px solid rgb(255 255 255 / 0.65);
+        backdrop-filter: blur(18px);
+      }
+
+      .toast-host {
+        position: fixed;
+        right: 16px;
+        bottom: 16px;
+        width: min(360px, calc(100vw - 32px));
+        z-index: 10;
+        pointer-events: none;
+      }
+
+      .toast {
+        pointer-events: auto;
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        padding: 14px 14px 14px 12px;
+        border-radius: 16px;
+        border: 1px solid rgb(226 232 240);
+        background: rgb(255 255 255);
+        box-shadow: 0 4px 14px -6px rgb(15 23 42 / 0.1);
+        transform: translateY(24px);
+        opacity: 0;
+      }
+
+      .toast.is-visible {
+        animation: toast-enter 280ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+      }
+
+      .toast.is-hiding {
+        animation: toast-exit 220ms cubic-bezier(0.4, 0, 1, 1) forwards;
+      }
+
+      @keyframes toast-enter {
+        from {
+          opacity: 0;
+          transform: translateY(24px) scale(0.96);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+
+      @keyframes toast-exit {
+        from {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+        to {
+          opacity: 0;
+          transform: translateY(16px) scale(0.98);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .toast.is-visible,
+        .toast.is-hiding {
+          animation: none;
+        }
+        .toast.is-visible {
+          opacity: 1;
+          transform: none;
+        }
+        .toast.is-hiding {
+          opacity: 0;
+        }
+      }
+
+      .avatar {
+        flex-shrink: 0;
+        width: 40px;
+        height: 40px;
+        border-radius: 999px;
+        background: linear-gradient(135deg, rgb(251 113 133), rgb(251 191 36));
+        display: grid;
+        place-items: center;
+        box-shadow: 0 2px 8px -2px rgb(244 63 94 / 0.35);
+      }
+
+      .avatar svg {
+        width: 22px;
+        height: 22px;
+        fill: white;
+      }
+
+      .content {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 4px;
+      }
+
+      .title {
+        font-size: 13px;
+        font-weight: 600;
+        color: rgb(15 23 42);
+        line-height: 1.2;
+      }
+
+      .close {
+        cursor: pointer;
+        border: none;
+        background: transparent;
+        color: rgb(100 116 139);
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        transition: background 200ms ease, color 200ms ease;
+      }
+
+      .close:hover {
+        background: rgb(245 243 255);
+        color: rgb(124 58 237);
+      }
+
+      .body {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.55;
+        color: rgb(71 85 105);
+      }
+
+      .action {
+        margin-top: 10px;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        cursor: pointer;
+        border: none;
+        background: transparent;
+        padding: 0;
+        font-size: 12px;
+        font-weight: 600;
+        color: rgb(124 58 237);
+        transition: color 200ms ease;
+      }
+
+      .action:hover {
+        color: rgb(109 40 217);
+      }
+    </style>
+  </head>
+  <body>
+    <p class="desktop-hint">预览：屏幕右下角 · 入场 280ms · 自动 5s 消失 · 支持 reduced-motion</p>
+    <div class="controls">
+      <button type="button" id="btn-show">再次播放入场</button>
+      <button type="button" id="btn-hide">播放退场</button>
+    </div>
+    <div class="dock" aria-hidden="true"></div>
+
+    <div class="toast-host">
+      <article
+        class="toast is-visible"
+        id="toast"
+        role="status"
+        aria-live="polite"
+        aria-label="今日心情提醒"
+      >
+        <div class="avatar" aria-hidden="true">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M12 2l2.2 6.8H21l-5.5 4 2.1 6.7L12 15.8 6.4 19.5l2.1-6.7L3 8.8h6.8L12 2z"
+            />
+          </svg>
+        </div>
+        <div class="content">
+          <div class="head">
+            <h2 class="title">灵伴 · 今日心情</h2>
+            <button class="close" type="button" aria-label="关闭" id="btn-close">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <p class="body">花一分钟记下今天的心情与日记吧。</p>
+          <button class="action" type="button">去写小结 →</button>
+        </div>
+      </article>
+    </div>
+
+    <script>
+      const toast = document.getElementById('toast')
+      let hideTimer = null
+
+      function clearHideTimer() {
+        if (hideTimer) {
+          clearTimeout(hideTimer)
+          hideTimer = null
+        }
+      }
+
+      function showToast() {
+        clearHideTimer()
+        toast.classList.remove('is-hiding')
+        void toast.offsetWidth
+        toast.classList.add('is-visible')
+        hideTimer = setTimeout(hideToast, 5000)
+      }
+
+      function hideToast() {
+        clearHideTimer()
+        toast.classList.remove('is-visible')
+        toast.classList.add('is-hiding')
+      }
+
+      document.getElementById('btn-show').addEventListener('click', showToast)
+      document.getElementById('btn-hide').addEventListener('click', hideToast)
+      document.getElementById('btn-close').addEventListener('click', hideToast)
+
+      hideTimer = setTimeout(hideToast, 5000)
+    </script>
+  </body>
+</html>

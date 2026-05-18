@@ -1,0 +1,60 @@
+---
+description: Sidekick 仓库结构、工具链与编码规范（非对外贡献指南）
+globs: *
+alwaysApply: true
+---
+
+# Sidekick 项目规范
+
+本仓库不维护对外「贡献指南」；Agent 与协作者以本规则、`figma-strict-restore.mdc`（涉及 UI 视觉时）及 `docs/ARCHITECTURE.md` 为准。
+
+## 工具链
+
+- **包管理**：pnpm workspace（遵守根目录 `packageManager` 版本）。
+- **任务编排**：Turbo（`turbo.json`）。
+- **语言与检查**：TypeScript（继承根 `tsconfig.base.json`）、根 `eslint.config.mjs`、Prettier（`.prettierrc.json`）。
+
+## 根目录常用命令
+
+| 命令 | 说明 |
+|------|------|
+| `pnpm install` | 安装依赖 |
+| `pnpm dev` | Turbo 并行各包 `dev` |
+| `pnpm dev:ui` | 仅启动 `packages/ui` 的 Vite |
+| `pnpm build` | Turbo 构建 |
+| `pnpm typecheck` | 全仓 TypeScript 检查 |
+| `pnpm lint` | 全仓 ESLint |
+| `pnpm format` / `pnpm format:check` | Prettier 写回 / 仅检查 |
+| `pnpm pack:desktop` | 先 `build:ui` 再对 `@sidekick/electron-app` 执行 `electron-builder` |
+
+## 包边界
+
+- **`packages/core`**：领域逻辑、schema、存储与外部 API 客户端；**禁止**引入 React / 浏览器 DOM API。
+- **`packages/ui`**：Vite + React；`App.tsx` 为多模式入口；仅在此包使用 Tailwind。
+- **`packages/electron-app`**：Electron 主进程、`preload`、IPC 与桌面打包；入口以 `scripts/dev-main.mjs` 为准。
+- **`packages/extension`**：浏览器扩展（MV3）；按需参与。
+
+## 前端（`packages/ui`）
+
+- **Tailwind CSS v4**；不在业务里散落独立 CSS 文件；语义 token 与工具类优先 `src/styles/tokens.css`、`utilities.css`（与 Figma 还原规则一致）。
+- 组件状态显式（如 idle / loading / error）；考虑键盘操作与 `prefers-reduced-motion`。
+- `preload` 暴露的能力须在 `src/types/electron.d.ts` 中声明并保持同步。
+
+## TypeScript 与质量
+
+- 避免无说明的 `any`；公共导出保持类型清晰。
+- 改动后至少通过**受影响包**的 `typecheck`；合并前在根跑 `pnpm lint` / `pnpm typecheck` 更稳妥。
+
+## Electron 备忘
+
+- 主进程与渲染通过 `ipcMain` / `preload` / `contextBridge` 通信；新增 IPC 时同步类型与调用方。
+- 应用图标：`packages/electron-app/resources/icon.png`（≥512px）；macOS 打包用 `icon.icns` 由 `beforePack` 脚本在 darwin 上从 PNG 生成（见该包 `package.json` `build` 段）。
+
+## Git 与提交
+
+- **仅在用户明确要求时**创建 commit；勿擅自 `git push --force` 到 `main`/`master`。
+- 提交信息格式与 UTF-8 约束见 `.cursor/commands/git-workflow-shared.md`。
+
+## 架构文档
+
+- 模块职责、数据流与目录细节：**`docs/ARCHITECTURE.md`**。

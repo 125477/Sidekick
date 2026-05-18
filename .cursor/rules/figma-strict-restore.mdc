@@ -1,0 +1,47 @@
+---
+description: Figma 1:1 还原硬闸门与技术规范
+globs: *
+alwaysApply: true
+---
+
+# Figma 1:1 还原硬规则与技术规范
+
+## 🛡️ 适用范围
+- 任何涉及 UI 视觉改动的任务：布局、尺寸、间距、圆角、字体、颜色、阴影、渐变、透明度、动效节奏。
+- 本规则优先级高于“最小改动”与“快速修复”。
+
+## 🚀 强制流程（必须逐项完成）
+
+1. **先确认目标**：开始实现前，必须明确目标 Figma 节点（node id）或等效标注范围（截图 + 明确区域）。
+2. **先做对照**：实现前必须列出对照清单：尺寸、间距、圆角、字体、颜色、阴影、渐变、状态差异。
+3. **Token 优先**：组件样式必须优先复用 `packages/ui/src/styles/tokens.css` 与 `packages/ui/src/styles/utilities.css`；若缺失语义 token，必须先补 token 再使用。
+4. **逐项验收**：完成后必须逐项自检并报告结果；每项误差必须 <= 1px 或 <= 1 字重。
+5. **未过即继续**：任一项未达标时，不得宣称完成，不得结束任务，必须继续修正直至达标。
+
+## 🚫 禁止项
+- **禁止**以“视觉接近”“大致一致”“差不多”作为完成标准。
+- **禁止**绕过逐项对照直接提交结果。
+- **禁止**在组件中硬编码色值（`#hex` / `rgb` / `rgba`），除非用户明确批准并说明原因。
+- **禁止**使用 `position: absolute` 进行整体布局（除非设计明确要求重叠），必须优先使用 Flexbox/Grid。
+
+## 🛠️ 技术实现策略
+
+### 1. 布局与样式 (Tailwind CSS)
+- **Flexbox 优先**：严禁随意使用绝对定位布局。必须识别 Figma 的 Auto Layout 并转换为 Tailwind 的 Flexbox 类 (如 `flex`, `flex-col`, `gap-4`, `items-center`).
+- **尺寸与间距**：
+    - 严格遵循 Figma 的像素值。
+    - 如果是 Tailwind 项目，将像素值映射到最近的 Tailwind spacing scale。如果数值非标，必须使用 Arbitrary Values (例如 `mt-[17px]`, `w-[342px]`) 以确保 1px 不差。
+- **排版**：严格匹配字体大小、字重、行高和字间距。使用 `leading-none` 或自定义 `leading-[value]` 确保文字垂直居中无偏差。
+
+### 2. 图标与资源 (SVG)
+- **SVG 内容直出**：不要使用 `<img src="...">` 或图标库（如 FontAwesome）。
+- **操作方式**：必须从 Figma 复制 SVG 代码内容，直接内联在 React 组件中，或者封装为独立的 SVG 组件文件。
+- **属性控制**：移除 SVG 内部的 `fill` 和 `stroke` 属性，改用 Tailwind 的 `fill-current` 或 `text-[color]` 控制颜色，以便继承父级样式。
+
+### 3. MCP 工具使用
+- **数据获取**：使用 MCP 获取 Figma 节点数据时，重点关注 `absoluteBoundingBox` (尺寸/坐标), `fills` (颜色/图片), `strokes` (边框), `effects` (阴影), `fontSize`, `letterSpacing`。
+- **逻辑转换**：不要照搬 JSON 坐标。必须理解 Figma 的层级结构，将其逻辑转换为语义化的 HTML 结构。
+
+## ⛔️ 阻塞处理
+- **若缺少 Figma 节点或关键规格信息**：必须先向用户索取，不得自行猜测。
+- **若当前环境无法验证某项**：必须明确说明阻塞项、影响范围、以及下一步所需信息。
