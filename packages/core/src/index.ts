@@ -13,7 +13,10 @@ export type {
   DashScopeTextRequest,
 } from './clients/dashscopeTextClient'
 export {
+  dashScopeBodyHasApiError,
+  isDashScopeInternalOrServerError,
   isDashScopeQuotaOrAccessError,
+  isDashScopeRetryableWithNextModel,
   listDashScopeChatModels,
   modelsListUrl,
   requestDashScopeChatCompletion,

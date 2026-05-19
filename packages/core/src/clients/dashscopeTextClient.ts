@@ -5,7 +5,6 @@ import {
   parseExtraFallbackModelsFromEnv,
 } from '../constants/dashscopeFallbackModels'
 import {
-  clearDashScopeUnavailableModels,
   markDashScopeModelUnavailable,
   prepareDashScopeModelTryOrder,
 } from '../constants/dashscopeUnavailableModels'
@@ -26,8 +25,37 @@ type DashScopeChoice = {
   }
 }
 
+type DashScopeApiError = {
+  message?: string
+  type?: string
+  code?: string
+  param?: string | null
+}
+
 type DashScopeResponse = {
   choices?: DashScopeChoice[]
+  error?: DashScopeApiError | string | null
+}
+
+function dashScopePayloadHasError(
+  payload: DashScopeResponse,
+): payload is DashScopeResponse & { error: NonNullable<DashScopeResponse['error']> } {
+  const err = payload.error
+  if (err == null) return false
+  if (typeof err === 'string') return err.trim().length > 0
+  if (typeof err === 'object') return Object.keys(err).length > 0
+  return false
+}
+
+/** 响应 JSON 含非空 `error` 字段（含 HTTP 200 但 body 报错的情况）。 */
+export function dashScopeBodyHasApiError(bodySnippet: string): boolean {
+  const raw = bodySnippet.trim()
+  if (!raw || raw[0] !== '{') return false
+  try {
+    return dashScopePayloadHasError(JSON.parse(raw) as DashScopeResponse)
+  } catch {
+    return false
+  }
 }
 
 export type DashScopeHttpError = Error & {
@@ -79,8 +107,7 @@ function isDashScope400ModelAccessError(bodySnippet: string): boolean {
 }
 
 /**
- * 是否应换下一个 model 并重试。
- * 含：429 额度超限、403、400 模型不存在/无权限、仅流式模型等。
+ * 额度/权限类错误：换下一个 model，并记入本地不可用缓存。
  */
 export function isDashScopeQuotaOrAccessError(
   status: number,
@@ -107,6 +134,49 @@ export function isDashScopeQuotaOrAccessError(
     lower.includes('access denied') ||
     lower.includes('allocation')
   )
+}
+
+/**
+ * 服务端瞬时故障（如 internal_error、5xx）：换下一个 model，但不记入不可用缓存。
+ */
+export function isDashScopeInternalOrServerError(
+  status: number,
+  bodySnippet: string,
+): boolean {
+  if (status >= 500 && status < 600) return true
+  const lower = bodySnippet.toLowerCase()
+  return (
+    lower.includes('internal_error') ||
+    lower.includes('internal error') ||
+    lower.includes('service unavailable') ||
+    lower.includes('bad gateway') ||
+    lower.includes('gateway timeout')
+  )
+}
+
+/** 是否应换下一个 model 重试（含额度/权限、internal_error/5xx、body.error）。 */
+export function isDashScopeRetryableWithNextModel(
+  status: number,
+  bodySnippet: string,
+): boolean {
+  return (
+    dashScopeBodyHasApiError(bodySnippet) ||
+    isDashScopeQuotaOrAccessError(status, bodySnippet) ||
+    isDashScopeInternalOrServerError(status, bodySnippet)
+  )
+}
+
+function dashScopeApiErrorLabel(bodySnippet: string): string {
+  try {
+    const err = (JSON.parse(bodySnippet) as DashScopeResponse).error
+    if (typeof err === 'string') return err.slice(0, 80)
+    if (err && typeof err === 'object') {
+      return [err.type, err.code, err.message].filter(Boolean).join(' ').slice(0, 120)
+    }
+  } catch {
+    /* ignore */
+  }
+  return 'api_error'
 }
 
 function createHttpError(
@@ -199,6 +269,9 @@ export async function requestDashScopeChatCompletion(
   } catch {
     throw new Error('Invalid JSON from DashScope')
   }
+  if (dashScopePayloadHasError(payload)) {
+    throw createHttpError(response.status || 500, bodyText, model)
+  }
   const content = payload.choices?.[0]?.message?.content?.trim()
   if (!content) throw new Error('Empty content from DashScope')
   return content
@@ -212,7 +285,7 @@ export type RequestDashScopeTextWithFallbackOptions = {
 }
 
 /**
- * 按候选顺序请求；遇 403/429 或额度类错误时自动换下一个 model。
+ * 按候选顺序请求；遇 body.error、403/429、额度/权限、internal_error 或 5xx 时自动换下一个 model。
  */
 export async function requestDashScopeTextWithFallback(
   input: DashScopeTextRequest,
@@ -283,17 +356,28 @@ export async function requestDashScopeTextWithFallback(
           : err instanceof Error
             ? err.message
             : ''
-      if (!isDashScopeQuotaOrAccessError(status, bodySnippet)) {
+      if (!isDashScopeRetryableWithNextModel(status, bodySnippet)) {
         throw err
       }
       markDashScopeModelUnavailable(model)
+      if (typeof console !== 'undefined' && console.warn) {
+        const reason = dashScopeBodyHasApiError(bodySnippet)
+          ? dashScopeApiErrorLabel(bodySnippet)
+          : isDashScopeInternalOrServerError(status, bodySnippet)
+            ? 'internal_error/5xx'
+            : isDashScopeQuotaOrAccessError(status, bodySnippet)
+              ? 'quota/access'
+              : 'retryable'
+        console.warn(
+          `[sidekick] DashScope model=${model} 已标记不可用（${reason}），尝试下一个模型`,
+        )
+      }
     }
   }
 
-  clearDashScopeUnavailableModels()
   if (typeof console !== 'undefined' && console.warn) {
     console.warn(
-      '[sidekick] DashScope 全部候选模型均无额度/不可用，已清空本地缓存；充值后下次请求将重头尝试',
+      `[sidekick] DashScope 全部候选模型均失败（已尝试 ${triedModels.length} 个）；不可用列表已保留，下次将跳过已标记模型`,
     )
   }
 

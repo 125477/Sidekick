@@ -1,7 +1,12 @@
 /**
- * 主进程 DashScope 文案：403/429 时按候选 model 自动切换。
- * 逻辑与 @sidekick/core dashscopeTextClient 保持一致（本文件为 .mjs 入口复用）。
+ * 主进程 DashScope 文案：body.error、403/429、internal_error/5xx 时按候选 model 自动切换。
+ * 不可用 model 持久化见 dashscopeUnavailableModels.mjs。
  */
+
+import {
+  markDashScopeModelUnavailable,
+  prepareDashScopeModelTryOrder,
+} from './dashscopeUnavailableModels.mjs'
 
 const DEFAULT_COMPLETIONS_URL =
   'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
@@ -12,32 +17,6 @@ const STATIC_FALLBACK = ['qwen-turbo', 'qwen-plus', 'qwen-max']
 let cachedModelIds = null
 let cachedAt = 0
 const CACHE_MS = 10 * 60_000
-
-/** 主进程内无额度/不可用 model（与 renderer localStorage 独立，逻辑一致）。 */
-const unavailableModels = new Set()
-
-function markModelUnavailable(modelId) {
-  const id = String(modelId ?? '').trim()
-  if (id) unavailableModels.add(id)
-}
-
-function clearUnavailableModels() {
-  unavailableModels.clear()
-}
-
-function filterUnavailable(modelIds) {
-  return modelIds.filter((id) => !unavailableModels.has(id))
-}
-
-function prepareTryOrder(fullOrder) {
-  if (fullOrder.length === 0) return fullOrder
-  const active = filterUnavailable(fullOrder)
-  if (active.length === 0) {
-    clearUnavailableModels()
-    return fullOrder
-  }
-  return active
-}
 
 function is400ModelAccess(body) {
   const lower = String(body).toLowerCase()
@@ -86,6 +65,53 @@ function isQuotaOrAccess(status, body) {
     lower.includes('用完') ||
     lower.includes('access denied') ||
     lower.includes('allocation')
+  )
+}
+
+function isInternalOrServerError(status, body) {
+  if (status >= 500 && status < 600) return true
+  const lower = String(body).toLowerCase()
+  return (
+    lower.includes('internal_error') ||
+    lower.includes('internal error') ||
+    lower.includes('service unavailable') ||
+    lower.includes('bad gateway') ||
+    lower.includes('gateway timeout')
+  )
+}
+
+function bodyHasApiError(body) {
+  const raw = String(body ?? '').trim()
+  if (!raw || raw[0] !== '{') return false
+  try {
+    const err = JSON.parse(raw).error
+    if (err == null) return false
+    if (typeof err === 'string') return err.trim().length > 0
+    if (typeof err === 'object') return Object.keys(err).length > 0
+    return false
+  } catch {
+    return false
+  }
+}
+
+function apiErrorLabel(body) {
+  try {
+    const err = JSON.parse(String(body)).error
+    if (typeof err === 'string') return err.slice(0, 80)
+    if (err && typeof err === 'object') {
+      return [err.type, err.code, err.message].filter(Boolean).join(' ').slice(0, 120)
+    }
+  } catch {
+    /* ignore */
+  }
+  return 'api_error'
+}
+
+function shouldTryNextModel(status, body) {
+  return (
+    bodyHasApiError(body) ||
+    isQuotaOrAccess(status, body) ||
+    isInternalOrServerError(status, body)
   )
 }
 
@@ -198,6 +224,15 @@ async function completeOnce({
   }
 
   const data = JSON.parse(bodyText)
+  if (bodyHasApiError(bodyText)) {
+    const err = new Error(
+      `DashScope ${response.status || 500} (model=${model}): ${apiErrorLabel(bodyText)}`,
+    )
+    err.status = response.status || 500
+    err.bodySnippet = bodyText
+    err.model = model
+    throw err
+  }
   const content = data.choices?.[0]?.message?.content?.trim()
   if (!content) throw new Error('Empty content from DashScope')
   return content
@@ -233,7 +268,7 @@ export async function dashscopeChatCompleteWithFallback(payload) {
     fetched,
     parseEnvFallback(payload?.modelFallbackEnv),
   )
-  const tryOrder = prepareTryOrder(fullOrder)
+  const tryOrder = prepareDashScopeModelTryOrder(fullOrder)
   const skippedCached = fullOrder.length - tryOrder.length
   if (skippedCached > 0) {
     console.info(
@@ -263,16 +298,26 @@ export async function dashscopeChatCompleteWithFallback(payload) {
       return { content, model, triedModels }
     } catch (err) {
       lastErr = err
-      if (!isQuotaOrAccess(err.status, err.bodySnippet ?? err.message)) {
+      const bodySnippet = err.bodySnippet ?? err.message ?? ''
+      if (!shouldTryNextModel(err.status, bodySnippet)) {
         throw err
       }
-      markModelUnavailable(model)
+      markDashScopeModelUnavailable(model)
+      const reason = bodyHasApiError(bodySnippet)
+        ? apiErrorLabel(bodySnippet)
+        : isInternalOrServerError(err.status, bodySnippet)
+          ? 'internal_error/5xx'
+          : isQuotaOrAccess(err.status, bodySnippet)
+            ? 'quota/access'
+            : 'retryable'
+      console.warn(
+        `[sidekick] DashScope model=${model} 已标记不可用（${reason}），尝试下一个模型`,
+      )
     }
   }
 
-  clearUnavailableModels()
   console.warn(
-    '[sidekick] DashScope 全部候选模型均无额度/不可用，已清空本地缓存；充值后下次请求将重头尝试',
+    `[sidekick] DashScope 全部候选模型均失败（已尝试 ${triedModels.length} 个）；不可用列表已保留在 userData`,
   )
 
   throw new Error(

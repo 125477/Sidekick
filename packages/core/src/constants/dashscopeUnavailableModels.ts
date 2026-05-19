@@ -65,14 +65,11 @@ export function filterOutUnavailableDashScopeModels(
 }
 
 /**
- * 跳过本地记录的无额度模型；若全部被跳过则清空缓存并返回完整列表（充值后重试）。
+ * 跳过本地记录的无额度/不可用模型；若全部被跳过则本轮仍完整重试，但保留磁盘缓存。
  */
 export function prepareDashScopeModelTryOrder(fullOrder: string[]): string[] {
   if (fullOrder.length === 0) return fullOrder
   const active = filterOutUnavailableDashScopeModels(fullOrder)
-  if (active.length === 0) {
-    clearDashScopeUnavailableModels()
-    return fullOrder
-  }
+  if (active.length === 0) return fullOrder
   return active
 }

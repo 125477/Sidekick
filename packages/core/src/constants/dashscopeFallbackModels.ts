@@ -5,8 +5,9 @@
  * 2. `VITE_DASHSCOPE_MODEL_FALLBACK`（可选，逗号分隔）
  * 3. **GET /compatible-mode/v1/models**（有 Key 时拉取全部 model id，缓存 10 分钟）
  *    - 接口**不返回**各模型剩余免费 Token，无法只拉「还有额度」的列表
- *    - 额度用尽靠 429/403/400 等错误自动换下一个；无额度 model 记入本地缓存
- *    - 全部候选均失败时清空缓存，充值后下次请求重头尝试
+ *    - 响应 JSON 含非空 error、429/403/400、internal_error/5xx 时自动换下一个
+ *    - 失败的 model 记入本地缓存（Electron：userData/dashscope-unavailable-models.json；浏览器：localStorage）
+ *    - 全部候选均失败时保留缓存；充值后需手动删除缓存文件或 localStorage 项
  * 4. 下方 `DASHSCOPE_CHAT_FALLBACK_MODELS` —— 仅当 /v1/models 失败时的离线兜底
  *
  * 若只要尝试控制台里仍有额度的模型，请把 id 写入 `VITE_DASHSCOPE_MODEL_FALLBACK`（逗号分隔，会排在最前）。
