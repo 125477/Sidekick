@@ -270,8 +270,6 @@ function App() {
       spriteMenuSurface,
       detachedWidgetSpriteMenu,
       uiState,
-      settingsRef,
-      requestCompanionTextRef,
       handleMenuActionRef,
       dispatch,
       setSpriteMenuSurface,
@@ -537,8 +535,8 @@ function App() {
   if (isWidgetMode) {
     return (
       <>
-        <main className="relative h-full min-h-0 w-full overflow-visible bg-transparent text-slate-800 select-none outline-none [-webkit-app-region:no-drag]">
-          <div className="absolute inset-0 flex min-h-0 items-end justify-end overflow-visible pr-3 pb-2 pt-2 outline-none [-webkit-app-region:no-drag]">
+        <main className="relative h-full min-h-0 w-full overflow-visible bg-transparent text-slate-800 select-none outline-none pointer-events-none [-webkit-app-region:no-drag]">
+          <div className="absolute inset-0 flex min-h-0 items-end justify-end overflow-visible pr-3 pb-2 pt-2 outline-none pointer-events-none [-webkit-app-region:no-drag]">
             {spriteLayer}
           </div>
         </main>

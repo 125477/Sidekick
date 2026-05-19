@@ -10,6 +10,8 @@ import { APP_DISPLAY_NAME } from '../constants/brand'
 import type { SidekickSettings } from '../state/settingsState'
 import type { SpriteState, UiAction, UiState } from '../state/uiState'
 import { reportSpriteAnchorToMain } from '../utils/reportSpriteAnchor'
+import { measureWidgetShellBounds } from './widgetShellMeasure'
+import { clampWidgetWindowWidthPx } from './widgetWindowSize'
 
 export type UseAppModeShellArgs = {
   isWidgetMode: boolean
@@ -232,13 +234,14 @@ export function useAppModeShell({
     if (!el) return
 
     const apply = () => {
-      const h = Math.ceil(el.getBoundingClientRect().height)
-      if (h < 40) return
+      const bounds = measureWidgetShellBounds(el)
+      if (!bounds || bounds.height < 40) return
       reportSpriteAnchorToMain(el, {
         avatarSizePercent: settingsRef.current.avatarSize,
       })
       void window.sidekickDesktop?.resizeWidgetWindow?.({
-        height: Math.min(720, Math.max(168, h + 12)),
+        width: clampWidgetWindowWidthPx(bounds.width),
+        height: Math.min(720, Math.max(168, bounds.height)),
       })
     }
 
@@ -259,6 +262,7 @@ export function useAppModeShell({
     spriteAvatarSize,
     settings.avatarOpacity,
     selectedAvatarId,
+    menuOpen,
     settingsRef,
     widgetMeasureRef,
   ])

@@ -10,7 +10,7 @@ export function FortuneWidgetModal({ open, onClose }: FortuneWidgetModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center p-3 [-webkit-app-region:no-drag]"
+      className="pointer-events-auto fixed inset-0 z-[60] flex items-center justify-center p-3 [-webkit-app-region:no-drag]"
       role="dialog"
       aria-modal="true"
       aria-labelledby="fortune-widget-title"

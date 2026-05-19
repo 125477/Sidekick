@@ -159,6 +159,7 @@ export function SpriteMenu({
       />
       <div
         ref={menuRef}
+        data-widget-layout-bound={widgetMode ? true : undefined}
         className={`absolute ${resolvedMenuPositionClass} ${
           customPlacement ? 'z-50' : zIndexClass
         }`}

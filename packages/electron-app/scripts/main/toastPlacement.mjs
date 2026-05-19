@@ -1,7 +1,7 @@
 import { screen } from 'electron'
 import { clamp } from './geometry.mjs'
 import {
-  SPRITE_SIZE,
+  spriteSizeForPercent,
   TOAST_GAP,
   TOAST_WINDOW_WIDTH,
   TOAST_WINDOW_HEIGHT,
@@ -12,7 +12,8 @@ import { syncLastSpriteAnchorToWindowMotion } from './spriteAnchor.mjs'
 
 function getSpriteVerticalExtent(spriteBounds) {
   const spriteBottomY = spriteBounds.y + spriteBounds.height - WIDGET_PAD_BOTTOM
-  const spriteTopY = spriteBottomY - SPRITE_SIZE
+  const spriteH = spriteSizeForPercent(state.lastAvatarSizePercent)
+  const spriteTopY = spriteBottomY - spriteH
   return { spriteTopY, spriteBottomY }
 }
 
@@ -50,7 +51,7 @@ export function computeToastPlacement(preferredAnchor, toastH = TOAST_WINDOW_HEI
     /** Matches widget `pr-3`: sprite sits against the bottom-right of the window. */
     const PAD_R = 12
     const spriteRight = spriteBounds.x + spriteBounds.width - PAD_R
-    const spriteLeft = spriteRight - SPRITE_SIZE
+    const spriteLeft = spriteRight - spriteSizeForPercent(state.lastAvatarSizePercent)
     centerX = (spriteLeft + spriteRight) / 2
   }
 

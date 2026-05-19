@@ -22,7 +22,6 @@ import { replayCompanionSpeech } from '../utils/companionTts'
 import type { SidekickSettings } from '../state/settingsState'
 import type { UiAction, UiState, SpriteState } from '../state/uiState'
 import { zLayers } from '../state/uiState'
-import { canPushNow } from './companionCopy'
 
 export type WidgetSpriteLayerProps = {
   widgetMeasureRef: RefObject<HTMLDivElement | null> | undefined
@@ -116,7 +115,7 @@ export function WidgetSpriteLayer({
   return (
     <div
       ref={widgetMeasureRef}
-      className={`relative overflow-visible outline-none ${zLayers.sprite}`}
+      className={`relative overflow-visible outline-none pointer-events-auto ${zLayers.sprite}`}
     >
       {isWidgetMode && onboardingDone === null ? (
         <div className="flex min-h-[144px] min-w-[160px] items-center justify-center text-xs text-slate-400 [-webkit-app-region:no-drag]">
@@ -159,13 +158,6 @@ export function WidgetSpriteLayer({
                     }
                   : {})}
                 onToggleMenu={() => {
-                  if (
-                    menuOpen &&
-                    settings.clickToFetchEnabled &&
-                    canPushNow(settings)
-                  ) {
-                    void requestCompanionText('点击精灵互动')
-                  }
                   if (!menuExpandedForToggle) {
                     setSpriteMenuSurface('sprite')
                   }

@@ -8,7 +8,6 @@ import { replayCompanionSpeech } from '../utils/companionTts'
 import type { SidekickSettings } from '../state/settingsState'
 import type { UiAction, UiState, SpriteState } from '../state/uiState'
 import { zLayers } from '../state/uiState'
-import { canPushNow } from './companionCopy'
 
 export type HostAppMainProps = {
   panelContent: ReactNode
@@ -96,13 +95,6 @@ export function HostAppMain({
                     avatarOpacity={settings.avatarOpacity}
                     interactionLocked={spriteInteractionLocked}
                     onToggleMenu={() => {
-                      if (
-                        menuOpen &&
-                        settings.clickToFetchEnabled &&
-                        canPushNow(settings)
-                      ) {
-                        void requestCompanionText('点击精灵互动')
-                      }
                       if (!menuExpandedForToggle) {
                         setSpriteMenuSurface('sprite')
                       }

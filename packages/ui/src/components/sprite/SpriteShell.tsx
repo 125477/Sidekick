@@ -2,6 +2,7 @@ import { DotLottieReact } from '@lottiefiles/dotlottie-react'
 import { useCallback, useRef } from 'react'
 import type { SpriteState } from '../../state/uiState'
 import { isDotLottieSrc, isVideoAvatarSrc } from '../../utils/isDotLottieSrc'
+import { spriteLayoutSizePx } from './spriteLayoutSize'
 
 type SpriteShellProps = {
   spriteState: SpriteState
@@ -40,7 +41,7 @@ export function SpriteShell({
   const isLaugh = spriteState === 'laugh'
   const isSmile = spriteState === 'hover' || spriteState === 'notify'
   const faceOpacity = motionProfile === 'enhanced' ? 0.95 : 0.55
-  const scale = Math.max(0.6, avatarSize / 100)
+  const layoutSizePx = spriteLayoutSizePx(avatarSize)
 
   const dragRef = useRef<{
     startX: number
@@ -137,9 +138,9 @@ export function SpriteShell({
           ? 'pointer-events-none cursor-default [-webkit-app-region:no-drag]'
           : '[-webkit-app-region:drag]'
       }`}
-      style={{ transform: `scale(${scale})` }}
+      style={{ width: layoutSizePx, height: layoutSizePx }}
     >
-      <div className="relative h-36 w-36">
+      <div className="relative h-full w-full">
         <button
           type="button"
           data-sprite-menu-trigger

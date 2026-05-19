@@ -3,7 +3,10 @@ export const DEV_SERVER_URL_CANDIDATES = EXPLICIT_UI_URL
   ? [EXPLICIT_UI_URL]
   : [ 5174, 5175, 5176, 5177, 5178].map((port) => `http://localhost:${port}`)
 
-export const WIDGET_WINDOW_WIDTH = 360
+/** Initial width; renderer measures sprite layer and IPC-resizes to fit. */
+export const WIDGET_WINDOW_WIDTH = 304
+export const WIDGET_WINDOW_MIN_WIDTH = 160
+export const WIDGET_WINDOW_MAX_WIDTH = 620
 /** Initial height; renderer measures sprite layer and IPC-resizes to fit. */
 export const WIDGET_WINDOW_HEIGHT = 216
 /**
@@ -27,8 +30,15 @@ export const CORNER_NOTIFICATION_WIDTH = 360
 export const CORNER_NOTIFICATION_HEIGHT = 140
 export const CORNER_NOTIFICATION_MARGIN = 16
 export const TOAST_GAP = 6
-/** Sprite block inside the widget (matches SpriteShell `h-36`). */
+/** Sprite block inside the widget at 100% (matches SpriteShell `SPRITE_LAYOUT_BASE_PX`). */
 export const SPRITE_SIZE = 144
+
+/** Layout size when settings「大小(%)」≠ 100; matches ui `spriteLayoutSizePx`. */
+export function spriteSizeForPercent(percent) {
+  const pct = Number.isFinite(percent) && percent > 0 ? percent : 80
+  const scale = Math.max(0.6, pct / 100)
+  return Math.round(SPRITE_SIZE * scale)
+}
 /** 与 `SpriteMenuPanel`（`w-39` + 边框）匹配。 */
 export const SPRITE_MENU_WINDOW_WIDTH = 172
 /** 与 `SpriteMenuPanel` 七行 `h-9` + `divide-y` 对齐（改菜单项数时同步） */

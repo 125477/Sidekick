@@ -78,15 +78,33 @@ export type BuildCompanionPromptInput = {
 
 const STYLE_GUIDE: Record<CompanionCopyStyle, string> = {
   治愈:
-    '格言或短诗气质：人生、时光、温柔、成长、陪伴；一句一个重心。可用自然或日常小物承接情绪，但须让人感到被体谅或被托住，禁止纯宿命感叹（「再亮也照不亮…」）；禁止办公设备与电脑操作描写。',
+    '格言或短诗气质：人生、时光、温柔、成长、陪伴；一句一个重心。以承接感受与存在许可为主（可以、允许、就好），禁止命令、拯救口号与条件价值；禁止纯宿命感叹（「再亮也照不亮…」）；禁止办公设备与电脑操作描写。',
   励志:
-    '可多用「我」或无人称格言；聚焦态度与微小可能，禁止鸡血口号与抽象成功学；禁止写键盘、光标、加班赶场等办公套话，勿照抄常见鸡汤句。',
-  搞笑: '仅当用户情绪为「开心」时启用；生活化自嘲或轻巧反差，禁止在焦虑/低落情绪下用幽默转移感受；禁止办公梗。',
+    '可多用「我」或无人称格言；聚焦态度与微小可能，禁止鸡血口号与抽象成功学；禁止命令式打气（加油/撑住/你必须）与「只要你…就…」式条件价值；禁止写键盘、光标、加班赶场等办公套话，勿照抄常见鸡汤句。',
+  搞笑:
+    '仅当用户情绪为「开心」时启用；生活化自嘲或轻巧反差，禁止命令、拯救口号与条件价值；禁止在焦虑/低落情绪下用幽默转移感受；禁止办公梗。',
   助眠:
-    '语气极轻、句短；可写呼吸、停顿、夜色、安静，禁止睡眠指令（「快睡吧」）与未来承诺；禁止屏幕蓝光、敲键等提神意象。',
+    '语气极轻、句短；可写呼吸、停顿、夜色、安静与存在许可，禁止睡眠指令（「快睡吧」）、布置步骤与未来承诺；禁止屏幕蓝光、敲键等提神意象。',
   职场解压:
-    '用人生节奏、取舍、边界感来减压（例：允许慢下来、不必一次做完），禁止会议、邮件、通知、文件、光标、键盘等办公名词。',
+    '用人生节奏、取舍、边界感来减压（例：允许慢下来、不必一次做完），禁止会议、邮件、通知、文件、光标、键盘等办公名词；禁止命令式加班打气与条件价值。',
 }
+
+/** 各语气类型下的「反功能性相处」写作约束（写入 system，与生成后校验一致）。 */
+const STYLE_ANTI_FUNCTIONAL: Record<CompanionCopyStyle, string> = {
+  治愈:
+    '【治愈·相处】优先「被看见、被接纳」：可写允许休息、此刻就好；禁止你应该/记得/别忘、禁止撑住挺过去、禁止只要你…就…/努力就会…。',
+  励志:
+    '【励志·相处】可写微小可能与方向感，但禁止命令（你应该/快去）、禁止拯救口号（撑住/加油/没有过不去的坎）、禁止条件价值与空洞保证。',
+  搞笑:
+    '【搞笑·相处】轻松但不居高临下；禁止命令与拯救口号、禁止只要你…就…；禁止「笑一笑」「别难过了」式否定感受。',
+  助眠:
+    '【助眠·相处】只写轻、静、许可歇着；禁止任何步骤作业（先…/试试深呼吸/快睡）、禁止加油撑住与条件价值。',
+  职场解压:
+    '【职场解压·相处】写边界与允许慢下来，禁止更高效/冲一把/你应该扛住、禁止只要你努力就…式交换。',
+}
+
+const ANTI_FUNCTIONAL_RELATIONSHIP_LINE =
+  '【反功能性相处】勿把用户当任务或角色：禁止布置步骤（应该先…/记得…/别忘…）；禁止拯救口号（撑住/挺过去/没有过不去的坎/一切都会好起来）；禁止条件价值（只要你…就…/努力就会…/才配…）；优先存在许可（可以、允许、就好、在这、不必），少评价其表现。'
 
 /** 每次随机抽一种写法，避免连续落在「X时，像…」文艺模板。 */
 const DIVERSITY_ANGLES = [
@@ -220,8 +238,147 @@ const COMFORT_SIGNALS = [
   '托住',
   '体谅',
   '不妨',
-  '先',
+  '就好',
+  '够了',
+  '在这',
+  '不必',
+  '已经可以',
 ] as const
+
+/** 命令式 / 作业感（各语气类型普遍禁止）。 */
+export const COMPANION_INSTRUCTION_MARKERS = [
+  '你应该',
+  '您应该',
+  '你得',
+  '你必须',
+  '您必须',
+  '别忘',
+  '别忘了',
+  '记得去',
+  '记得要',
+  '快去',
+  '一定要',
+  '必须先',
+  '先试',
+  '先做',
+  '第一步',
+  '试试看',
+  '不妨先',
+  '先去',
+  '别急着',
+] as const
+
+/** 拯救者 / 打鸡血口号（各语气类型普遍禁止）。 */
+export const COMPANION_RESCUE_MARKERS = [
+  '撑住',
+  '挺住',
+  '挺过去',
+  '扛过去',
+  '没有过不去',
+  '一切都会',
+  '阳光总在',
+  '加油',
+  '你能行',
+  '站起来',
+  '打起精神',
+  '振作起来',
+  '笑一笑',
+  '别难过了',
+  '别灰心',
+  '会好起来的',
+] as const
+
+/** 存在许可信号：有则弱化对「指令/拯救」的误判（如「可以先歇」）。 */
+export const COMPANION_PRESENCE_MARKERS = [
+  '可以',
+  '不妨',
+  '允许',
+  '没关系',
+  '慢慢来',
+  '就好',
+  '够了',
+  '在这',
+  '不必',
+  '已经可以',
+  '歇',
+  '休息',
+  '接纳',
+  '陪着',
+  '陪你',
+] as const
+
+/** 语气类型额外禁止词（生成后校验）。 */
+const STYLE_FUNCTIONAL_EXTRA_MARKERS: Record<CompanionCopyStyle, readonly string[]> = {
+  治愈: [],
+  励志: ['奋斗', '拼搏', '力争', '冲鸭'],
+  搞笑: [],
+  助眠: ['快睡', '睡吧', '早点睡', '赶紧睡'],
+  职场解压: ['更高效', '冲一把', '赶进度', '扛住'],
+}
+
+function companionTextHasInstruction(t: string): boolean {
+  return COMPANION_INSTRUCTION_MARKERS.some((m) => t.includes(m))
+}
+
+function companionTextHasRescue(t: string): boolean {
+  return COMPANION_RESCUE_MARKERS.some((m) => t.includes(m))
+}
+
+function companionTextHasConditionalValue(t: string): boolean {
+  if (/只要[^，,。！？]{1,24}就/.test(t)) return true
+  if (/只有[^，,。！？]{1,24}才/.test(t)) return true
+  if (/努力就会|坚持就会|就会成功|才配/.test(t)) return true
+  return false
+}
+
+/**
+ * 「反指令、反拯救、反条件价值」：按语气类型检验是否像功能性相处（布置任务 / 打鸡血 / 交换价值）。
+ */
+export function companionTextHasFunctionalTone(
+  text: string,
+  style: CompanionCopyStyle,
+): boolean {
+  const t = text.trim()
+  if (!t) return false
+
+  const instruction = companionTextHasInstruction(t)
+  const rescue = companionTextHasRescue(t)
+  const conditional = companionTextHasConditionalValue(t)
+  const extra = STYLE_FUNCTIONAL_EXTRA_MARKERS[style].some((m) => t.includes(m))
+
+  switch (style) {
+    case '治愈':
+      return instruction || rescue || conditional
+    case '励志':
+      return instruction || rescue || conditional || extra
+    case '搞笑':
+      return instruction || rescue || conditional
+    case '助眠':
+      return instruction || rescue || conditional || extra
+    case '职场解压':
+      return instruction || rescue || conditional || extra
+    default:
+      return instruction || rescue || conditional
+  }
+}
+
+export function buildFunctionalToneRetryUserSuffix(
+  style: CompanionCopyStyle,
+): string {
+  const byStyle: Record<CompanionCopyStyle, string> = {
+    治愈:
+      '上一句像在下指令、打鸡血或讲条件。请改为：承认感受 + 允许休息/存在即可（可以、允许、就好），禁止你应该、撑住、只要你…就…。',
+    励志:
+      '上一句像命令式励志或条件价值。请写微小可能或方向感，禁止加油/撑住/你必须/只要你…就…/奋斗拼搏。',
+    搞笑:
+      '上一句像在命令或拯救。请保持轻巧自嘲，禁止你应该、撑住、笑一笑、别难过了、只要你…就…。',
+    助眠:
+      '上一句像在布置作业或打气。请极轻、极短，只写静与许可歇着，禁止应该先…/深呼吸/快睡/加油/撑住。',
+    职场解压:
+      '上一句像在要求更高效或扛住。请写边界与允许慢下来，禁止你应该、冲一把、更高效、只要你努力就…。',
+  }
+  return `【硬约束·${style}·反功能性相处】${byStyle[style]}`
+}
 
 const BLEAK_WITHOUT_COMFORT_BAN_LINE =
   '【禁止宿命感叹】禁止「再…也…不/没法…」式无力格言（如「灯火再亮，也照不亮所有黑夜」）；若写夜/暗/难，须带接纳、许可或温柔指望，让人感到被托住。'
@@ -417,7 +574,9 @@ export function buildCompanionSystemPrompt(input: BuildCompanionPromptInput): st
     POETIC_TEMPLATE_BAN_LINE,
     MOTIVATIONAL_PARALLEL_BAN_LINE,
     BLEAK_WITHOUT_COMFORT_BAN_LINE,
-    '【陪伴感底线】每句须让人感到被体谅或被托住：允许慢下来、肯定努力、温柔提议；禁止整句只有衰败/无力感而无接纳或指望。',
+    ANTI_FUNCTIONAL_RELATIONSHIP_LINE,
+    STYLE_ANTI_FUNCTIONAL[input.style],
+    '【陪伴感底线】每句须让人感到被体谅或被托住：允许慢下来、肯定感受或当下的存在、温柔许可；禁止整句只有衰败/无力感而无接纳或指望。',
     `避免广告式文艺腔：不要叠用「${OVERUSED_ADVERBS}」；不要写「你…，我…」对称陪伴模板。`,
     '禁止输出编号、解释、引号、标题、前后缀。',
     '禁止医学建议、极端表述、负向暗示。',
@@ -492,6 +651,11 @@ function buildOpeningConstraint(recent: string[], seed: number): string {
     if (companionTextHasBleakWithoutComfort(last)) {
       rules.push(
         '上一句是宿命感叹、缺少托住感；本句须写接纳、许可或温柔指望，禁止「再…也…不…」式无力格言。',
+      )
+    }
+    if (companionTextHasFunctionalTone(last, '治愈')) {
+      rules.push(
+        '上一句像指令、拯救口号或条件价值；本句改为存在许可（可以、允许、就好），禁止你应该、撑住、只要你…就…。',
       )
     }
     const bannedOpeners = ['风起', '茶凉', '暮色', '雨落', '雪落', '窗', '有些']
@@ -578,7 +742,7 @@ export function buildCompanionUserPrompt(
   if (kw) {
     return `${prefix}请围绕这个关键词生成文案：${kw}。（${seed}）`
   }
-  return `${prefix}请给我一句陪伴短句：格言或诗意风格，有接纳与体谅；勿写办公设备、电脑操作与捧读实体书。每次换角度，避免重复上一句。（${seed}）`
+  return `${prefix}请给我一句陪伴短句：可有诗意，但优先接纳与存在许可（可以、允许、就好）；勿写办公设备、电脑操作与捧读实体书；禁止你应该、撑住、只要你…就…。每次换角度，避免重复上一句。（${seed}）`
 }
 
 export function parseCompanionInterestTags(interests: string[] | undefined): {

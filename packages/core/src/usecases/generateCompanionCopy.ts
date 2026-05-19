@@ -9,10 +9,12 @@ import {
   buildCompanionUserPromptWithInterests,
   buildDesktopClicheRetryUserSuffix,
   buildMotivationalParallelRetryUserSuffix,
+  buildFunctionalToneRetryUserSuffix,
   buildPoeticTemplateRetryUserSuffix,
   companionStyleForEmotion,
   companionTextHasBleakWithoutComfort,
   companionTextHasDesktopCliche,
+  companionTextHasFunctionalTone,
   companionTextHasMotivationalParallelTemplate,
   companionTextHasPoeticTemplate,
   parseCompanionInterestTags,
@@ -154,11 +156,17 @@ export async function generateCompanionCopy(
         `${userPrompt}\n${buildBleakWithoutComfortRetryUserSuffix()}`,
       )
     }
+    if (companionTextHasFunctionalTone(line, effectiveStyle)) {
+      line = await requestModelLine(
+        `${userPrompt}\n${buildFunctionalToneRetryUserSuffix(effectiveStyle)}`,
+      )
+    }
     if (
       companionTextHasPoeticTemplate(line) ||
       companionTextHasDesktopCliche(line) ||
       companionTextHasMotivationalParallelTemplate(line) ||
-      companionTextHasBleakWithoutComfort(line)
+      companionTextHasBleakWithoutComfort(line) ||
+      companionTextHasFunctionalTone(line, effectiveStyle)
     ) {
       throw new Error('companion copy still matches banned template')
     }

@@ -8,6 +8,8 @@ import {
   SPRITE_MENU_ACTIONS,
   TOAST_WINDOW_MIN_WIDTH,
   TOAST_WINDOW_WIDTH,
+  WIDGET_WINDOW_MAX_WIDTH,
+  WIDGET_WINDOW_MIN_WIDTH,
   WIDGET_WINDOW_WIDTH,
 } from './constants.mjs'
 import {
@@ -235,16 +237,19 @@ export function registerSidekickIpcHandlers() {
     const maxH = 720
     const newH = clamp(Math.round(raw), minH, maxH)
     const b = state.spriteWindow.getBounds()
-    const compactW = WIDGET_WINDOW_WIDTH
     const rawW = payload?.width
     let newW = b.width
     if (rawW !== undefined && rawW !== null) {
       const parsed = Number(rawW)
       if (Number.isFinite(parsed)) {
-        newW = clamp(Math.round(parsed), 300, 620)
+        newW = clamp(
+          Math.round(parsed),
+          WIDGET_WINDOW_MIN_WIDTH,
+          WIDGET_WINDOW_MAX_WIDTH,
+        )
       }
-    } else {
-      newW = compactW
+    } else if (!Number.isFinite(newW) || newW <= 0) {
+      newW = WIDGET_WINDOW_WIDTH
     }
     state.spriteWindow.setBounds({ ...b, width: newW, height: newH })
     state.spriteAnchorBase = null

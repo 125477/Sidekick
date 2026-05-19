@@ -1,10 +1,7 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
 import { useCallback, useEffect, useLayoutEffect } from 'react'
-import type { EmotionKind } from '@sidekick/core'
 import type { MenuAction } from '../components/menu/SpriteMenu'
-import type { SidekickSettings } from '../state/settingsState'
 import type { UiAction, UiState } from '../state/uiState'
-import { canPushNow } from './companionCopy'
 import { parseMenuActionFromMessage } from '../components/menu/SpriteMenu'
 
 export type UseDetachedSpriteMenuArgs = {
@@ -13,10 +10,6 @@ export type UseDetachedSpriteMenuArgs = {
   spriteMenuSurface: 'sprite' | 'toast-bubble'
   detachedWidgetSpriteMenu: boolean
   uiState: UiState
-  settingsRef: MutableRefObject<SidekickSettings>
-  requestCompanionTextRef: MutableRefObject<
-    ((keyword?: string, emotion?: EmotionKind) => Promise<void>) | undefined
-  >
   handleMenuActionRef: MutableRefObject<(action: MenuAction) => void>
   dispatch: Dispatch<UiAction>
   setSpriteMenuSurface: Dispatch<SetStateAction<'sprite' | 'toast-bubble'>>
@@ -30,8 +23,6 @@ export function useDetachedSpriteMenu({
   spriteMenuSurface,
   detachedWidgetSpriteMenu,
   uiState,
-  settingsRef,
-  requestCompanionTextRef,
   handleMenuActionRef,
   dispatch,
   setSpriteMenuSurface,
@@ -214,10 +205,6 @@ export function useDetachedSpriteMenu({
   }, [browserSpriteMenuWindowRef, setSpriteMenuUsesBrowserPopup])
 
   const openSpriteMenuFromToastToolbar = useCallback(() => {
-    const s = settingsRef.current
-    if (menuOpen && s.clickToFetchEnabled && canPushNow(s)) {
-      void requestCompanionTextRef.current?.('点击精灵互动')
-    }
     const toolbarMenuExpanded =
       uiState.menuState === 'open' || uiState.menuState === 'opening'
     if (!toolbarMenuExpanded) {
@@ -237,9 +224,7 @@ export function useDetachedSpriteMenu({
     uiState.menuState,
     dispatch,
     openBrowserSpriteMenuPopup,
-    requestCompanionTextRef,
     setSpriteMenuSurface,
-    settingsRef,
   ])
 
   useEffect(() => {

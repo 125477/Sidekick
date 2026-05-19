@@ -10,6 +10,8 @@ import {
   TOAST_WINDOW_HEIGHT,
   TOAST_WINDOW_WIDTH,
   WIDGET_WINDOW_HEIGHT,
+  WIDGET_WINDOW_MAX_WIDTH,
+  WIDGET_WINDOW_MIN_WIDTH,
   WIDGET_WINDOW_WIDTH,
 } from './constants.mjs'
 import {
@@ -33,8 +35,8 @@ export function createSpriteWindow() {
   const window = new BrowserWindow({
     width: WIDGET_WINDOW_WIDTH,
     height: WIDGET_WINDOW_HEIGHT,
-    minWidth: 300,
-    maxWidth: 640,
+    minWidth: WIDGET_WINDOW_MIN_WIDTH,
+    maxWidth: WIDGET_WINDOW_MAX_WIDTH,
     minHeight: WIDGET_WINDOW_HEIGHT,
     frame: false,
     transparent: true,

@@ -2,6 +2,54 @@
 
 在桌面角落陪你的小精灵：**陪伴短句**、**情绪气泡**、**换肤与形象**、**每日抽签**与**收藏历史**，同一套 UI 既跑在 **Electron 挂件**里，也能在浏览器里调试。
 
+## 预览
+
+以下为 macOS 桌面版界面示意（深色壁纸仅便于展示透明挂件）。
+
+### 桌面挂件与陪伴气泡
+
+桌面角落精灵；陪伴短句可重新生成、收藏与朗读，悬停可展开工具栏。
+
+![桌面挂件与陪伴气泡](docs/images/readme/widget-toast.png)
+
+### 精灵菜单
+
+右键菜单进入换肤、情绪、收藏、抽签与设置等能力。
+
+![精灵菜单](docs/images/readme/sprite-menu.png)
+
+### 更换形象
+
+内置多套 Lottie / 图片形象，支持上传 JPG、PNG、WebP、GIF、MP4。
+
+![更换形象](docs/images/readme/skin-panel.png)
+
+### 情绪反馈
+
+记录此刻感受或撰写今日小结，并查看本地情绪趋势。
+
+| 此刻与趋势 | 今日小结 |
+|:---:|:---:|
+| ![情绪趋势](docs/images/readme/emotion-trend.png) | ![今日小结](docs/images/readme/emotion-daily.png) |
+
+### 收藏历史
+
+陪伴句收藏仅保存在本机，可复制或删除。
+
+![收藏历史](docs/images/readme/favorites.png)
+
+### 每日抽签
+
+娱乐向小仪式，同一自然日以内最后一次签文为准。
+
+![每日抽签](docs/images/readme/fortune.png)
+
+### 设置
+
+语气、气泡位置、兴趣偏好、推送与语音等可在设置中调整。
+
+![设置](docs/images/readme/settings.png)
+
 ### 下载
 
 macOS、Windows 安装包见 **[最新版本](https://github.com/125477/Sidekick/releases/latest)**（在页面中按系统选择对应文件即可）。
@@ -13,6 +61,7 @@ macOS、Windows 安装包见 **[最新版本](https://github.com/125477/Sidekick
 
 ## 目录
 
+- [预览](#预览)
 - [下载](#下载)
 - [亮点速览](#亮点速览)
 - [功能说明](#功能说明)
