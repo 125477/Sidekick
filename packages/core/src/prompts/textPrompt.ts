@@ -1,6 +1,13 @@
 /**
  * 陪伴文案：默认在一次请求里把「风格 + 可选情绪」写进 system/user prompt。
  * 追问（多轮对话）更适合需要澄清意图的场景；这里固定输出一条短句，单轮注入成本更低、延迟更稳。
+ *
+ * ## 定稿原则（勿反复横跳）
+ * 1. **通顺完整** > 文艺；禁止半截句（如「包括被自己。」）。
+ * 2. **治愈** 三类轮换即可：直白许可 | 单处轻隐喻+许可 | 短格言；勿连刷同一句式。
+ * 3. **只拦硬套**：「像…一样」、轻轻停驻、风起/茶凉/暮色爆款、励志对仗、办公词、指令/拯救/条件价值。
+ * 4. **允许** 一处克制意象（书页/故事里的停顿）；**不** 把治愈锁死成句句「累了就歇歇」。
+ * 5. 改规则时同步检查 `fallback/quotes.ts` 与生成后校验函数，避免提示与兜底打架。
  */
 import type { EmotionKind } from '../schema/data'
 
@@ -36,10 +43,11 @@ export const EMOTION_CN_LABEL: Record<EmotionKind, string> = {
 
 const EMOTION_GUIDE: Record<EmotionKind, string> = {
   happy: '此刻偏愉悦，语气轻快温暖，避免浮夸鸡血。',
-  calm: '此刻偏平稳，语气舒缓克制。',
-  anxious: '此刻偏焦虑，先承接不安再给轻柔喘息感，避免说教与否定感受。',
- low: '此刻偏低落，温柔承接情绪，禁止搞笑转移（如“笑一笑十年少”），聚焦“此刻被接纳”的安全感。',
-  tired: '此刻偏疲惫，体谅身心负荷，句短声柔。',
+  calm: '此刻偏平稳，承接与许可为主；可直白可一处轻隐喻，禁止「像…一样」与爆款套句。',
+  anxious:
+    '此刻偏焦虑，先承接不安再给许可，避免说教与否定感受；禁止「像…一样」与连刷口语模板。',
+  low: '此刻偏低落，温柔承接；禁止搞笑转移；可直白许可或一处克制意象（如故事/路里的停顿），禁止「像…一样」。',
+  tired: '此刻偏疲惫，句短、通顺，体谅负荷；禁止「像…一样」「轻轻停驻」与口语许可套句连刷。',
 }
 
 /**
@@ -78,13 +86,13 @@ export type BuildCompanionPromptInput = {
 
 const STYLE_GUIDE: Record<CompanionCopyStyle, string> = {
   治愈:
-    '格言或短诗气质：人生、时光、温柔、成长、陪伴；一句一个重心。以承接感受与存在许可为主（可以、允许、就好），禁止命令、拯救口号与条件价值；禁止纯宿命感叹（「再亮也照不亮…」）；禁止办公设备与电脑操作描写。',
+    '治愈=承接感受与存在许可，通顺好读。可轮换：①直白口语（累了就歇歇）；②单处轻隐喻+许可（如「书页里的停顿，也该被允许」）；③短格言。一句一重心，勿连刷同一句式。禁止「像…一样」、轻轻停驻、风起/茶凉/暮色等爆款；禁止命令、拯救与条件价值；禁止办公设备描写。',
   励志:
     '可多用「我」或无人称格言；聚焦态度与微小可能，禁止鸡血口号与抽象成功学；禁止命令式打气（加油/撑住/你必须）与「只要你…就…」式条件价值；禁止写键盘、光标、加班赶场等办公套话，勿照抄常见鸡汤句。',
   搞笑:
     '仅当用户情绪为「开心」时启用；生活化自嘲或轻巧反差，禁止命令、拯救口号与条件价值；禁止在焦虑/低落情绪下用幽默转移感受；禁止办公梗。',
   助眠:
-    '语气极轻、句短；可写呼吸、停顿、夜色、安静与存在许可，禁止睡眠指令（「快睡吧」）、布置步骤与未来承诺；禁止屏幕蓝光、敲键等提神意象。',
+    '语气极轻、句短；写安静与许可歇着，禁止「像…一样」与轻轻停驻；禁止睡眠指令、布置步骤与未来承诺；禁止屏幕蓝光、敲键等提神意象。',
   职场解压:
     '用人生节奏、取舍、边界感来减压（例：允许慢下来、不必一次做完），禁止会议、邮件、通知、文件、光标、键盘等办公名词；禁止命令式加班打气与条件价值。',
 }
@@ -92,7 +100,7 @@ const STYLE_GUIDE: Record<CompanionCopyStyle, string> = {
 /** 各语气类型下的「反功能性相处」写作约束（写入 system，与生成后校验一致）。 */
 const STYLE_ANTI_FUNCTIONAL: Record<CompanionCopyStyle, string> = {
   治愈:
-    '【治愈·相处】优先「被看见、被接纳」：可写允许休息、此刻就好；禁止你应该/记得/别忘、禁止撑住挺过去、禁止只要你…就…/努力就会…。',
+    '【治愈·相处】禁止你应该/撑住/只要你…就…；其余见上方语气要求。',
   励志:
     '【励志·相处】可写微小可能与方向感，但禁止命令（你应该/快去）、禁止拯救口号（撑住/加油/没有过不去的坎）、禁止条件价值与空洞保证。',
   搞笑:
@@ -106,13 +114,44 @@ const STYLE_ANTI_FUNCTIONAL: Record<CompanionCopyStyle, string> = {
 const ANTI_FUNCTIONAL_RELATIONSHIP_LINE =
   '【反功能性相处】勿把用户当任务或角色：禁止布置步骤（应该先…/记得…/别忘…）；禁止拯救口号（撑住/挺过去/没有过不去的坎/一切都会好起来）；禁止条件价值（只要你…就…/努力就会…/才配…）；优先存在许可（可以、允许、就好、在这、不必），少评价其表现。'
 
+const PLAIN_HEALING_STYLES = new Set<CompanionCopyStyle>(['治愈', '助眠'])
+
+/** 治愈类重试共用收尾（勿在各 build*Retry 里写互相矛盾的示例）。 */
+const HEALING_QUALITY_RETRY_TAIL =
+  '改通顺完整的一句，换骨架：直白许可、单处轻隐喻+许可、或短格言三选一；禁止像…一样、轻轻停驻、口语套句连刷、半截句。'
+
+/** 模型连刷的「口语许可」套句（治愈语气下过密时触发重试）。 */
+export const COMPANION_ORAL_PERMISSION_CLICHES = [
+  '此刻停一会儿',
+  '停一会儿，也可以',
+  '歇一会儿，也可以',
+  '累了就歇歇',
+  '歇歇，不算',
+  '不算偷懒',
+  '先停一会儿也好',
+] as const
+
+/** 模型易写的「假治愈」文艺硬套（与 POETIC 校验配合）。 */
+export const COMPANION_STIFF_HEALING_MARKERS = [
+  '像风一样',
+  '像云一样',
+  '像海一样',
+  '轻轻停驻',
+  '轻轻停',
+  '停驻',
+  '驻足',
+  '栖息',
+  '允许自己像',
+  '不妨像',
+] as const
+
 /** 每次随机抽一种写法，避免连续落在「X时，像…」文艺模板。 */
 const DIVERSITY_ANGLES = [
-  '用格言式判断句：短、具体、无景物比喻，禁止「X时，像…」对仗，禁止「有些…，…」励志对仗。',
-  '用一句短促许可（允许休息、肯定当下），不要写景、不要比喻，勿照抄常见鸡汤句。',
+  '用格言式判断句：短、具体，禁止「X时，像…」对仗，禁止「有些…，…」励志对仗。',
+  '用一句短促口语许可（累了就歇歇/此刻也好），勿照抄上一句骨架。',
+  '单处轻隐喻+许可（如「书页里的停顿，也该被允许」），仅一处意象，禁止像…一样与风起/茶凉/暮色。',
   '从成长或耐心直说，禁止暮色、风起、茶凉、窗台、杯底余温等爆款意象。',
   '用极短问句或感叹，禁止「你…，我…」对称、禁止逗号后接「像…」。',
-  '口语化像朋友微信，一句一个意思，禁止堆砌景物比喻。',
   '用「可以」「不妨」邀请休息，禁止「不妨让心先停一停」式套句。',
   '用对比结构（「不是…而是…」「与其…不如…」），禁止文艺散文腔。',
   '第二人称单分句，无逗号对仗，禁止起笔「风起/茶凉/暮色」。',
@@ -157,10 +196,13 @@ export const COMPANION_POETIC_TEMPLATE_MARKERS = [
   '有人正为你',
   '余温在',
   '像星辰落入',
+  '像风一样',
+  '轻轻停驻',
+  '停驻',
 ] as const
 
 const POETIC_TEMPLATE_BAN_LINE =
-  '【禁止文艺套句】禁止：①「X时，…」起句+「像…」比喻（如风起时/茶凉时/暮色漫过…）；②「像未说完的句子」「在杯底藏着」「留着一盏灯」；③暮色+窗台/窗棂组合。优先直白格言、判断句或许可，一句一个重心。'
+  '【禁止文艺套句】禁止：①「X时，…」+「像…」、②「像…一样」（如像风一样轻轻停驻）；③爆款意象堆砌（风起/茶凉/暮色+窗台）；④「像未说完的句子」「杯底藏着」。治愈可一处轻隐喻+许可，须通顺，一句一重心。'
 
 const MOTIVATIONAL_PARALLEL_BAN_LINE =
   '【禁止励志套句】禁止：①以「有些」起头的对仗句（如「有些坚持，终会…」「有些努力，不必…」）；②「不是所有…但总有一些…」；③「终会落在心头」「不必等回应也能发光」等口号式后半句。'
@@ -418,6 +460,9 @@ export function companionTextHasPoeticTemplate(text: string): boolean {
   if (COMPANION_POETIC_TEMPLATE_MARKERS.some((m) => t.includes(m))) {
     return true
   }
+  if (/像[^，,。！？]{1,14}一样/.test(t)) {
+    return true
+  }
   if (/^[^，,。！？]{1,10}时[，,]/.test(t) && /像/.test(t)) {
     return true
   }
@@ -427,16 +472,71 @@ export function companionTextHasPoeticTemplate(text: string): boolean {
   return false
 }
 
+export function companionTextHasOralPermissionCliche(text: string): boolean {
+  const t = text.trim()
+  if (!t) return false
+  return COMPANION_ORAL_PERMISSION_CLICHES.some((m) => t.includes(m))
+}
+
+/** 「包括被自己。」等省略宾语、读起来没说完的尾巴。 */
+export function companionTextHasEllipticalTail(text: string): boolean {
+  const t = text.trim()
+  if (/包括被自己[。！？]?$/.test(t)) return true
+  if (
+    /，包括被[^，,。！？]{1,10}[。！？]$/.test(t) &&
+    !/对待|温柔|善待|爱惜/.test(t)
+  ) {
+    return true
+  }
+  return false
+}
+
+export function buildEllipticalTailRetryUserSuffix(): string {
+  return `【硬约束】后半句像没说完（如「包括被自己」）。${HEALING_QUALITY_RETRY_TAIL}`
+}
+
+export function companionTextHasStiffHealingCliche(text: string): boolean {
+  const t = text.trim()
+  if (!t) return false
+  if (COMPANION_STIFF_HEALING_MARKERS.some((m) => t.includes(m))) {
+    return true
+  }
+  if (/像[^，,。！？]{1,14}一样/.test(t)) {
+    return true
+  }
+  if (/轻轻/.test(t) && /像|如|似|风|云|海|停驻|驻足/.test(t)) {
+    return true
+  }
+  if (/停驻|驻足|栖息/.test(t)) {
+    return true
+  }
+  return false
+}
+
+export function companionTextNeedsPlainHealingCheck(
+  style: CompanionCopyStyle,
+): boolean {
+  return PLAIN_HEALING_STYLES.has(style)
+}
+
 export function buildPoeticTemplateRetryUserSuffix(): string {
-  return '【硬约束】勿用「风起时/茶凉时/暮色/窗台/像未说完的句子」等套句。改直白格言或许可，一句一重心，勿照抄常见网句或示范句。'
+  return `【硬约束】勿用风起/茶凉/暮色/像…一样等套句。${HEALING_QUALITY_RETRY_TAIL}`
+}
+
+export function buildStiffHealingRetryUserSuffix(): string {
+  return `【硬约束】上一句太硬或不通顺（如像…一样轻轻停驻）。${HEALING_QUALITY_RETRY_TAIL}`
+}
+
+export function buildOralPermissionRetryUserSuffix(): string {
+  return `【硬约束】上一句像口语许可套句连刷。${HEALING_QUALITY_RETRY_TAIL}`
 }
 
 /** 桌面挂件：知道用户在电脑前，但文风偏格言短句，不写办公场景。 */
 const DESKTOP_SCENE_LINES = [
   '【场景】用户通过桌面角落挂件读一句短陪伴文案；你知道对方可能在办公，但输出应是**普适的人生短句/诗意格言**，不要写成电脑旁实况描写。',
   DESKTOP_CLICHE_BAN_LINE,
-  '【文风取向】普适人生短句：一句一重心，可有接纳与体谅；可写人生/时光/温柔/成长，勿写设备与操作。禁止照抄常见鸡汤与网句；禁止「有些…，…」励志对仗与「不是所有…但总有一些…」。不写带引号的示范句。',
-  '禁止写眼前有实体书/纸质书：合上书本、翻书页、捧读、灯下看书、书页等。',
+  '【文风取向】通顺短句，一句一重心；可有接纳、许可或一处克制隐喻，勿写设备与操作。禁止照抄鸡汤网句、「有些…，…」励志对仗。不写带引号的示范句。',
+  '禁止眼前翻书、捧读等动作；允许抽象用「书页/故事」作一处隐喻（如书页里的停顿），勿叠多处景物。',
   '【时间】禁止编造具体时长（「才刚过五分钟」「已经两小时」）；可说「此刻」「这会儿」或不写时间。',
 ] as const
 
@@ -468,7 +568,7 @@ const INTEREST_TAG_GUIDE: Record<string, string> = {
   影视:
     '「影视」：只化用经典台词的**情绪与节奏**（可略改写，勿标注片名演员）；禁止出现「电影」「剧集」「影院」「屏幕」等词，禁止写追剧/观影动作。',
   书籍:
-    '「书籍」：化用名著/诗里**一句**短引神韵（勿标注书名作者）；禁止描写眼前实体书、合书、翻页；禁止把「书」当作眼前道具。',
+    '「书籍」：化用名著/诗里**一句**短引神韵（勿标注书名作者）；禁止眼前翻书、捧读；允许抽象「书页/故事」一处隐喻，勿叠景物。',
   音乐:
     '「音乐」：可化用歌词意象或节奏感（勿写歌名歌手），禁止「戴上耳机听歌」等旁观描写。',
   运动:
@@ -579,6 +679,7 @@ export function buildCompanionSystemPrompt(input: BuildCompanionPromptInput): st
     '【陪伴感底线】每句须让人感到被体谅或被托住：允许慢下来、肯定感受或当下的存在、温柔许可；禁止整句只有衰败/无力感而无接纳或指望。',
     `避免广告式文艺腔：不要叠用「${OVERUSED_ADVERBS}」；不要写「你…，我…」对称陪伴模板。`,
     '禁止输出编号、解释、引号、标题、前后缀。',
+    '禁止半截句：不得写「包括被自己。」等省略宾语；须写全「也包括被自己温柔对待」或改成完整句。',
     '禁止医学建议、极端表述、负向暗示。',
     '只返回一句纯文本。',
   ].join('\n')
@@ -656,6 +757,16 @@ function buildOpeningConstraint(recent: string[], seed: number): string {
     if (companionTextHasFunctionalTone(last, '治愈')) {
       rules.push(
         '上一句像指令、拯救口号或条件价值；本句改为存在许可（可以、允许、就好），禁止你应该、撑住、只要你…就…。',
+      )
+    }
+    if (companionTextHasStiffHealingCliche(last)) {
+      rules.push(
+        '上一句像硬套文艺（如像…一样轻轻停驻）；本句改通顺治愈句，可单处轻隐喻+许可，禁止像…一样。',
+      )
+    }
+    if (companionTextHasOralPermissionCliche(last)) {
+      rules.push(
+        '上一句是口语许可套句；本句换骨架，可写单处意象+许可（如书页/故事里的停顿），禁止再写「停一会儿也可以」「累了就歇歇」。',
       )
     }
     const bannedOpeners = ['风起', '茶凉', '暮色', '雨落', '雪落', '窗', '有些']
@@ -742,7 +853,7 @@ export function buildCompanionUserPrompt(
   if (kw) {
     return `${prefix}请围绕这个关键词生成文案：${kw}。（${seed}）`
   }
-  return `${prefix}请给我一句陪伴短句：可有诗意，但优先接纳与存在许可（可以、允许、就好）；勿写办公设备、电脑操作与捧读实体书；禁止你应该、撑住、只要你…就…。每次换角度，避免重复上一句。（${seed}）`
+  return `${prefix}请给我一句陪伴短句：通顺完整，接纳与许可；可直白、可一处轻隐喻、可短格言，换与上一句不同骨架。禁止像…一样、轻轻停驻、爆款套句、半截句、办公词与拯救口号。（${seed}）`
 }
 
 export function parseCompanionInterestTags(interests: string[] | undefined): {

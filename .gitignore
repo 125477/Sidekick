@@ -24,3 +24,11 @@ Thumbs.db
 .vscode/
 # .cursor/
 
+# Python（如 .cursor/skills 下脚本运行产生的缓存）
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 本地 pip --target 临时依赖（非项目正式依赖，勿提交）
+.tmp-pillow/
+

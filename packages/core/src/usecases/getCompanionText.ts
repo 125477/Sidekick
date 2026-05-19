@@ -1,9 +1,11 @@
 import { FALLBACK_QUOTES } from '../fallback/quotes'
 import {
   companionTextHasBleakWithoutComfort,
+  companionTextHasEllipticalTail,
   companionTextHasFunctionalTone,
   companionTextHasMotivationalParallelTemplate,
   companionTextHasPoeticTemplate,
+  companionTextHasStiffHealingCliche,
 } from '../prompts/textPrompt'
 
 export type CompanionTextResult = {
@@ -22,7 +24,9 @@ function pickFallbackQuote(maxChars?: number): string {
       !companionTextHasPoeticTemplate(q) &&
       !companionTextHasMotivationalParallelTemplate(q) &&
       !companionTextHasBleakWithoutComfort(q) &&
-      !companionTextHasFunctionalTone(q, '治愈'),
+      !companionTextHasFunctionalTone(q, '治愈') &&
+      !companionTextHasStiffHealingCliche(q) &&
+      !companionTextHasEllipticalTail(q),
   )
   const pool = withoutBanned.length > 0 ? withoutBanned : base
   return (

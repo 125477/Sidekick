@@ -11,6 +11,13 @@ import {
   buildMotivationalParallelRetryUserSuffix,
   buildFunctionalToneRetryUserSuffix,
   buildPoeticTemplateRetryUserSuffix,
+  buildEllipticalTailRetryUserSuffix,
+  buildOralPermissionRetryUserSuffix,
+  buildStiffHealingRetryUserSuffix,
+  companionTextHasEllipticalTail,
+  companionTextHasOralPermissionCliche,
+  companionTextHasStiffHealingCliche,
+  companionTextNeedsPlainHealingCheck,
   companionStyleForEmotion,
   companionTextHasBleakWithoutComfort,
   companionTextHasDesktopCliche,
@@ -162,11 +169,37 @@ export async function generateCompanionCopy(
       )
     }
     if (
+      companionTextNeedsPlainHealingCheck(effectiveStyle) &&
+      companionTextHasStiffHealingCliche(line)
+    ) {
+      line = await requestModelLine(
+        `${userPrompt}\n${buildStiffHealingRetryUserSuffix()}`,
+      )
+    }
+    if (
+      companionTextNeedsPlainHealingCheck(effectiveStyle) &&
+      companionTextHasOralPermissionCliche(line)
+    ) {
+      line = await requestModelLine(
+        `${userPrompt}\n${buildOralPermissionRetryUserSuffix()}`,
+      )
+    }
+    if (companionTextHasEllipticalTail(line)) {
+      line = await requestModelLine(
+        `${userPrompt}\n${buildEllipticalTailRetryUserSuffix()}`,
+      )
+    }
+    if (
       companionTextHasPoeticTemplate(line) ||
       companionTextHasDesktopCliche(line) ||
       companionTextHasMotivationalParallelTemplate(line) ||
       companionTextHasBleakWithoutComfort(line) ||
-      companionTextHasFunctionalTone(line, effectiveStyle)
+      companionTextHasFunctionalTone(line, effectiveStyle) ||
+      (companionTextNeedsPlainHealingCheck(effectiveStyle) &&
+        companionTextHasStiffHealingCliche(line)) ||
+      (companionTextNeedsPlainHealingCheck(effectiveStyle) &&
+        companionTextHasOralPermissionCliche(line)) ||
+      companionTextHasEllipticalTail(line)
     ) {
       throw new Error('companion copy still matches banned template')
     }
