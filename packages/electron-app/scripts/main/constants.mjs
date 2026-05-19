@@ -18,6 +18,8 @@ export const AUX_WINDOW_WIDTH = 980
 export const AUX_WINDOW_HEIGHT = 780
 export const AUX_WINDOW_MIN_WIDTH = 800
 export const AUX_WINDOW_MIN_HEIGHT = 600
+/** 不透明辅窗在 HTML 绘制前的底色，减轻夜间模式白闪（与 ui 首屏 bootstrap 对齐）。 */
+export const AUX_WINDOW_BACKGROUND = '#18181b'
 /** Match EmotionToast `max-w` so the detached bubble window is not wider than the card. */
 /** 初始宽；渲染器 `resizeToastWindow` 会按卡片内容收窄。 */
 export const TOAST_WINDOW_WIDTH = 304

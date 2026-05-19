@@ -88,7 +88,7 @@ export function EmotionToastToolbarIconButton({
         onMouseLeave={hideTip}
         onFocus={showTip}
         onBlur={hideTip}
-        className="sk-toast-clickable inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-violet-700 transition-colors hover:bg-violet-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-400/50 disabled:cursor-wait disabled:opacity-40"
+        className="sk-toast-clickable sk-toast-toolbar-btn inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md disabled:cursor-wait disabled:opacity-40"
       >
         {children}
       </button>

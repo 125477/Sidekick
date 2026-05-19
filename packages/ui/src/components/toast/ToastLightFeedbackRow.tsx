@@ -119,7 +119,7 @@ export function ToastLightFeedbackRow({
   }
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-0.5 border-t border-slate-100/90 px-0.5 py-1 [-webkit-app-region:no-drag]">
+    <div className="sk-toast-feedback-divider flex w-full min-w-0 flex-col gap-0.5 px-0.5 py-1 [-webkit-app-region:no-drag]">
       <div
         className={`flex flex-row flex-wrap items-center gap-1 ${centered ? 'justify-center' : ''}`}
       >
@@ -155,7 +155,7 @@ export function ToastLightFeedbackRow({
         })}
       </div>
       {hint ? (
-        <p className="text-[10px] leading-snug text-slate-500" role="status">
+        <p className="sk-toast-muted text-[10px] leading-snug" role="status">
           {hint}
         </p>
       ) : null}

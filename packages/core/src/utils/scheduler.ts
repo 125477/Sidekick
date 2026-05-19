@@ -13,6 +13,22 @@ function parseTime(input: string): number {
   return hour * 60 + minute
 }
 
+/** 本地时区：当前时刻是否落在 [start, end) 内；跨午夜区间（如 20:00–06:00）按环状处理。 */
+export function isWithinScheduledInterval(
+  now: Date,
+  start: string,
+  end: string,
+): boolean {
+  const nowMinutes = now.getHours() * 60 + now.getMinutes()
+  const startMinutes = parseTime(start)
+  const endMinutes = parseTime(end)
+
+  if (startMinutes <= endMinutes) {
+    return nowMinutes >= startMinutes && nowMinutes < endMinutes
+  }
+  return nowMinutes >= startMinutes || nowMinutes < endMinutes
+}
+
 export function isWithinQuietHours(now: Date, config: SchedulerConfig): boolean {
   if (!config.quietHoursEnabled) return false
   const nowMinutes = now.getHours() * 60 + now.getMinutes()

@@ -44,25 +44,22 @@ export function FavoriteTextsPanel({
 
   const listBody =
     loading ? (
-      <p className="py-6 text-center text-sm text-slate-500">加载中…</p>
+      <p className="sk-muted py-6 text-center text-sm">加载中…</p>
     ) : rows.length === 0 ? (
-      <p className="py-8 text-center text-sm text-slate-500">暂无收藏</p>
+      <p className="sk-muted py-8 text-center text-sm">暂无收藏</p>
     ) : (
       <ul className="flex flex-col gap-2">
         {rows.map((t) => (
-          <li
-            key={t.id}
-            className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2 text-[13px] leading-relaxed text-slate-700"
-          >
+          <li key={t.id} className="sk-favorite-row">
             <p className="whitespace-pre-wrap break-words">{t.content}</p>
-            <div className="mt-1.5 flex items-center justify-between gap-2">
-              <span className="text-[10px] text-slate-400">
+            <div className="mt-2 flex items-center justify-between gap-2 border-t border-[color:var(--sk-divider)] pt-2">
+              <span className="sk-muted text-[10px] tabular-nums">
                 {new Date(t.createdAt).toLocaleString()}
               </span>
-              <div className="flex shrink-0 items-center gap-1">
+              <div className="flex shrink-0 items-center gap-0.5">
                 <button
                   type="button"
-                  className="rounded-md px-2 py-0.5 text-[11px] font-medium text-violet-700 hover:bg-violet-50"
+                  className="sk-favorite-row-action sk-favorite-row-action--copy"
                   onClick={() => {
                     void navigator.clipboard
                       .writeText(t.content)
@@ -87,7 +84,7 @@ export function FavoriteTextsPanel({
                 </button>
                 <button
                   type="button"
-                  className="rounded-md px-2 py-0.5 text-[11px] font-medium text-rose-600 hover:bg-rose-50"
+                  className="sk-favorite-row-action sk-favorite-row-action--delete"
                   onClick={() => {
                     if (
                       !window.confirm(
@@ -111,7 +108,7 @@ export function FavoriteTextsPanel({
   if (fillAvailable) {
     return (
       <div className="flex min-h-0 flex-1 flex-col gap-2">
-        <p className="shrink-0 text-xs text-slate-500">仅本地保存的陪伴句收藏</p>
+        <p className="sk-muted shrink-0 text-xs">仅本地保存的陪伴句收藏</p>
         <div className="min-h-0 flex-1 overflow-y-auto pr-1">{listBody}</div>
       </div>
     )
@@ -119,7 +116,7 @@ export function FavoriteTextsPanel({
 
   return (
     <div className="space-y-2">
-      <p className="text-xs text-slate-500">仅本地保存的陪伴句收藏</p>
+      <p className="sk-muted text-xs">仅本地保存的陪伴句收藏</p>
       <div className="max-h-[min(60vh,520px)] overflow-y-auto pr-1">{listBody}</div>
     </div>
   )

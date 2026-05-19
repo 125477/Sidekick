@@ -85,7 +85,7 @@ export function UploadTab({ onApply }: UploadTabProps) {
   return (
     <div className="grid gap-3 pb-4">
       <label
-        className="cursor-pointer rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-600 hover:border-slate-400 hover:bg-slate-50/80"
+        className="cursor-pointer rounded-xl border border-dashed border-[color:var(--sk-chip-off-border)] p-4 text-sm text-[color:var(--sk-text-secondary)] hover:border-[color:var(--sk-accent-border)] hover:bg-[color:var(--sk-accent-subtle-bg)]"
         onDragOver={(event) => {
           event.preventDefault()
           event.stopPropagation()
@@ -138,7 +138,7 @@ export function UploadTab({ onApply }: UploadTabProps) {
           {sizeRejectMessage}
         </p>
       ) : null}
-      <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3">
+      <div className="flex items-center gap-3 rounded-xl bg-[color:var(--sk-card-bg)] p-3">
         {fileSrc ? (
           showVideoPreview ? (
             <video
@@ -162,8 +162,8 @@ export function UploadTab({ onApply }: UploadTabProps) {
           <div className="h-12 w-12 rounded-full bg-gradient-to-b from-sky-200 to-violet-200" />
         )}
         <div>
-          <p className="text-sm font-medium text-slate-700">{fileName}</p>
-          <p className="text-xs text-slate-500">圆形预览区域（示意）</p>
+          <p className="text-sm font-medium text-[color:var(--sk-text-body)]">{fileName}</p>
+          <p className="sk-muted text-xs">圆形预览区域（示意）</p>
         </div>
       </div>
       <p className="text-xs text-amber-700">{warning}</p>
@@ -197,7 +197,7 @@ export function UploadTab({ onApply }: UploadTabProps) {
           setFileName('未选择文件')
           if (inputRef.current) inputRef.current.value = ''
         }}
-        className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+        className="sk-btn-primary rounded-xl px-4 py-2 text-sm font-medium"
       >
         上传
       </button>

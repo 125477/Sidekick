@@ -53,18 +53,12 @@ export function moodEntryDisplayLabel(entry: {
 }
 
 export function emotionChipButtonClass(active: boolean): string {
-  return `cursor-pointer rounded-full border px-3 py-1 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 disabled:cursor-not-allowed disabled:opacity-60 ${
-    active
-      ? 'border-violet-600 bg-violet-600 text-white shadow-sm'
-      : 'border-violet-200 text-violet-700 hover:bg-violet-50'
-  }`
+  return `sk-emotion-chip ${active ? 'sk-emotion-chip--active' : ''} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--sk-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60`
 }
 
 /** 陪伴气泡轻反馈：比情绪面板 chip 更小、更弱，不抢正文。 */
 export function toastLightFeedbackChipClass(active: boolean): string {
-  return `sk-toast-clickable rounded-full border px-2 py-0.5 text-[11px] leading-tight transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-violet-400 disabled:opacity-50 ${
-    active
-      ? 'border-violet-300 bg-violet-50 text-violet-700'
-      : 'border-slate-200 text-slate-600 hover:border-violet-200 hover:bg-slate-50/90 hover:text-violet-700'
+  return `sk-toast-clickable sk-toast-chip rounded-full px-2 py-0.5 text-[11px] leading-tight focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[color:var(--sk-focus-ring)] disabled:opacity-50 ${
+    active ? 'sk-toast-chip--active' : ''
   }`
 }

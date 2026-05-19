@@ -37,7 +37,7 @@ export function toastBarGroupClass(compact: boolean, groupName: string): string 
 }
 
 export function toastMessageCellWrapClass(_compact: boolean): string {
-  return 'min-w-0 w-full max-w-full shrink rounded-md px-0.5 py-0.5 transition-colors motion-reduce:transition-none hover:bg-slate-100/80 focus-within:bg-slate-100/80'
+  return 'sk-toast-message-cell min-w-0 w-full max-w-full shrink rounded-md px-0.5 py-0.5 motion-reduce:transition-none'
 }
 
 export function toastMessageTextClass(compact: boolean, multiline: boolean): string {

@@ -25,6 +25,20 @@ function unionViewportBounds(root: HTMLElement): DOMRect | null {
   return new DOMRect(left, top, right - left, bottom - top)
 }
 
+/** 精灵可点区域（视口坐标），用于 Electron 窗体透明区点击穿透。 */
+export function measureWidgetInteractClientRect(
+  root: HTMLElement,
+): { left: number; top: number; width: number; height: number } | null {
+  const union = unionViewportBounds(root)
+  if (!union || union.width < 1 || union.height < 1) return null
+  return {
+    left: union.left,
+    top: union.top,
+    width: union.width,
+    height: union.height,
+  }
+}
+
 /** Content box for `resizeWidgetWindow` (includes shell padding). */
 export function measureWidgetShellBounds(
   root: HTMLElement,

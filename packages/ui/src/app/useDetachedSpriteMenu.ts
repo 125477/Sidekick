@@ -3,10 +3,17 @@ import { useCallback, useEffect, useLayoutEffect } from 'react'
 import type { MenuAction } from '../components/menu/SpriteMenu'
 import type { UiAction, UiState } from '../state/uiState'
 import { parseMenuActionFromMessage } from '../components/menu/SpriteMenu'
+import {
+  readThemeForExternalWindow,
+  type CachedEffectiveTheme,
+  writeCachedEffectiveTheme,
+} from '../state/themeBootstrap'
 
 export type UseDetachedSpriteMenuArgs = {
   isToastMode: boolean
   menuOpen: boolean
+  /** 与设置里「夜间模式」解析结果一致，避免挂件 `data-theme` 仍是浅色。 */
+  menuTheme: CachedEffectiveTheme
   spriteMenuSurface: 'sprite' | 'toast-bubble'
   detachedWidgetSpriteMenu: boolean
   uiState: UiState
@@ -17,9 +24,44 @@ export type UseDetachedSpriteMenuArgs = {
   browserSpriteMenuWindowRef: MutableRefObject<Window | null>
 }
 
+function screenBoundsFromClientRect(r: DOMRectReadOnly) {
+  return {
+    left: window.screenX + r.left,
+    top: window.screenY + r.top,
+    right: window.screenX + r.right,
+    bottom: window.screenY + r.bottom,
+    width: r.width,
+    height: r.height,
+  }
+}
+
+function centerFallbackClientRect(): DOMRectReadOnly {
+  const pad = 28
+  const ix = Math.max(
+    pad,
+    Math.min(window.innerWidth - pad, window.innerWidth / 2),
+  )
+  const iy = Math.max(
+    pad,
+    Math.min(window.innerHeight - pad, window.innerHeight / 2),
+  )
+  return {
+    x: ix - pad,
+    y: iy - pad,
+    width: pad * 2,
+    height: pad * 2,
+    left: ix - pad,
+    top: iy - pad,
+    right: ix + pad,
+    bottom: iy + pad,
+    toJSON: () => ({}),
+  } as DOMRectReadOnly
+}
+
 export function useDetachedSpriteMenu({
   isToastMode,
   menuOpen,
+  menuTheme,
   spriteMenuSurface,
   detachedWidgetSpriteMenu,
   uiState,
@@ -40,42 +82,16 @@ export function useDetachedSpriteMenu({
       void window.sidekickDesktop?.closeWidgetSpriteMenu?.({ notify: false })
       return
     }
-    let cancelled = false
-    let opened = false
-    let lateTimer: ReturnType<typeof setTimeout> | null = null
 
-    const invokeBounds = (r: DOMRectReadOnly) => {
-      void window.sidekickDesktop?.openWidgetSpriteMenu?.({
-        left: window.screenX + r.left,
-        top: window.screenY + r.top,
-        right: window.screenX + r.right,
-        bottom: window.screenY + r.bottom,
-        width: r.width,
-        height: r.height,
-      })
-    }
+    let disposed = false
+    const theme = readThemeForExternalWindow(menuTheme)
+    writeCachedEffectiveTheme(theme)
 
-    const invokeCenterFallback = () => {
-      if (cancelled || opened) return
-      opened = true
-      const pad = 28
-      const ix = Math.max(
-        pad,
-        Math.min(window.innerWidth - pad, window.innerWidth / 2),
-      )
-      const iy = Math.max(
-        pad,
-        Math.min(window.innerHeight - pad, window.innerHeight / 2),
-      )
-      const cx = window.screenX + ix
-      const cy = window.screenY + iy
+    const invokeOpen = (r: DOMRectReadOnly) => {
+      if (disposed) return
       void window.sidekickDesktop?.openWidgetSpriteMenu?.({
-        left: cx - pad,
-        top: cy - pad,
-        right: cx + pad,
-        bottom: cy + pad,
-        width: pad * 2,
-        height: pad * 2,
+        ...screenBoundsFromClientRect(r),
+        theme,
       })
     }
 
@@ -108,47 +124,52 @@ export function useDetachedSpriteMenu({
       return el
     }
 
-    const tryMeasureAndInvoke = () => {
-      if (cancelled || opened) return true
+    const measureAndOpen = () => {
+      if (disposed) return
       const useToastToolbarAnchor =
         isToastMode || spriteMenuSurface === 'toast-bubble'
       const el = resolveAnchorEl(useToastToolbarAnchor)
-      if (!(el instanceof HTMLElement)) return false
-      const r = el.getBoundingClientRect()
-      if (r.width < 1 || r.height < 1) return false
-      opened = true
-      invokeBounds(r)
-      return true
-    }
-
-    let attempts = 0
-    const tick = () => {
-      if (cancelled) return
-      if (tryMeasureAndInvoke()) return
-      attempts += 1
-      if (attempts < 12) {
-        requestAnimationFrame(tick)
-      } else {
-        invokeCenterFallback()
+      if (el instanceof HTMLElement) {
+        const r = el.getBoundingClientRect()
+        if (r.width >= 1 && r.height >= 1) {
+          invokeOpen(r)
+          return
+        }
       }
+      invokeOpen(centerFallbackClientRect())
     }
 
-    requestAnimationFrame(tick)
-    lateTimer = window.setTimeout(() => {
-      lateTimer = null
-      if (cancelled) return
-      if (!tryMeasureAndInvoke()) invokeCenterFallback()
-    }, 220)
+    let rafAttempts = 0
+    const tryMeasureWithRaf = () => {
+      if (disposed) return
+      const useToastToolbarAnchor =
+        isToastMode || spriteMenuSurface === 'toast-bubble'
+      const el = resolveAnchorEl(useToastToolbarAnchor)
+      if (el instanceof HTMLElement) {
+        const r = el.getBoundingClientRect()
+        if (r.width >= 1 && r.height >= 1) {
+          invokeOpen(r)
+          return
+        }
+      }
+      rafAttempts += 1
+      if (rafAttempts < 8) {
+        requestAnimationFrame(tryMeasureWithRaf)
+        return
+      }
+      measureAndOpen()
+    }
+
+    // StrictMode 会连续 mount/cleanup：用 setTimeout(0) 合并为一次 IPC，避免主进程连开两窗互毁。
+    const openTimer = window.setTimeout(() => {
+      tryMeasureWithRaf()
+    }, 0)
 
     return () => {
-      cancelled = true
-      if (lateTimer != null) {
-        window.clearTimeout(lateTimer)
-        lateTimer = null
-      }
-      void window.sidekickDesktop?.closeWidgetSpriteMenu?.({ notify: false })
+      disposed = true
+      window.clearTimeout(openTimer)
     }
-  }, [useDetachedSpriteMenuLayout, menuOpen, isToastMode, spriteMenuSurface])
+  }, [useDetachedSpriteMenuLayout, menuOpen, menuTheme, isToastMode, spriteMenuSurface])
 
   useEffect(() => {
     if (!detachedWidgetSpriteMenu && !isToastMode) return
@@ -163,6 +184,33 @@ export function useDetachedSpriteMenu({
       dispatch({ type: 'MENU_CLOSE' })
     })
   }, [detachedWidgetSpriteMenu, isToastMode, dispatch])
+
+  /** 点到挂件/气泡窗其它区域时关闭独立菜单（菜单窗本身收不到这次点击）。 */
+  useEffect(() => {
+    if (!useDetachedSpriteMenuLayout || !menuOpen) return
+
+    const dismissMenu = () => {
+      dispatch({ type: 'MENU_CLOSE' })
+      void window.sidekickDesktop?.closeWidgetSpriteMenu?.({ notify: true })
+    }
+
+    const onPointerDownCapture = (event: PointerEvent) => {
+      const target = event.target
+      if (!(target instanceof Element)) return
+      if (target.closest('[data-sprite-menu-trigger]')) return
+      if (target.closest('[data-sprite-menu-anchor]')) return
+      dismissMenu()
+    }
+
+    const timer = window.setTimeout(() => {
+      window.addEventListener('pointerdown', onPointerDownCapture, true)
+    }, 0)
+
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('pointerdown', onPointerDownCapture, true)
+    }
+  }, [useDetachedSpriteMenuLayout, menuOpen, dispatch])
 
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
@@ -220,7 +268,6 @@ export function useDetachedSpriteMenu({
       openBrowserSpriteMenuPopup()
     }
   }, [
-    menuOpen,
     uiState.menuState,
     dispatch,
     openBrowserSpriteMenuPopup,

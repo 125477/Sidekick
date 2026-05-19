@@ -14,7 +14,9 @@ import {
   buildEllipticalTailRetryUserSuffix,
   buildOralPermissionRetryUserSuffix,
   buildStiffHealingRetryUserSuffix,
+  buildTooShortRetryUserSuffix,
   companionTextHasEllipticalTail,
+  companionTextTooShort,
   companionTextHasOralPermissionCliche,
   companionTextHasStiffHealingCliche,
   companionTextNeedsPlainHealingCheck,
@@ -143,6 +145,11 @@ export async function generateCompanionCopy(
 
   const result = await getCompanionText(async () => {
     let line = await requestModelLine(userPrompt)
+    if (companionTextTooShort(line, input.maxChars, effectiveStyle)) {
+      line = await requestModelLine(
+        `${userPrompt}\n${buildTooShortRetryUserSuffix(input.maxChars, effectiveStyle)}`,
+      )
+    }
     if (companionTextHasPoeticTemplate(line)) {
       line = await requestModelLine(
         `${userPrompt}\n${buildPoeticTemplateRetryUserSuffix()}`,
@@ -189,6 +196,11 @@ export async function generateCompanionCopy(
         `${userPrompt}\n${buildEllipticalTailRetryUserSuffix()}`,
       )
     }
+    if (companionTextTooShort(line, input.maxChars, effectiveStyle)) {
+      line = await requestModelLine(
+        `${userPrompt}\n${buildTooShortRetryUserSuffix(input.maxChars, effectiveStyle)}`,
+      )
+    }
     if (
       companionTextHasPoeticTemplate(line) ||
       companionTextHasDesktopCliche(line) ||
@@ -199,7 +211,8 @@ export async function generateCompanionCopy(
         companionTextHasStiffHealingCliche(line)) ||
       (companionTextNeedsPlainHealingCheck(effectiveStyle) &&
         companionTextHasOralPermissionCliche(line)) ||
-      companionTextHasEllipticalTail(line)
+      companionTextHasEllipticalTail(line) ||
+      companionTextTooShort(line, input.maxChars, effectiveStyle)
     ) {
       throw new Error('companion copy still matches banned template')
     }

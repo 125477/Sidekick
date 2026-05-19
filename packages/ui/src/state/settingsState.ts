@@ -58,7 +58,14 @@ export type SidekickSettings = {
   textStyle: CompanionCopyStyle
   allowEmoji: boolean
   textMaxChars: number
+  /** 手动开关：仅 `darkModeSource === 'manual'` 时生效。 */
   darkMode: boolean
+  /** 夜间模式来源：手动 / 跟随系统 / 自定义时段。 */
+  darkModeSource: 'manual' | 'system' | 'schedule'
+  /** 定时夜间：开始时刻（本地 `HH:mm`）。 */
+  darkModeScheduleStart: string
+  /** 定时夜间：结束时刻（本地 `HH:mm`）。 */
+  darkModeScheduleEnd: string
   motionEnabled: boolean
   language: 'zh-CN' | 'en-US'
   /** After companion copy is generated and shown (toast / panel / desktop bubble). */
@@ -96,6 +103,8 @@ export type SidekickSettings = {
   /** 底图本身不透明度，1 为完全显示。 */
   panelBackgroundImageOpacity: number
   panelBackgroundBlurPx: number
+  /** 登录时自动启动应用（Electron `setLoginItemSettings`）。 */
+  launchAtLogin: boolean
 }
 
 /** 用于跨窗口同步后避免 `setSettings` 无变化仍换新引用，触发 `saveSettings` 死循环。 */
@@ -169,6 +178,9 @@ export const defaultSettings: SidekickSettings = {
   allowEmoji: false,
   textMaxChars: 32,
   darkMode: false,
+  darkModeSource: 'system',
+  darkModeScheduleStart: '20:00',
+  darkModeScheduleEnd: '06:00',
   motionEnabled: true,
   language: 'zh-CN',
   companionTtsEnabled: false,
@@ -186,4 +198,5 @@ export const defaultSettings: SidekickSettings = {
   panelBackgroundOverlayOpacity: 0.45,
   panelBackgroundImageOpacity: 1,
   panelBackgroundBlurPx: 0,
+  launchAtLogin: true,
 }

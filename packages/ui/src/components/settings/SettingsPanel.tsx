@@ -795,14 +795,72 @@ export function SettingsPanel({
               blurPx={settings.panelBackgroundBlurPx}
               onBlurPxChange={(v) => update('panelBackgroundBlurPx', v)}
             />
-            <SettingsSubsection title="外观与语言">
+            <SettingsSubsection title="启动">
               <SettingsSwitchRow
-                id="settings-dark-mode"
-                labelId="settings-dark-mode-lbl"
-                label="夜间模式"
-                checked={settings.darkMode}
-                onCheckedChange={(v) => update('darkMode', v)}
+                id="settings-launch-at-login"
+                labelId="settings-launch-at-login-lbl"
+                label="开启自启动"
+                checked={settings.launchAtLogin}
+                onCheckedChange={(v) => update('launchAtLogin', v)}
               />
+            </SettingsSubsection>
+            <SettingsSubsection title="外观与语言">
+              <div className="grid gap-2">
+                <span className="sk-label" id="settings-dark-mode-source-lbl">
+                  夜间模式
+                </span>
+                <div className="sk-segmented">
+                  <button
+                    type="button"
+                    className={`sk-segmented-btn ${settings.darkModeSource === 'manual' ? 'sk-segmented-btn-active' : ''}`}
+                    onClick={() => update('darkModeSource', 'manual')}
+                    aria-labelledby="settings-dark-mode-source-lbl"
+                  >
+                    手动
+                  </button>
+                  <button
+                    type="button"
+                    className={`sk-segmented-btn ${settings.darkModeSource === 'system' ? 'sk-segmented-btn-active' : ''}`}
+                    onClick={() => update('darkModeSource', 'system')}
+                    aria-labelledby="settings-dark-mode-source-lbl"
+                  >
+                    跟随系统
+                  </button>
+                  <button
+                    type="button"
+                    className={`sk-segmented-btn ${settings.darkModeSource === 'schedule' ? 'sk-segmented-btn-active' : ''}`}
+                    onClick={() => update('darkModeSource', 'schedule')}
+                    aria-labelledby="settings-dark-mode-source-lbl"
+                  >
+                    定时
+                  </button>
+                </div>
+              </div>
+              {settings.darkModeSource === 'manual' ? (
+                <SettingsSwitchRow
+                  id="settings-dark-mode"
+                  labelId="settings-dark-mode-lbl"
+                  label="开启夜间"
+                  checked={settings.darkMode}
+                  onCheckedChange={(v) => update('darkMode', v)}
+                />
+              ) : null}
+              {settings.darkModeSource === 'schedule' ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <SettingsTimeField
+                    id="settings-dark-mode-start"
+                    label="夜间开始"
+                    value={settings.darkModeScheduleStart}
+                    onChange={(v) => update('darkModeScheduleStart', v)}
+                  />
+                  <SettingsTimeField
+                    id="settings-dark-mode-end"
+                    label="夜间结束"
+                    value={settings.darkModeScheduleEnd}
+                    onChange={(v) => update('darkModeScheduleEnd', v)}
+                  />
+                </div>
+              ) : null}
               <label className="grid gap-1">
                 <span className="sk-label">语言</span>
                 <select

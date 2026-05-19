@@ -1,4 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useLayoutEffect } from 'react'
+import {
+  applyEffectiveThemeToDocument,
+  readThemeFromLocationSearch,
+} from '../../state/themeBootstrap'
 import {
   SpriteMenuPanel,
   type MenuAction,
@@ -8,6 +12,12 @@ import {
  * Electron `mode=sprite-menu`：独立无边框窗体，避免在窄挂件窗内被裁切。
  */
 export function WidgetSpriteMenuPage() {
+  useLayoutEffect(() => {
+    const urlTheme = readThemeFromLocationSearch()
+    if (urlTheme) applyEffectiveThemeToDocument(urlTheme)
+    document.documentElement.classList.remove('sk-sprite-menu-pending')
+  }, [])
+
   useEffect(() => {
     document.documentElement.classList.add('sidekick-toast-root')
     document.body.classList.add('sidekick-toast-root')

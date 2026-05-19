@@ -9,8 +9,9 @@ export function resolveLiveBaseUrl() {
   if (app.isPackaged) return state.baseUrl
 
   for (const win of [
-    state.panelWindow,
     state.spriteWindow,
+    state.toastWindow,
+    state.panelWindow,
     state.cornerNotificationWindow,
   ]) {
     if (!win || win.isDestroyed()) continue

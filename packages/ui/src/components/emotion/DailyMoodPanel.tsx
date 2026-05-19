@@ -180,13 +180,13 @@ export function DailyMoodPanel({
               void requestCompanionText(undefined, kind)
             }}
           />
-          <div className="shrink-0 overflow-hidden rounded-xl border border-slate-200">
+          <div className="sk-emotion-surface shrink-0 overflow-hidden">
             <Suspense
               fallback={
                 <section className="flex flex-col px-2 py-1.5" aria-busy="true">
-                  <p className="mb-1 h-4 w-24 animate-pulse rounded bg-slate-100" aria-hidden />
+                  <p className="mb-1 h-4 w-24 animate-pulse rounded bg-[color:var(--sk-segmented-bg)]" aria-hidden />
                   <div
-                    className="shrink-0 rounded-lg bg-slate-50/90"
+                    className="sk-emotion-trend-chart shrink-0 rounded-lg"
                     style={{ height: 260 }}
                     aria-hidden
                   />
@@ -198,12 +198,12 @@ export function DailyMoodPanel({
           </div>
         </div>
       ) : summaryView === 'history' ? (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200">
-          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-100 px-3 py-2.5">
-            <h3 className="text-sm font-medium text-slate-800">历史记录</h3>
+        <div className="sk-emotion-surface flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[color:var(--sk-divider)] px-3 py-2.5">
+            <h3 className="text-sm font-medium text-[color:var(--sk-text-body)]">历史记录</h3>
             <button
               type="button"
-              className="rounded-full border border-violet-200 px-3 py-1 text-sm text-violet-700 hover:bg-violet-50"
+              className="sk-emotion-chip-outline-btn"
               onClick={() => setSummaryView('form')}
             >
               返回填写
@@ -229,7 +229,7 @@ export function DailyMoodPanel({
             </p>
             <button
               type="button"
-              className="shrink-0 rounded-full border border-violet-300 bg-violet-50 px-3 py-1 text-sm font-medium text-violet-800 hover:bg-violet-100"
+              className="sk-emotion-chip-outline-btn shrink-0"
               onClick={() => setSummaryView('history')}
             >
               查看历史
@@ -237,7 +237,7 @@ export function DailyMoodPanel({
             </button>
           </div>
           <section className="rounded-xl">
-            <h3 className="mb-3 text-sm font-medium">今天的整体心情是？</h3>
+            <h3 className="mb-3 text-sm font-medium text-[color:var(--sk-text-body)]">今天的整体心情是？</h3>
             <div className="flex flex-wrap gap-2">
               {EMOTION_CHIP_LABELS.map((label) => {
                 const active = moodLabel === label
@@ -283,7 +283,7 @@ export function DailyMoodPanel({
               type="button"
               disabled={busy}
               onClick={() => void handleSubmitToday()}
-              className="min-w-[7.5rem] rounded-full border border-violet-600 bg-violet-600 px-8 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-violet-700 disabled:opacity-50"
+              className="sk-btn-primary min-w-[7.5rem] rounded-full px-8 py-1.5 text-sm font-medium disabled:opacity-50"
             >
               确定
             </button>
@@ -298,10 +298,10 @@ export function DailyMoodPanel({
               </button>
             ) : null}
             {saveHint ? (
-              <span className="text-xs text-slate-500">{saveHint}</span>
+              <span className="sk-muted text-xs">{saveHint}</span>
             ) : null}
             {todayEntry ? (
-              <span className="text-xs text-slate-400">
+              <span className="sk-muted text-xs opacity-80">
                 今日已有一条记录，再次点击将覆盖更新
               </span>
             ) : null}

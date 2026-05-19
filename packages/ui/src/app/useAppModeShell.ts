@@ -5,12 +5,21 @@ import {
 } from '../components/toast/toastLayoutSync'
 import { clampToastWindowWidthPx } from '../components/toast/toastCardMetrics'
 import { useEffect, useLayoutEffect } from 'react'
+import { useEffectiveDarkMode } from '../hooks/useEffectiveDarkMode'
+import {
+  applyEffectiveThemeToDocument,
+  readThemeFromLocationSearch,
+  writeCachedEffectiveTheme,
+} from '../state/themeBootstrap'
 import type { AvatarPreset } from '@sidekick/core'
 import { APP_DISPLAY_NAME } from '../constants/brand'
 import type { SidekickSettings } from '../state/settingsState'
 import type { SpriteState, UiAction, UiState } from '../state/uiState'
 import { reportSpriteAnchorToMain } from '../utils/reportSpriteAnchor'
-import { measureWidgetShellBounds } from './widgetShellMeasure'
+import {
+  measureWidgetInteractClientRect,
+  measureWidgetShellBounds,
+} from './widgetShellMeasure'
 import { clampWidgetWindowWidthPx } from './widgetWindowSize'
 
 export type UseAppModeShellArgs = {
@@ -19,6 +28,7 @@ export type UseAppModeShellArgs = {
   isPanelMode: boolean
   isOnboardingMode: boolean
   isDragTrailMode: boolean
+  isSpriteMenuMode?: boolean
   themeSyncApplies: boolean
   settings: SidekickSettings
   settingsRef: MutableRefObject<SidekickSettings>
@@ -59,6 +69,7 @@ export function useAppModeShell({
   isPanelMode,
   isOnboardingMode,
   isDragTrailMode = false,
+  isSpriteMenuMode = false,
   themeSyncApplies,
   settings,
   settingsRef,
@@ -243,6 +254,16 @@ export function useAppModeShell({
         width: clampWidgetWindowWidthPx(bounds.width),
         height: Math.min(720, Math.max(168, bounds.height)),
       })
+      const reportWidgetPassthrough =
+        window.sidekickDesktop?.reportWidgetPassthroughInteractRect
+      if (reportWidgetPassthrough) {
+        if (spriteInteractionLocked) {
+          reportWidgetPassthrough(null)
+        } else {
+          const hit = measureWidgetInteractClientRect(el)
+          reportWidgetPassthrough(hit)
+        }
+      }
     }
 
     apply()
@@ -255,9 +276,11 @@ export function useAppModeShell({
     return () => {
       cancelAnimationFrame(id)
       ro.disconnect()
+      void window.sidekickDesktop?.reportWidgetPassthroughInteractRect?.(null)
     }
   }, [
     isWidgetMode,
+    spriteInteractionLocked,
     onboardingDone,
     spriteAvatarSize,
     settings.avatarOpacity,
@@ -401,16 +424,25 @@ export function useAppModeShell({
     }
   }, [isDragTrailMode])
 
-  useEffect(() => {
+  const effectiveDarkMode = useEffectiveDarkMode(settings)
+
+  useLayoutEffect(() => {
     if (!themeSyncApplies) {
+      // 独立菜单窗 `?theme=` 由 index.html / open IPC 写入；勿 remove（本 hook 在子组件 layout effect 之后跑）。
+      const urlTheme = readThemeFromLocationSearch()
+      if (urlTheme) {
+        applyEffectiveThemeToDocument(urlTheme)
+        return
+      }
+      if (isSpriteMenuMode) return
       document.documentElement.removeAttribute('data-theme')
       return
     }
-    document.documentElement.dataset.theme = settings.darkMode ? 'dark' : 'light'
-    return () => {
-      document.documentElement.removeAttribute('data-theme')
-    }
-  }, [themeSyncApplies, settings.darkMode])
+    const theme = effectiveDarkMode ? 'dark' : 'light'
+    applyEffectiveThemeToDocument(theme)
+    writeCachedEffectiveTheme(theme)
+  }, [themeSyncApplies, effectiveDarkMode, isSpriteMenuMode])
+
 
   useEffect(() => {
     if (!isPanelMode && !isOnboardingMode) return

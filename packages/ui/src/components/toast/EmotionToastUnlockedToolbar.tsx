@@ -1,4 +1,9 @@
-import { useLayoutEffect, type ReactNode, type RefObject } from 'react'
+import {
+  useLayoutEffect,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+  type RefObject,
+} from 'react'
 import { ToastLightFeedbackRow } from './ToastLightFeedbackRow'
 import { EmotionToastToolbarIconButton } from './EmotionToastToolbarButton'
 import {
@@ -22,10 +27,8 @@ import {
   toastMessageInnerClass,
 } from './toastMessageLayout'
 
-const toastToolbarChromeClassName = (detached: boolean) =>
-  `flex w-full min-w-0 flex-col rounded-b-2xl border-t border-slate-200/70 ${
-    detached ? 'bg-white' : 'bg-white/95'
-  }`
+const toastToolbarChromeClassName = () =>
+  'sk-toast-toolbar flex w-full min-w-0 flex-col rounded-b-2xl'
 
 const toastToolbarIconsRowClassName =
   'flex min-h-7 min-w-0 shrink-0 flex-nowrap items-center justify-center gap-0 px-0.5 py-1'
@@ -42,7 +45,7 @@ export type EmotionToastUnlockedToolbarProps = {
   toastBarPinnedOpen: boolean
   unlockedToolbarHot: boolean
   toolbarMenuHoldOpen: boolean
-  /** 已锁定：仅展示解锁按钮，悬停显隐与未锁定共用一套逻辑。 */
+  /** 已锁定：工具栏仅展示解锁按钮；轻反馈与悬停展开逻辑与未锁定一致。 */
   spriteInteractionLockedOnly?: boolean
   toastUnlockHitRef?: RefObject<HTMLDivElement | null>
   unlockedToastbarGroupRef: RefObject<HTMLDivElement | null>
@@ -122,7 +125,14 @@ export function EmotionToastUnlockedToolbar({
     introMode ||
     toolbarMenuHoldOpen ||
     unlockedToolbarHot ||
-    (!spriteInteractionLockedOnly && toastBarPinnedOpen)
+    (!spriteInteractionLockedOnly && toastBarPinnedOpen) ||
+    (spriteInteractionLockedOnly && !detached && toastBarPinnedOpen)
+
+  const lockedWidget = spriteInteractionLockedOnly && !detached
+  const chromeRevealClass = (revealed: boolean) =>
+    toastChromeRevealClass(detached, motionEnabled, revealed, 'toastbar', {
+      lockedWidget,
+    })
 
   useLayoutEffect(() => {
     if (!detached) return
@@ -131,29 +141,30 @@ export function EmotionToastUnlockedToolbar({
     )
   }, [detached, chromeRevealed])
 
+  const revealToolbarHot = () => {
+    if (detached) {
+      requestToastLayoutSync({ measureExpanded: true })
+    }
+    setUnlockedToolbarHot(true)
+  }
+
+  const hideToolbarHot = (e: ReactPointerEvent) => {
+    const t = e.relatedTarget
+    if (t instanceof Node && unlockedToastbarGroupRef.current?.contains(t)) {
+      return
+    }
+    setUnlockedToolbarHot(false)
+  }
+
   return (
     <div
       ref={unlockedToastbarGroupRef}
       className={toastBarGroupClass(compactMessageLayout, 'group/toastbar')}
-      onPointerEnter={() => {
-        if (detached) {
-          requestToastLayoutSync({ measureExpanded: true })
-        }
-        setUnlockedToolbarHot(true)
-      }}
-      onPointerLeave={(e) => {
-        const t = e.relatedTarget
-        if (
-          t instanceof Node &&
-          unlockedToastbarGroupRef.current?.contains(t)
-        ) {
-          return
-        }
-        setUnlockedToolbarHot(false)
-      }}
+      onPointerEnter={revealToolbarHot}
+      onPointerLeave={hideToolbarHot}
     >
       <div
-        className={`rounded-lg bg-slate-50/55 transition-colors duration-200 ease-out motion-reduce:transition-none ${toastMessageChromeClass(
+        className={`sk-toast-message-panel transition-colors duration-200 ease-out motion-reduce:transition-none ${toastMessageChromeClass(
           compactMessageLayout,
           regenerating,
         )}`}
@@ -167,11 +178,8 @@ export function EmotionToastUnlockedToolbar({
       ) : null}
       {showLightFeedback && !regenerating && introMode ? (
         <div
-          className={`emotion-toast-light-feedback relative z-[1] -mt-0.5 ${toastChromeRevealClass(
-            detached,
-            motionEnabled,
+          className={`emotion-toast-light-feedback relative z-[1] -mt-0.5 ${chromeRevealClass(
             chromeRevealed,
-            'toastbar',
           )}`}
         >
           <div className="min-h-0 overflow-hidden">
@@ -185,11 +193,8 @@ export function EmotionToastUnlockedToolbar({
       ) : null}
       {!introMode && !regenerating ? (
         <div
-          className={`emotion-toast-chrome-below relative z-[1] ${toastChromeRevealClass(
-            detached,
-            motionEnabled,
+          className={`emotion-toast-chrome-below relative z-[1] w-full min-w-0 self-stretch ${chromeRevealClass(
             chromeRevealed,
-            'toastbar',
           )}`}
         >
           <div className="min-h-0 overflow-hidden">
@@ -204,10 +209,13 @@ export function EmotionToastUnlockedToolbar({
             ) : null}
             <div aria-hidden className="h-1.5 w-full shrink-0" />
             <div className="emotion-toast-toolbar -mt-1.5 overflow-hidden rounded-b-2xl">
-              <div className={toastToolbarChromeClassName(detached)}>
+              <div className={toastToolbarChromeClassName()}>
                 <div className={toastToolbarIconsRowClassName}>
             {spriteInteractionLockedOnly ? (
-              <div ref={toastUnlockHitRef} className="pointer-events-auto">
+              <div
+                ref={toastUnlockHitRef}
+                className="pointer-events-auto flex w-full justify-center"
+              >
                 <EmotionToastToolbarIconButton
                   title="解锁"
                   ariaLabel="解锁形象"

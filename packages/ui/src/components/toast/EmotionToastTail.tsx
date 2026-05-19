@@ -1,7 +1,4 @@
 /** SVG tails avoid border-hack rotated squares (visible diamond seam) with backdrop-blur / translucent cards. */
-const tailStroke = 'rgb(226 232 240)'
-
-/** 单一 SVG + 垂直镜像，避免切换上下时卸载/挂载两个尾巴导致「先平移再翻面」。 */
 export function EmotionToastTail({ pointsDown }: { pointsDown: boolean }) {
   return (
     <div
@@ -19,18 +16,18 @@ export function EmotionToastTail({ pointsDown }: { pointsDown: boolean }) {
         }`}
         aria-hidden
       >
-        <path d="M 0 0 L 9 11 L 18 0 Z" fill="white" />
+        <path d="M 0 0 L 9 11 L 18 0 Z" fill="var(--sk-toast-shell-bg)" />
         <path
           d="M 0 0 L 9 11"
           fill="none"
-          stroke={tailStroke}
+          stroke="var(--sk-toast-shell-border)"
           strokeWidth={1}
           strokeLinecap="round"
         />
         <path
           d="M 18 0 L 9 11"
           fill="none"
-          stroke={tailStroke}
+          stroke="var(--sk-toast-shell-border)"
           strokeWidth={1}
           strokeLinecap="round"
         />

@@ -32,10 +32,10 @@ export function AvatarPresetGallery({
 }: AvatarPresetGalleryProps) {
   return (
     <section className="mb-4">
-      <p className="mb-2 text-sm font-medium text-slate-700">{sectionTitle}</p>
+      <p className="mb-2 text-sm font-medium text-[color:var(--sk-text-body)]">{sectionTitle}</p>
       {presets.length === 0 ? (
         emptyHint ? (
-          <p className="text-xs leading-relaxed text-slate-500">{emptyHint}</p>
+          <p className="sk-muted text-xs leading-relaxed">{emptyHint}</p>
         ) : null
       ) : (
         <div className="grid grid-cols-6 gap-1 sm:gap-1.5">
@@ -49,9 +49,9 @@ export function AvatarPresetGallery({
                 <button
                   type="button"
                   onClick={() => onSelect(avatar.id)}
-                  className={`min-w-0 w-full overflow-hidden rounded-xl border p-0.5 text-left sm:p-1 ${selectedAvatarId === avatar.id ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-200'}`}
+                  className={`min-w-0 w-full overflow-hidden rounded-xl border p-0.5 text-left sm:p-1 ${selectedAvatarId === avatar.id ? 'border-[color:var(--sk-accent-border-strong)] ring-2 ring-[color:var(--sk-accent-border)]' : 'border-[color:var(--sk-card-border)]'}`}
                 >
-                  <div className="relative flex aspect-square w-full min-h-0 min-w-0 items-center justify-center overflow-hidden rounded-lg bg-slate-50">
+                  <div className="relative flex aspect-square w-full min-h-0 min-w-0 items-center justify-center overflow-hidden rounded-lg bg-[color:var(--sk-card-bg)]">
                     {isVideoAvatarSrc(avatar.src) ? (
                       <video
                         key={avatar.src}
@@ -82,7 +82,7 @@ export function AvatarPresetGallery({
                       />
                     )}
                   </div>
-                  <span className="mt-0.5 block truncate text-[10px] leading-tight text-slate-600 sm:text-xs">
+                  <span className="mt-0.5 block truncate text-[10px] leading-tight text-[color:var(--sk-text-secondary)] sm:text-xs">
                     {displayName}
                   </span>
                 </button>
@@ -91,7 +91,7 @@ export function AvatarPresetGallery({
                     type="button"
                     aria-label={`删除${displayName}`}
                     title="删除"
-                    className="absolute right-0.5 top-0.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-slate-200/90 bg-white/95 text-rose-600 shadow-md opacity-0 pointer-events-none transition-opacity duration-150 motion-reduce:transition-none group-hover/preset:pointer-events-auto group-hover/preset:opacity-100 group-focus-within/preset:pointer-events-auto group-focus-within/preset:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-rose-500 hover:bg-rose-50 [-webkit-app-region:no-drag]"
+                    className="absolute right-0.5 top-0.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-[color:var(--sk-card-border)] bg-[color:var(--sk-content-surface)] text-rose-500 shadow-md opacity-0 pointer-events-none transition-opacity duration-150 motion-reduce:transition-none group-hover/preset:pointer-events-auto group-hover/preset:opacity-100 group-focus-within/preset:pointer-events-auto group-focus-within/preset:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-rose-500 hover:bg-rose-500/10 [-webkit-app-region:no-drag]"
                     onClick={(event) => {
                       event.stopPropagation()
                       onRemovePreset?.(avatar.id)

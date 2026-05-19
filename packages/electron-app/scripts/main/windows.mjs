@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from 'electron'
 import {
   APP_DISPLAY_NAME,
+  AUX_WINDOW_BACKGROUND,
   AUX_WINDOW_HEIGHT,
   AUX_WINDOW_MIN_HEIGHT,
   AUX_WINDOW_MIN_WIDTH,
@@ -20,7 +21,10 @@ import {
 import { preloadPath } from './paths.mjs'
 import { buildRoute } from './route.mjs'
 import { state } from './state.mjs'
-import { closeWidgetSpriteMenuWindow } from './spriteMenu.mjs'
+import {
+  closeWidgetSpriteMenuWindow,
+  destroyWidgetSpriteMenuWindow,
+} from './spriteMenu.mjs'
 import { stopToastPassthroughHitTest } from './toastPassthrough.mjs'
 import { computeToastPlacement } from './toastPlacement.mjs'
 import { awaitWebContentsNavigationSettled } from './navigationWait.mjs'
@@ -121,7 +125,7 @@ export function createSpriteWindow() {
 
   window.on('closed', () => {
     destroyDragTrailWindow()
-    closeWidgetSpriteMenuWindow({ notify: false })
+    destroyWidgetSpriteMenuWindow()
     try {
       if (!window.isDestroyed()) {
         window.setIgnoreMouseEvents(false)
@@ -163,6 +167,7 @@ export function openPanelWindow(panel, opts = {}) {
     title: `${APP_DISPLAY_NAME} · ${PANEL_WINDOW_TITLE[panel] ?? panel}`,
     autoHideMenuBar: true,
     show: false,
+    backgroundColor: AUX_WINDOW_BACKGROUND,
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
@@ -201,6 +206,7 @@ export function openOnboardingWindow() {
     title: `${APP_DISPLAY_NAME} · 首次引导`,
     autoHideMenuBar: true,
     show: false,
+    backgroundColor: AUX_WINDOW_BACKGROUND,
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,

@@ -23,7 +23,7 @@ export function MoodHistoryPanel({
 
   if (entries.length === 0) {
     return (
-      <div className="p-4 text-sm text-slate-500">
+      <div className="sk-muted p-4 text-sm">
         还没有历史记录。在「今日小结」里点「确定」保存第一条后，会出现在这里。
       </div>
     )
@@ -47,23 +47,23 @@ export function MoodHistoryPanel({
 
   return (
     <div className="flex max-h-[min(420px,60vh)] flex-col overflow-y-auto">
-      <ul className="divide-y divide-slate-100">
+      <ul className="divide-y divide-[color:var(--sk-divider)]">
         {entries.map((e) => (
           <li key={e.id}>
             <button
               type="button"
-              className="flex w-full flex-col gap-1 px-3 py-2.5 text-left transition-colors hover:bg-violet-50/60 focus-visible:bg-violet-50/60 focus-visible:outline-none"
+              className="flex w-full flex-col gap-1 px-3 py-2.5 text-left transition-colors hover:bg-[color:var(--sk-accent-subtle-bg)] focus-visible:bg-[color:var(--sk-accent-subtle-bg)] focus-visible:outline-none"
               onClick={() => setSelectedId(e.id)}
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="shrink-0 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-800">
+                <span className="sk-emotion-chip sk-emotion-chip--active shrink-0 px-2 py-0.5 text-xs">
                   {moodEntryDisplayLabel(e)}
                 </span>
-                <span className="text-sm font-medium text-slate-800 tabular-nums">
+                <span className="text-sm font-medium text-[color:var(--sk-text-body)] tabular-nums">
                   {e.dayKey}
                 </span>
               </div>
-              <p className="line-clamp-2 text-xs leading-relaxed text-slate-600">
+              <p className="sk-muted line-clamp-2 text-xs leading-relaxed">
                 {notePreview(e.note)}
               </p>
             </button>
@@ -106,7 +106,7 @@ function MoodHistoryDetail({
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <button
           type="button"
-          className="rounded-full border border-violet-200 px-3 py-1 text-sm text-violet-700 hover:bg-violet-50"
+          className="sk-emotion-chip-outline-btn"
           onClick={onBack}
           disabled={deleting}
         >
@@ -125,33 +125,33 @@ function MoodHistoryDetail({
       </div>
       <div className="grid gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="inline-flex rounded-full border border-violet-300 bg-violet-600 px-3 py-0.5 text-sm font-medium text-white">
+          <span className="sk-emotion-chip sk-emotion-chip--active inline-flex px-3 py-0.5 text-sm">
             {mood}
           </span>
-          <span className="text-base font-medium text-slate-800 tabular-nums">
+          <span className="text-base font-medium text-[color:var(--sk-text-body)] tabular-nums">
             {entry.dayKey}
           </span>
         </div>
         <section>
-          <h4 className="mb-1 text-xs font-medium text-slate-500">日记</h4>
+          <h4 className="sk-label mb-1 text-xs">日记</h4>
           {entry.note.trim() ? (
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-[color:var(--sk-text-body)]">
               {entry.note}
             </p>
           ) : (
-            <p className="text-sm text-slate-400">（无文字）</p>
+            <p className="sk-muted text-sm">（无文字）</p>
           )}
         </section>
         {attachments.length > 0 ? (
           <section>
-            <h4 className="mb-2 text-xs font-medium text-slate-500">
+            <h4 className="sk-label mb-2 text-xs">
               图片与视频
             </h4>
             <ul className="grid grid-cols-2 gap-2">
               {attachments.map((att) => (
                 <li
                   key={att.id}
-                  className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50"
+                  className="overflow-hidden rounded-lg border border-[color:var(--sk-card-border)] bg-[color:var(--sk-card-bg)]"
                 >
                   {att.type === 'video' ? (
                     <video

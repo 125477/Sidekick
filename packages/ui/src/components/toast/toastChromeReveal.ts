@@ -44,6 +44,13 @@ export function toastCollapseRevealClass(
   }`
 }
 
+/** 挂件锁定：仅 pointer 状态驱动展开，避免 group-hover 与 hot 双通道抢动画。 */
+export function toastLockedWidgetRevealClass(revealed: boolean): string {
+  return `grid min-h-0 overflow-hidden transition-none motion-reduce:transition-none ${
+    revealed ? revealedClass : 'grid-rows-[0fr] pointer-events-none opacity-0'
+  }`
+}
+
 /** 独立气泡窗：仅状态驱动；高度瞬时切换，避免 grid 动画导致窗体分两段测量。 */
 export function toastDetachedRevealClass(
   motionEnabled: boolean,
@@ -57,13 +64,19 @@ export function toastDetachedRevealClass(
   }`
 }
 
+export type ToastChromeRevealOptions = {
+  /** 挂件锁定：不用 group-hover，减少展开闪动。 */
+  lockedWidget?: boolean
+}
+
 export function toastChromeRevealClass(
   detached: boolean,
   motionEnabled: boolean,
   revealed: boolean,
   group: ToastRevealGroup = 'toastbar',
+  options?: ToastChromeRevealOptions,
 ): string {
-  return detached
-    ? toastDetachedRevealClass(motionEnabled, revealed)
-    : toastCollapseRevealClass(motionEnabled, revealed, group)
+  if (detached) return toastDetachedRevealClass(motionEnabled, revealed)
+  if (options?.lockedWidget) return toastLockedWidgetRevealClass(revealed)
+  return toastCollapseRevealClass(motionEnabled, revealed, group)
 }

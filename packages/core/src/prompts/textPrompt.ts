@@ -4,9 +4,9 @@
  *
  * ## 定稿原则（勿反复横跳）
  * 1. **通顺完整** > 文艺；禁止半截句（如「包括被自己。」）。
- * 2. **治愈** 三类轮换即可：直白许可 | 单处轻隐喻+许可 | 短格言；勿连刷同一句式。
- * 3. **只拦硬套**：「像…一样」、轻轻停驻、风起/茶凉/暮色爆款、励志对仗、办公词、指令/拯救/条件价值。
- * 4. **允许** 一处克制意象（书页/故事里的停顿）；**不** 把治愈锁死成句句「累了就歇歇」。
+ * 2. **治愈** 三类轮换：直白许可 | 单处轻隐喻+许可 | 短格言；须写满最短字数、通顺完整，勿连刷同一句式。
+ * 3. **只拦硬套**：「像…一样」、轻轻停驻、风起/茶凉/暮色爆款、励志对仗、办公词、指令/拯救/条件价值、「累了就歇」类口语套句。
+ * 4. **允许** 一处克制意象（书页/故事里的停顿）；**禁止** 把治愈写成七字口号（如「累了就歇会儿。」）。
  * 5. 改规则时同步检查 `fallback/quotes.ts` 与生成后校验函数，避免提示与兜底打架。
  */
 import type { EmotionKind } from '../schema/data'
@@ -47,7 +47,8 @@ const EMOTION_GUIDE: Record<EmotionKind, string> = {
   anxious:
     '此刻偏焦虑，先承接不安再给许可，避免说教与否定感受；禁止「像…一样」与连刷口语模板。',
   low: '此刻偏低落，温柔承接；禁止搞笑转移；可直白许可或一处克制意象（如故事/路里的停顿），禁止「像…一样」。',
-  tired: '此刻偏疲惫，句短、通顺，体谅负荷；禁止「像…一样」「轻轻停驻」与口语许可套句连刷。',
+  tired:
+    '此刻偏疲惫，体谅负荷；须写满最短字数、通顺完整（可含逗号分句），禁止「累了就歇会儿」式过短套句；禁止「像…一样」与「累了就歇」骨架连刷。',
 }
 
 /**
@@ -59,7 +60,7 @@ export function companionStyleForEmotion(emotion: EmotionKind): CompanionCopySty
     calm: '治愈',
     anxious: '治愈',
     low: '治愈',
-    tired: '助眠',
+    tired: '治愈',
   }
   return map[emotion]
 }
@@ -86,13 +87,13 @@ export type BuildCompanionPromptInput = {
 
 const STYLE_GUIDE: Record<CompanionCopyStyle, string> = {
   治愈:
-    '治愈=承接感受与存在许可，通顺好读。可轮换：①直白口语（累了就歇歇）；②单处轻隐喻+许可（如「书页里的停顿，也该被允许」）；③短格言。一句一重心，勿连刷同一句式。禁止「像…一样」、轻轻停驻、风起/茶凉/暮色等爆款；禁止命令、拯救与条件价值；禁止办公设备描写。',
+    '治愈=承接感受与存在许可，通顺好读、写满最短字数。可轮换：①直白许可（例：「疲惫时，休息也是正经事。」）；②单处轻隐喻+许可（例：「书页里的停顿，也该被允许存在。」）；③短格言（例：「晚一点也没关系，路还在。」）。一句一重心，须有实质内容，禁止七字口号。禁止「累了就歇」「歇会儿」作整句骨架；禁止「像…一样」、轻轻停驻、风起/茶凉/暮色；禁止命令、拯救与条件价值；禁止办公设备描写。',
   励志:
     '可多用「我」或无人称格言；聚焦态度与微小可能，禁止鸡血口号与抽象成功学；禁止命令式打气（加油/撑住/你必须）与「只要你…就…」式条件价值；禁止写键盘、光标、加班赶场等办公套话，勿照抄常见鸡汤句。',
   搞笑:
     '仅当用户情绪为「开心」时启用；生活化自嘲或轻巧反差，禁止命令、拯救口号与条件价值；禁止在焦虑/低落情绪下用幽默转移感受；禁止办公梗。',
   助眠:
-    '语气极轻、句短；写安静与许可歇着，禁止「像…一样」与轻轻停驻；禁止睡眠指令、布置步骤与未来承诺；禁止屏幕蓝光、敲键等提神意象。',
+    '语气极轻、安静；写静与许可歇着，仍须写满最短字数、通顺完整，禁止只有「歇会儿」式过短套句；禁止「像…一样」与轻轻停驻；禁止睡眠指令、布置步骤与未来承诺；禁止屏幕蓝光、敲键等提神意象。',
   职场解压:
     '用人生节奏、取舍、边界感来减压（例：允许慢下来、不必一次做完），禁止会议、邮件、通知、文件、光标、键盘等办公名词；禁止命令式加班打气与条件价值。',
 }
@@ -118,7 +119,29 @@ const PLAIN_HEALING_STYLES = new Set<CompanionCopyStyle>(['治愈', '助眠'])
 
 /** 治愈类重试共用收尾（勿在各 build*Retry 里写互相矛盾的示例）。 */
 const HEALING_QUALITY_RETRY_TAIL =
-  '改通顺完整的一句，换骨架：直白许可、单处轻隐喻+许可、或短格言三选一；禁止像…一样、轻轻停驻、口语套句连刷、半截句。'
+  '改通顺完整、写满最短字数的一句，换骨架：直白许可、单处轻隐喻+许可、或短格言三选一；禁止像…一样、轻轻停驻、「累了就歇」类口语套句、半截句与过短口号。'
+
+/** 陪伴句最短汉字数（不含标点）。 */
+const COMPANION_MIN_CHARS_ABSOLUTE = 10
+
+/** 本条陪伴句至少应达到的汉字数（不含标点）；不超过 maxChars−2。 */
+export function companionMinCharsForStyle(
+  maxChars: number,
+  _style?: CompanionCopyStyle,
+): number {
+  const cap = Math.max(1, maxChars - 2)
+  return Math.min(cap, COMPANION_MIN_CHARS_ABSOLUTE)
+}
+
+export function companionTextTooShort(
+  text: string,
+  maxChars: number,
+  style: CompanionCopyStyle,
+): boolean {
+  const t = text.replace(/[。！？….…]+$/u, '').trim()
+  if (!t) return true
+  return t.length < companionMinCharsForStyle(maxChars, style)
+}
 
 /** 模型连刷的「口语许可」套句（治愈语气下过密时触发重试）。 */
 export const COMPANION_ORAL_PERMISSION_CLICHES = [
@@ -126,9 +149,13 @@ export const COMPANION_ORAL_PERMISSION_CLICHES = [
   '停一会儿，也可以',
   '歇一会儿，也可以',
   '累了就歇歇',
+  '累了就歇着',
+  '累了就歇会儿',
+  '累了就歇',
   '歇歇，不算',
   '不算偷懒',
   '先停一会儿也好',
+  '不用怕耽误',
 ] as const
 
 /** 模型易写的「假治愈」文艺硬套（与 POETIC 校验配合）。 */
@@ -147,9 +174,9 @@ export const COMPANION_STIFF_HEALING_MARKERS = [
 
 /** 每次随机抽一种写法，避免连续落在「X时，像…」文艺模板。 */
 const DIVERSITY_ANGLES = [
-  '用格言式判断句：短、具体，禁止「X时，像…」对仗，禁止「有些…，…」励志对仗。',
-  '用一句短促口语许可（累了就歇歇/此刻也好），勿照抄上一句骨架。',
-  '单处轻隐喻+许可（如「书页里的停顿，也该被允许」），仅一处意象，禁止像…一样与风起/茶凉/暮色。',
+  '用格言式判断句：具体、通顺，写满最短字数，禁止「X时，像…」对仗，禁止「有些…，…」励志对仗。',
+  '用直白许可或判断（例：「疲惫时，休息也是正经事。」），禁止「累了就歇」骨架，勿照抄上一句。',
+  '单处轻隐喻+许可（如「书页里的停顿，也该被允许存在。」），仅一处意象，禁止像…一样与风起/茶凉/暮色。',
   '从成长或耐心直说，禁止暮色、风起、茶凉、窗台、杯底余温等爆款意象。',
   '用极短问句或感叹，禁止「你…，我…」对称、禁止逗号后接「像…」。',
   '用「可以」「不妨」邀请休息，禁止「不妨让心先停一停」式套句。',
@@ -475,7 +502,12 @@ export function companionTextHasPoeticTemplate(text: string): boolean {
 export function companionTextHasOralPermissionCliche(text: string): boolean {
   const t = text.trim()
   if (!t) return false
-  return COMPANION_ORAL_PERMISSION_CLICHES.some((m) => t.includes(m))
+  if (COMPANION_ORAL_PERMISSION_CLICHES.some((m) => t.includes(m))) {
+    return true
+  }
+  if (/累了.{0,4}歇/.test(t)) return true
+  if (t.length <= 10 && /歇.{0,3}会儿/.test(t)) return true
+  return false
 }
 
 /** 「包括被自己。」等省略宾语、读起来没说完的尾巴。 */
@@ -528,7 +560,15 @@ export function buildStiffHealingRetryUserSuffix(): string {
 }
 
 export function buildOralPermissionRetryUserSuffix(): string {
-  return `【硬约束】上一句像口语许可套句连刷。${HEALING_QUALITY_RETRY_TAIL}`
+  return `【硬约束】上一句像口语许可套句（如累了就歇/歇会儿/不用怕耽误）。${HEALING_QUALITY_RETRY_TAIL}`
+}
+
+export function buildTooShortRetryUserSuffix(
+  maxChars: number,
+  style: CompanionCopyStyle,
+): string {
+  const min = companionMinCharsForStyle(maxChars, style)
+  return `【硬约束】上一句过短、像口号。请写不少于 ${min} 个汉字、不超过 ${maxChars} 个汉字的通顺完整句，最好含一个逗号分句；禁止「累了就歇会儿」式套句。${HEALING_QUALITY_RETRY_TAIL}`
 }
 
 /** 桌面挂件：知道用户在电脑前，但文风偏格言短句，不写办公场景。 */
@@ -657,6 +697,7 @@ export function buildCompanionSystemPrompt(input: BuildCompanionPromptInput): st
       : []
 
   const timeLine = buildLocalTimeHintLine(input.now ?? new Date())
+  const minChars = companionMinCharsForStyle(input.maxChars, input.style)
 
   return [
     '你是桌面情绪陪伴助手，只输出一条中文短句。',
@@ -668,7 +709,7 @@ export function buildCompanionSystemPrompt(input: BuildCompanionPromptInput): st
     ...lightFeedbackLines,
     `目标语气类型：${input.style}。`,
     `语气要求：${STYLE_GUIDE[input.style]}`,
-    `长度要求：不超过 ${input.maxChars} 个汉字。`,
+    `长度要求：不少于 ${minChars}、不超过 ${input.maxChars} 个汉字（不含标点）；须通顺完整，最好有一个逗号把两层意思写开，禁止只有「累了就歇会儿」式过短套句。`,
     emojiRule,
     DESKTOP_CLICHE_BAN_LINE,
     POETIC_TEMPLATE_BAN_LINE,
@@ -766,7 +807,12 @@ function buildOpeningConstraint(recent: string[], seed: number): string {
     }
     if (companionTextHasOralPermissionCliche(last)) {
       rules.push(
-        '上一句是口语许可套句；本句换骨架，可写单处意象+许可（如书页/故事里的停顿），禁止再写「停一会儿也可以」「累了就歇歇」。',
+        '上一句是口语许可套句（如累了就歇/歇会儿/不用怕耽误）；本句换骨架，可写单处意象+许可（如书页里的停顿），禁止再写「累了就歇」类短句。',
+      )
+    }
+    if (/累了|歇会儿|歇歇|不用怕耽误/.test(last)) {
+      rules.push(
+        '上一句是「累了/歇」类套句；本句禁止再起「累了就…歇」骨架，改隐喻+许可或短格言，并写满最短字数。',
       )
     }
     const bannedOpeners = ['风起', '茶凉', '暮色', '雨落', '雪落', '窗', '有些']
@@ -853,7 +899,7 @@ export function buildCompanionUserPrompt(
   if (kw) {
     return `${prefix}请围绕这个关键词生成文案：${kw}。（${seed}）`
   }
-  return `${prefix}请给我一句陪伴短句：通顺完整，接纳与许可；可直白、可一处轻隐喻、可短格言，换与上一句不同骨架。禁止像…一样、轻轻停驻、爆款套句、半截句、办公词与拯救口号。（${seed}）`
+  return `${prefix}请给我一句陪伴短句：通顺完整、写满字数，接纳与许可；可直白、可一处轻隐喻、可短格言，换与上一句不同骨架。禁止像…一样、轻轻停驻、「累了就歇」类套句、过短口号、半截句、办公词与拯救口号。（${seed}）`
 }
 
 export function parseCompanionInterestTags(interests: string[] | undefined): {

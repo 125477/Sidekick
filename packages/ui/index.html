@@ -2,6 +2,74 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      (function () {
+        try {
+          var params = new URLSearchParams(location.search || '')
+          var mode = params.get('mode') || ''
+          if (mode) document.documentElement.setAttribute('data-mode', mode)
+          if (mode === 'sprite-menu') {
+            document.documentElement.classList.add('sk-sprite-menu-pending')
+          }
+          var k = 'sidekick.effectiveTheme'
+          var t = params.get('theme')
+          if (t !== 'dark' && t !== 'light') t = localStorage.getItem(k)
+          if (t !== 'dark' && t !== 'light') {
+            t =
+              window.matchMedia &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light'
+          }
+          document.documentElement.setAttribute('data-theme', t)
+        } catch (e) {}
+      })()
+    </script>
+    <style>
+      html {
+        color-scheme: light;
+      }
+      html[data-theme='dark'] {
+        color-scheme: dark;
+        background-color: #18181b;
+      }
+      html[data-theme='dark'] body {
+        background-color: #18181b;
+      }
+      /* 透明菜单 / 挂件 / 气泡：勿铺不透明底，否则会闪一块色块 */
+      html[data-mode='sprite-menu'],
+      html[data-mode='sprite-menu'] body,
+      html[data-mode='widget'],
+      html[data-mode='widget'] body,
+      html[data-mode='toast'],
+      html[data-mode='toast'] body,
+      html[data-mode='drag-trail'],
+      html[data-mode='drag-trail'] body {
+        background: transparent !important;
+      }
+      /* 菜单首屏：在 tailwind/tokens.css 到达前用与 tokens.css 一致的变量，减轻深浅色闪动 */
+      html[data-mode='sprite-menu'] {
+        --sk-content-border: rgb(226 232 240 / 0.92);
+        --sk-content-surface: rgb(255 255 255);
+        --sk-card-bg: rgb(248 250 252 / 0.92);
+        --sk-text-body: rgb(30 41 59);
+        --sk-divider: rgb(226 232 240 / 0.88);
+        --sk-frame-shadow: 0 12px 40px -12px rgb(91 33 182 / 0.06);
+        --sk-focus-ring: rgb(139 92 246);
+      }
+      html[data-mode='sprite-menu'][data-theme='dark'] {
+        --sk-content-border: rgb(63 63 70 / 0.55);
+        --sk-content-surface: rgb(24 24 27);
+        --sk-card-bg: rgb(39 39 42 / 0.65);
+        --sk-text-body: rgb(228 228 231);
+        --sk-divider: rgb(63 63 70 / 0.45);
+        --sk-frame-shadow: 0 10px 28px rgb(0 0 0 / 0.5);
+        --sk-focus-ring: rgb(167 139 250);
+      }
+      html[data-mode='sprite-menu'].sk-sprite-menu-pending #root {
+        opacity: 0;
+      }
+    </style>
     <link rel="icon" type="image/png" href="./app-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>灵伴</title>

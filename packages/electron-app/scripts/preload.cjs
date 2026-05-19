@@ -22,6 +22,9 @@ contextBridge.exposeInMainWorld('sidekickDesktop', {
   updateMoodReminderSnapshot(snapshot) {
     ipcRenderer.send('sidekick:update-mood-reminder-snapshot', snapshot)
   },
+  setLaunchAtLogin(enabled) {
+    ipcRenderer.send('sidekick:set-launch-at-login', enabled === true)
+  },
   openOnboardingWindow() {
     return ipcRenderer.invoke('sidekick:open-onboarding')
   },
@@ -46,6 +49,9 @@ contextBridge.exposeInMainWorld('sidekickDesktop', {
   /** 独立气泡窗：锁定后点击穿透；传 `null` 关闭。`rect` 为视口内 getBoundingClientRect（与主进程 getContentBounds 合成屏幕坐标）。 */
   reportToastPassthroughInteractRect(rect) {
     ipcRenderer.send('sidekick:toast-passthrough-interact-rect', rect)
+  },
+  reportWidgetPassthroughInteractRect(rect) {
+    ipcRenderer.send('sidekick:widget-passthrough-interact-rect', rect)
   },
   setWidgetPointerPassthrough(enabled) {
     ipcRenderer.send('sidekick:widget-pointer-passthrough', enabled === true)
@@ -195,6 +201,9 @@ contextBridge.exposeInMainWorld('sidekickDesktop', {
   /** 挂件精灵窗：在独立小窗展示菜单，避免在窄挂件内被裁切。 */
   openWidgetSpriteMenu(bounds) {
     return ipcRenderer.invoke('sidekick:open-widget-sprite-menu', bounds)
+  },
+  warmWidgetSpriteMenu(opts) {
+    return ipcRenderer.invoke('sidekick:warm-widget-sprite-menu', opts ?? {})
   },
   closeWidgetSpriteMenu(opts) {
     return ipcRenderer.invoke('sidekick:close-widget-sprite-menu', opts ?? {})

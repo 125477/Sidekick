@@ -112,6 +112,28 @@ export async function loadSettings(): Promise<SidekickSettings> {
     Number.isFinite(imgOp) && imgOp >= 0.2 && imgOp <= 1
       ? imgOp
       : defaultSettings.panelBackgroundImageOpacity
+
+  const darkSource = merged.darkModeSource
+  merged.darkModeSource =
+    darkSource === 'system' || darkSource === 'schedule' || darkSource === 'manual'
+      ? darkSource
+      : defaultSettings.darkModeSource
+  if (
+    typeof merged.darkModeScheduleStart !== 'string' ||
+    !/^\d{1,2}:\d{2}$/.test(merged.darkModeScheduleStart)
+  ) {
+    merged.darkModeScheduleStart = defaultSettings.darkModeScheduleStart
+  }
+  if (
+    typeof merged.darkModeScheduleEnd !== 'string' ||
+    !/^\d{1,2}:\d{2}$/.test(merged.darkModeScheduleEnd)
+  ) {
+    merged.darkModeScheduleEnd = defaultSettings.darkModeScheduleEnd
+  }
+  if (typeof merged.launchAtLogin !== 'boolean') {
+    merged.launchAtLogin = defaultSettings.launchAtLogin
+  }
+
   return merged
 }
 

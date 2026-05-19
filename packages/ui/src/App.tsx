@@ -20,9 +20,12 @@ import { openAuxPanelFromBridgeOrDispatch } from './app/openAuxPanelFromBridgeOr
 import { openEmotionPanel } from './app/openEmotionPanel'
 import { useScheduledCompanionPush } from './app/useScheduledCompanionPush'
 import { useDailyMoodReminder } from './app/useDailyMoodReminder'
+import { useLaunchAtLogin } from './app/useLaunchAtLogin'
 import { useAppBootstrap } from './app/useAppBootstrap'
 import { useAppModeShell } from './app/useAppModeShell'
 import { useDetachedSpriteMenu } from './app/useDetachedSpriteMenu'
+import { useEffectiveDarkMode } from './hooks/useEffectiveDarkMode'
+import type { CachedEffectiveTheme } from './state/themeBootstrap'
 import { useAppMenuMachine } from './app/useAppMenuMachine'
 import { useCompanionActions } from './app/useCompanionActions'
 import { useAppSelfIntroBubble } from './app/useAppSelfIntroBubble'
@@ -188,13 +191,13 @@ function App() {
   const isSpriteMenuMode = mode === 'sprite-menu'
   const isDragTrailMode = mode === 'drag-trail'
   const isCornerNotificationMode = mode === 'corner-notification'
+  /** sprite-menu 不在此同步：用 URL `?theme=`，且避免未 hydrate 的 settings 盖掉暗黑。 */
   const themeSyncApplies =
     isPanelMode ||
     isOnboardingMode ||
-    (!isWidgetMode &&
-      !isToastMode &&
-      !isSpriteMenuMode &&
-      !isDragTrailMode)
+    isWidgetMode ||
+    isToastMode ||
+    mode === 'app'
   const runsScheduledPush = isWidgetMode || mode === 'app'
   const [toastDetachFavorite, setToastDetachFavorite] =
     useState(toastFavoriteFromUrl)
@@ -204,6 +207,8 @@ function App() {
   const detachedWidgetSpriteMenu =
     isWidgetMode &&
     typeof window.sidekickDesktop?.openWidgetSpriteMenu === 'function'
+  const effectiveDarkMode = useEffectiveDarkMode(settings)
+  const menuTheme: CachedEffectiveTheme = effectiveDarkMode ? 'dark' : 'light'
   const toastVisible =
     uiState.toastState === 'entering' || uiState.toastState === 'visible'
 
@@ -234,6 +239,7 @@ function App() {
     isPanelMode,
     isOnboardingMode,
     isDragTrailMode,
+    isSpriteMenuMode,
     themeSyncApplies,
     settings,
     settingsRef,
@@ -267,6 +273,7 @@ function App() {
     useDetachedSpriteMenu({
       isToastMode,
       menuOpen,
+      menuTheme,
       spriteMenuSurface,
       detachedWidgetSpriteMenu,
       uiState,
@@ -298,6 +305,8 @@ function App() {
     isWidgetMode || isPanelMode,
     onboardingDone,
   )
+
+  useLaunchAtLogin(settings, settingsReady, isWidgetMode || isPanelMode)
 
   const {
     showToastMessage,

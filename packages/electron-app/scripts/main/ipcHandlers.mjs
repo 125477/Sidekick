@@ -21,18 +21,20 @@ import {
   closeWidgetSpriteMenuWindow,
   normalizeSpriteMenuScreenBounds,
   openWidgetSpriteMenuWindow,
+  warmSpriteMenuWindow,
 } from './spriteMenu.mjs'
 import { state } from './state.mjs'
 import {
   applyWidgetWindowSpritePassthrough,
-  stopToastPassthroughHitTest,
-  tickToastPassthroughHitTest,
+  setToastPassthroughClientRect,
+  setWidgetPassthroughClientRect,
 } from './toastPassthrough.mjs'
 import {
   hideCornerNotificationWindow,
   openCornerNotificationTarget,
   showCornerNotificationWindow,
 } from './cornerNotification.mjs'
+import { applyLaunchAtLogin } from './launchAtLogin.mjs'
 import { updateMoodReminderSnapshot } from './moodReminderState.mjs'
 import { showSidekickSystemNotification } from './notification.mjs'
 import {
@@ -97,6 +99,9 @@ export function registerSidekickIpcHandlers() {
       console.warn('[sidekick] mood reminder snapshot failed', err)
     }
   })
+  ipcMain.on('sidekick:set-launch-at-login', (_event, enabled) => {
+    applyLaunchAtLogin(enabled === true)
+  })
   ipcMain.handle('sidekick:open-onboarding', () => {
     openOnboardingWindow()
     return undefined
@@ -129,27 +134,11 @@ export function registerSidekickIpcHandlers() {
   })
   ipcMain.on('sidekick:toast-passthrough-interact-rect', (_event, payload) => {
     if (!state.toastWindow || state.toastWindow.isDestroyed()) return
-    if (payload == null) {
-      stopToastPassthroughHitTest()
-      return
-    }
-    if (typeof payload !== 'object') {
-      stopToastPassthroughHitTest()
-      return
-    }
-    const left = Number(payload.left)
-    const top = Number(payload.top)
-    const width = Number(payload.width)
-    const height = Number(payload.height)
-    if (![left, top, width, height].every(Number.isFinite) || width <= 0 || height <= 0) {
-      stopToastPassthroughHitTest()
-      return
-    }
-    state.toastPassthroughClientRect = { left, top, width, height }
-    if (state.toastPassthroughPollId == null) {
-      state.toastPassthroughPollId = setInterval(tickToastPassthroughHitTest, 32)
-    }
-    tickToastPassthroughHitTest()
+    setToastPassthroughClientRect(payload)
+  })
+  ipcMain.on('sidekick:widget-passthrough-interact-rect', (_event, payload) => {
+    if (!state.spriteWindow || state.spriteWindow.isDestroyed()) return
+    setWidgetPassthroughClientRect(payload)
   })
   ipcMain.on('sidekick:widget-pointer-passthrough', (_event, enabled) => {
     const on =
@@ -186,7 +175,21 @@ export function registerSidekickIpcHandlers() {
     const b = normalizeSpriteMenuScreenBounds(payload)
     if (!b) return undefined
     const invoker = fromSprite ? 'sprite' : 'toast'
-    openWidgetSpriteMenuWindow(b, invoker)
+    openWidgetSpriteMenuWindow(payload, invoker)
+    return undefined
+  })
+  ipcMain.handle('sidekick:warm-widget-sprite-menu', (event, payload) => {
+    const fromSprite =
+      state.spriteWindow &&
+      !state.spriteWindow.isDestroyed() &&
+      event.sender === state.spriteWindow.webContents
+    const fromToast =
+      state.toastWindow &&
+      !state.toastWindow.isDestroyed() &&
+      event.sender === state.toastWindow.webContents
+    if (!fromSprite && !fromToast) return undefined
+    const theme = payload?.theme === 'dark' || payload?.theme === 'light' ? payload.theme : undefined
+    void warmSpriteMenuWindow(theme ? { theme } : {})
     return undefined
   })
   ipcMain.handle('sidekick:close-widget-sprite-menu', (event, opts) => {

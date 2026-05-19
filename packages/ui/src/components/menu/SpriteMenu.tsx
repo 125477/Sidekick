@@ -51,6 +51,7 @@ export function SpriteMenuPanel({
 }) {
   return (
     <div
+      data-sprite-menu-panel
       className={`flex w-[172px] flex-col overflow-hidden rounded-2xl border border-[color:var(--sk-content-border)] bg-[color:var(--sk-content-surface)] p-0 shadow-[var(--sk-frame-shadow)] [-webkit-app-region:no-drag] divide-y divide-[color:var(--sk-divider)] ${className}`}
     >
       {ITEMS.map((item, index) => {

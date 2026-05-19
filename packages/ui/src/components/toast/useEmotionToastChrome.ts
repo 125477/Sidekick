@@ -167,7 +167,8 @@ export function useEmotionToastChrome({
     introMode ||
     toolbarMenuHoldOpen ||
     unlockedToolbarHot ||
-    (!spriteInteractionLocked && toastBarPinnedOpen)
+    (!showLockedOnlyToolbar && toastBarPinnedOpen) ||
+    (showLockedOnlyToolbar && !detached && spriteHoverReveal)
 
   const placementSide: 'above' | 'below' =
     detached && bubblePlacement != null
@@ -278,24 +279,12 @@ export function useEmotionToastChrome({
   useLayoutEffect(() => {
     const reportRect = window.sidekickDesktop?.reportToastPassthroughInteractRect
     if (!reportRect) return
-    if (!visible || !toastPassthroughLocked) {
+    if (!visible || !detached) {
       reportRect(null)
       return
     }
     const report = () => {
-      if (regenerating) {
-        const root = toastHitRootRef.current
-        if (!root) return
-        const r = root.getBoundingClientRect()
-        reportRect({
-          left: r.left,
-          top: r.top,
-          width: r.width,
-          height: r.height,
-        })
-        return
-      }
-      if (!toolbarChromeRevealed) {
+      if (toastPassthroughLocked && !regenerating && !toolbarChromeRevealed) {
         const slop = lockedPassthroughSlopRef.current
         if (slop) {
           const sr = slop.getBoundingClientRect()
@@ -309,11 +298,13 @@ export function useEmotionToastChrome({
             return
           }
         }
+        reportRect(null)
         return
       }
       const root = toastHitRootRef.current
       if (!root) return
       const r = root.getBoundingClientRect()
+      if (r.width < 1 || r.height < 1) return
       reportRect({
         left: r.left,
         top: r.top,
@@ -341,6 +332,7 @@ export function useEmotionToastChrome({
     }
   }, [
     visible,
+    detached,
     toastPassthroughLocked,
     message,
     regenerating,

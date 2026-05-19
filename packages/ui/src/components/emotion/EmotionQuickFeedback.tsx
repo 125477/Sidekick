@@ -54,7 +54,7 @@ export function EmotionQuickFeedback({ onSelect }: EmotionQuickFeedbackProps) {
 
   return (
     <section className="relative rounded-xl">
-      <h3 className="mb-1 text-sm font-medium leading-snug">现在的情绪是？</h3>
+      <h3 className="mb-1 text-sm font-medium leading-snug text-[color:var(--sk-text-body)]">现在的情绪是？</h3>
       <div className="flex flex-wrap gap-1.5">
         {EMOTION_CHIP_LABELS.map((emotion) => {
           const active = selected === emotion
@@ -82,10 +82,10 @@ export function EmotionQuickFeedback({ onSelect }: EmotionQuickFeedbackProps) {
               className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-violet-500 border-t-transparent motion-reduce:animate-none motion-reduce:border-t-violet-500"
               aria-hidden
             />
-            <span className="text-xs font-medium text-violet-700">正在记录情绪…</span>
+            <span className="text-xs font-medium text-[color:var(--sk-accent-on-subtle)]">正在记录情绪…</span>
           </div>
         ) : hint ? (
-          <p className="text-xs leading-relaxed text-slate-600" role="status">
+          <p className="sk-muted text-xs leading-relaxed" role="status">
             {hint}
           </p>
         ) : null}

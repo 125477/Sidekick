@@ -17,6 +17,8 @@ type SidekickSpriteMenuAnchor = {
   bottom: number
   width: number
   height: number
+  /** 与挂件窗 `data-theme` 一致，供菜单首屏避免闪白。 */
+  theme?: 'dark' | 'light'
 }
 type SidekickToastAnchor = 'top' | 'bottom'
 
@@ -97,6 +99,8 @@ type SidekickDesktopApi = {
     dailyMoodReminderTime: string
     hasMoodEntryToday: boolean
   }) => void
+  /** 同步「登录时启动」到系统（仅打包版生效）。 */
+  setLaunchAtLogin?: (enabled: boolean) => void
   /** 打开独立「首次引导」窗口（与精灵悬浮窗分离）。 */
   openOnboardingWindow?: () => Promise<void>
   /** 引导窗内保存完成后调用：通知精灵窗并关闭引导窗口。 */
@@ -128,10 +132,14 @@ type SidekickDesktopApi = {
   /** 主进程定时唤醒，用于今日心情提醒（macOS 休眠后 renderer 计时可能滞后）。 */
   onMoodReminderTick?: (callback: () => void) => () => void
   /**
-   * Electron 独立气泡：锁定后整窗 `setIgnoreMouseEvents(forward)` 穿透；
-   * 渲染进程上报解锁按钮（或换句 loading 时整张卡）的视口矩形，主进程轮询光标是否在矩形内。
+   * Electron 独立气泡：仅卡片区域可点，窗内透明区穿透到下层应用。
+   * 锁定后仅上报解锁条等窄矩形；未锁时上报整张气泡卡。
    */
   reportToastPassthroughInteractRect?: (
+    rect: { left: number; top: number; width: number; height: number } | null,
+  ) => void
+  /** 精灵挂件窗：仅精灵/菜单可点区域可点，其余透明区穿透。 */
+  reportWidgetPassthroughInteractRect?: (
     rect: { left: number; top: number; width: number; height: number } | null,
   ) => void
   /**
@@ -206,6 +214,10 @@ type SidekickDesktopApi = {
   quitApp?: () => Promise<void>
   /** 挂件：打开独立菜单窗（`mode=sprite-menu`），`bounds` 为屏幕坐标。 */
   openWidgetSpriteMenu?: (bounds: SidekickSpriteMenuAnchor) => Promise<void>
+  /** 屏外预加载菜单页，减少首开白闪（挂件/气泡在主题就绪后调用）。 */
+  warmWidgetSpriteMenu?: (opts?: {
+    theme?: 'dark' | 'light'
+  }) => Promise<void>
   /** 关闭独立菜单窗。`notify: true` 时向精灵窗发 `onWidgetSpriteMenuClosed`（失焦等）。 */
   closeWidgetSpriteMenu?: (opts?: { notify?: boolean }) => Promise<void>
   /** 独立菜单窗内：用户点选某一项。 */

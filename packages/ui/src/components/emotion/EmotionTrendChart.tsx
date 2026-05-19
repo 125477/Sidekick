@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   CategoryScale,
   Chart as ChartJS,
@@ -46,8 +46,44 @@ const PERIOD_FOOTNOTE: Record<Period, string> = {
   month: '「月」为最近 12 个自然月；当月有反馈才有分值。分数由标签折算，仅供参考。',
 }
 
+function readCssColor(token: string, fallback: string): string {
+  if (typeof document === 'undefined') return fallback
+  const v = getComputedStyle(document.documentElement)
+    .getPropertyValue(token)
+    .trim()
+  return v || fallback
+}
+
+function accentAreaFill(accent: string): string {
+  const m = accent.match(/^rgb\(\s*(\d+)\s+(\d+)\s+(\d+)\s*\)$/)
+  if (m) return `rgba(${m[1]}, ${m[2]}, ${m[3]}, 0.16)`
+  return 'rgba(139, 92, 246, 0.16)'
+}
+
 export function EmotionTrendChart({ records }: EmotionTrendChartProps) {
   const [period, setPeriod] = useState<Period>('day')
+  const [chartChrome, setChartChrome] = useState(() => ({
+    grid: 'rgba(148, 163, 184, 0.22)',
+    muted: 'rgb(100, 116, 139)',
+    accent: 'rgb(124, 58, 237)',
+  }))
+
+  useEffect(() => {
+    const sync = () => {
+      setChartChrome({
+        grid: readCssColor('--sk-divider', 'rgba(148, 163, 184, 0.22)'),
+        muted: readCssColor('--sk-text-muted', 'rgb(100, 116, 139)'),
+        accent: readCssColor('--sk-accent', 'rgb(124, 58, 237)'),
+      })
+    }
+    sync()
+    const obs = new MutationObserver(sync)
+    obs.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    })
+    return () => obs.disconnect()
+  }, [])
 
   const { chartData, periodAllEmpty } = useMemo(() => {
     const agg =
@@ -64,8 +100,8 @@ export function EmotionTrendChart({ records }: EmotionTrendChartProps) {
           {
             label: '情绪倾向（均分）',
             data: agg.values,
-            borderColor: '#8b5cf6',
-            backgroundColor: 'rgba(139, 92, 246, 0.12)',
+            borderColor: chartChrome.accent,
+            backgroundColor: accentAreaFill(chartChrome.accent),
             tension: 0.35,
             fill: true,
             pointRadius: 3,
@@ -75,7 +111,7 @@ export function EmotionTrendChart({ records }: EmotionTrendChartProps) {
         ],
       },
     }
-  }, [period, records])
+  }, [period, records, chartChrome])
 
   const chartOptions = useMemo<ChartOptions<'line'>>(
     () => ({
@@ -99,12 +135,13 @@ export function EmotionTrendChart({ records }: EmotionTrendChartProps) {
         y: {
           min: 0,
           max: 6,
-          ticks: { stepSize: 1 },
-          grid: { color: 'rgba(148, 163, 184, 0.2)' },
+          grid: { color: chartChrome.grid },
+          ticks: { stepSize: 1, color: chartChrome.muted },
         },
         x: {
           grid: { display: false },
           ticks: {
+            color: chartChrome.muted,
             maxRotation: 0,
             autoSkip: true,
             maxTicksLimit: period === 'month' ? 12 : period === 'week' ? 4 : 7,
@@ -112,7 +149,7 @@ export function EmotionTrendChart({ records }: EmotionTrendChartProps) {
         },
       },
     }),
-    [period],
+    [period, chartChrome],
   )
 
   const hasAny = records.length > 0
@@ -121,7 +158,7 @@ export function EmotionTrendChart({ records }: EmotionTrendChartProps) {
   return (
     <section className="flex shrink-0 flex-col px-2 py-1.5">
       <div className="mb-1 flex shrink-0 items-center justify-between gap-2">
-        <h4 className="text-sm font-medium">情绪趋势</h4>
+        <h4 className="text-sm font-medium text-[color:var(--sk-text-body)]">情绪趋势</h4>
         <div className="sk-segmented shrink-0 text-xs">
           {(['day', 'week', 'month'] as const).map((p) => (
             <button
@@ -139,7 +176,7 @@ export function EmotionTrendChart({ records }: EmotionTrendChartProps) {
         </div>
       </div>
       <div
-        className="relative shrink-0 overflow-hidden rounded-lg bg-slate-50/90"
+        className="sk-emotion-trend-chart relative shrink-0 overflow-hidden rounded-lg"
         style={{ height: EMOTION_TREND_CHART_HEIGHT_PX }}
       >
         {showChart ? (
@@ -147,14 +184,14 @@ export function EmotionTrendChart({ records }: EmotionTrendChartProps) {
             <Line data={chartData} options={chartOptions} />
           </div>
         ) : (
-          <div className="flex h-full items-center justify-center px-3 text-center text-xs leading-relaxed text-slate-500">
+          <div className="sk-muted flex h-full items-center justify-center px-3 text-center text-xs leading-relaxed">
             {hasAny
               ? '该时段暂无记录；点选上方情绪标签后会出现在趋势里。'
               : '暂无记录；点击上方情绪标签后会出现在趋势里。'}
           </div>
         )}
       </div>
-      <p className="mt-0.5 shrink-0 text-[11px] leading-snug text-slate-500">
+      <p className="sk-muted mt-0.5 shrink-0 text-[11px] leading-snug">
         {PERIOD_FOOTNOTE[period]}
       </p>
     </section>

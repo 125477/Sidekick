@@ -25,7 +25,7 @@ function EmotionToastSwitchingRow() {
         className="h-4 w-4 shrink-0 rounded-full border-2 border-violet-400 border-t-transparent will-change-transform motion-safe:animate-spin motion-reduce:animate-pulse motion-reduce:border-t-violet-400"
         aria-hidden
       />
-      <span className="whitespace-nowrap text-[13px] font-medium leading-none text-slate-500">
+      <span className="sk-toast-muted whitespace-nowrap text-[13px] font-medium leading-none">
         切换中…
       </span>
       <span className="sr-only">正在换一句</span>
@@ -96,7 +96,7 @@ export function EmotionToastCard({
 
   const plainMessageChrome: ReactNode = (
     <div
-      className={`${toastBarGroupClass(chrome.compactMessageLayout, 'group/toastbar-plain')} rounded-lg bg-slate-50/55 transition-colors duration-200 ease-out motion-reduce:transition-none ${toastMessageChromeClass(
+      className={`${toastBarGroupClass(chrome.compactMessageLayout, 'group/toastbar-plain')} sk-toast-message-panel transition-colors duration-200 ease-out motion-reduce:transition-none ${toastMessageChromeClass(
         chrome.compactMessageLayout,
         chrome.regenerating,
       )}`}
@@ -134,15 +134,11 @@ export function EmotionToastCard({
         aria-busy={chrome.regenerating}
         className={`relative flex ${TOAST_CARD_MIN_CLASS} ${
           detached ? TOAST_CARD_MAX_CLASS_DETACHED : TOAST_CARD_MAX_CLASS
-        } w-max items-start gap-2.5 rounded-2xl border px-2.5 py-1 text-[13px] leading-relaxed text-slate-600 [-webkit-app-region:no-drag] ${
+        } sk-toast-shell w-max items-start gap-2.5 rounded-2xl border px-2.5 py-1 text-[13px] leading-relaxed [-webkit-app-region:no-drag] ${
           chrome.toastPassthroughLocked
             ? 'pointer-events-none'
             : 'pointer-events-auto'
-        } ${
-          detached
-            ? 'border-slate-200 bg-white shadow-[0_4px_14px_-6px_rgba(15,23,42,0.10)]'
-            : 'border-slate-200 bg-white shadow-[0_2px_10px_-3px_rgba(15,23,42,0.08)]'
-        } ${chrome.motionClass}`}
+        } ${detached ? 'sk-toast-shell--detached' : ''} ${chrome.motionClass}`}
       >
         <EmotionToastTail pointsDown={chrome.tailPointsDown} />
 
@@ -150,7 +146,10 @@ export function EmotionToastCard({
           {chrome.showToolbar ? (
             <div
               className="flex w-full min-w-0 flex-col"
-              onPointerEnter={() => onPointerEnteredToastChrome?.()}
+              onPointerEnter={() => {
+                chrome.setUnlockedToolbarHot(true)
+                onPointerEnteredToastChrome?.()
+              }}
             >
               <EmotionToastUnlockedToolbar
                 detached={detached}
@@ -180,9 +179,7 @@ export function EmotionToastCard({
                 messageCell={messageCell}
                 introActions={introActions}
                 introMode={introMode}
-                showLightFeedback={
-                  showLightFeedback && !introMode && !chrome.showLockedOnlyToolbar
-                }
+                showLightFeedback={showLightFeedback && !introMode}
                 lightFeedbackMessage={message}
                 compactMessageLayout={chrome.compactMessageLayout}
                 {...(onCopy ? { onCopy } : {})}
