@@ -4,12 +4,14 @@ import {
 } from '../clients/dashscopeTextClient'
 import type { EmotionKind } from '../schema/data'
 import {
+  buildBleakWithoutComfortRetryUserSuffix,
   buildCompanionSystemPrompt,
   buildCompanionUserPromptWithInterests,
   buildDesktopClicheRetryUserSuffix,
   buildMotivationalParallelRetryUserSuffix,
   buildPoeticTemplateRetryUserSuffix,
   companionStyleForEmotion,
+  companionTextHasBleakWithoutComfort,
   companionTextHasDesktopCliche,
   companionTextHasMotivationalParallelTemplate,
   companionTextHasPoeticTemplate,
@@ -147,10 +149,16 @@ export async function generateCompanionCopy(
         `${userPrompt}\n${buildMotivationalParallelRetryUserSuffix()}`,
       )
     }
+    if (companionTextHasBleakWithoutComfort(line)) {
+      line = await requestModelLine(
+        `${userPrompt}\n${buildBleakWithoutComfortRetryUserSuffix()}`,
+      )
+    }
     if (
       companionTextHasPoeticTemplate(line) ||
       companionTextHasDesktopCliche(line) ||
-      companionTextHasMotivationalParallelTemplate(line)
+      companionTextHasMotivationalParallelTemplate(line) ||
+      companionTextHasBleakWithoutComfort(line)
     ) {
       throw new Error('companion copy still matches banned template')
     }

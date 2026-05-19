@@ -20,13 +20,8 @@ export type EmotionToastChrome = {
   copyResetTimerRef: RefObject<number | null>
   toastUnlockHitRef: RefObject<HTMLDivElement | null>
   toastHitRootRef: RefObject<HTMLDivElement | null>
-  lockedChromeGroupRef: RefObject<HTMLDivElement | null>
-  lockedMessageChromeRef: RefObject<HTMLDivElement | null>
-  lockedToolbarRef: RefObject<HTMLDivElement | null>
   lockedPassthroughSlopRef: RefObject<HTMLDivElement | null>
   unlockedToastbarGroupRef: RefObject<HTMLDivElement | null>
-  setLockedMsgHot: (v: boolean) => void
-  setLockedToolbarHot: (v: boolean) => void
   setUnlockedToolbarHot: (v: boolean) => void
   regenInToolbar: boolean
   messageClickable: boolean
@@ -45,7 +40,7 @@ export type EmotionToastChrome = {
   toolbarMenuHoldOpen: boolean
   toastPassthroughLocked: boolean
   toastBarPinnedOpen: boolean
-  lockedBarOpen: boolean
+  toolbarChromeRevealed: boolean
   tailPointsDown: boolean
   positionClass: string
   toastOffsetStyle: CSSProperties | undefined
@@ -156,23 +151,11 @@ export function useEmotionToastChrome({
   const toastBarPinnedOpen =
     introMode || toastPassthroughLocked || spriteHoverReveal
 
-  const [lockedMsgHot, setLockedMsgHot] = useState(false)
-  const [lockedToolbarHot, setLockedToolbarHot] = useState(false)
   const [unlockedToolbarHot, setUnlockedToolbarHot] = useState(false)
   const [detachedEntranceConsumed, setDetachedEntranceConsumed] =
     useState(false)
-  const lockedChromeGroupRef = useRef<HTMLDivElement>(null)
-  const lockedMessageChromeRef = useRef<HTMLDivElement>(null)
-  const lockedToolbarRef = useRef<HTMLDivElement>(null)
   const lockedPassthroughSlopRef = useRef<HTMLDivElement>(null)
   const unlockedToastbarGroupRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!(spriteInteractionLocked && showLockControl)) {
-      setLockedMsgHot(false)
-      setLockedToolbarHot(false)
-    }
-  }, [spriteInteractionLocked, showLockControl])
 
   useEffect(() => {
     if (!visible || spriteInteractionLocked) {
@@ -180,8 +163,11 @@ export function useEmotionToastChrome({
     }
   }, [visible, spriteInteractionLocked])
 
-  const lockedBarOpen =
-    spriteHoverReveal || lockedMsgHot || lockedToolbarHot
+  const toolbarChromeRevealed =
+    introMode ||
+    toolbarMenuHoldOpen ||
+    unlockedToolbarHot ||
+    (!spriteInteractionLocked && toastBarPinnedOpen)
 
   const placementSide: 'above' | 'below' =
     detached && bubblePlacement != null
@@ -309,7 +295,7 @@ export function useEmotionToastChrome({
         })
         return
       }
-      if (!lockedBarOpen) {
+      if (!toolbarChromeRevealed) {
         const slop = lockedPassthroughSlopRef.current
         if (slop) {
           const sr = slop.getBoundingClientRect()
@@ -323,10 +309,11 @@ export function useEmotionToastChrome({
             return
           }
         }
+        return
       }
-      const el = toastUnlockHitRef.current
-      if (!el) return
-      const r = el.getBoundingClientRect()
+      const root = toastHitRootRef.current
+      if (!root) return
+      const r = root.getBoundingClientRect()
       reportRect({
         left: r.left,
         top: r.top,
@@ -358,7 +345,7 @@ export function useEmotionToastChrome({
     message,
     regenerating,
     showToolbar,
-    lockedBarOpen,
+    toolbarChromeRevealed,
   ])
 
   const pct =
@@ -422,13 +409,8 @@ export function useEmotionToastChrome({
     copyResetTimerRef,
     toastUnlockHitRef,
     toastHitRootRef,
-    lockedChromeGroupRef,
-    lockedMessageChromeRef,
-    lockedToolbarRef,
     lockedPassthroughSlopRef,
     unlockedToastbarGroupRef,
-    setLockedMsgHot,
-    setLockedToolbarHot,
     setUnlockedToolbarHot,
     regenInToolbar,
     messageClickable,
@@ -447,7 +429,7 @@ export function useEmotionToastChrome({
     unlockedToolbarHot,
     toastPassthroughLocked,
     toastBarPinnedOpen,
-    lockedBarOpen,
+    toolbarChromeRevealed,
     tailPointsDown,
     positionClass,
     toastOffsetStyle,

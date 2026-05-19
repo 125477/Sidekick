@@ -1,4 +1,8 @@
 import type { Dispatch, MutableRefObject, RefObject, SetStateAction } from 'react'
+import {
+  TOAST_LAYOUT_SYNC_EVENT,
+  type ToastLayoutSyncDetail,
+} from '../components/toast/toastLayoutSync'
 import { clampToastWindowWidthPx } from '../components/toast/toastCardMetrics'
 import { useEffect, useLayoutEffect } from 'react'
 import type { AvatarPreset } from '@sidekick/core'
@@ -87,8 +91,11 @@ export function useAppModeShell({
     if (!shell) return
     let roRaf = 0
     let debounceTimer: number | null = null
+    let suppressRoUntil = 0
     const lastAppliedRef = { w: 0, h: 0 }
     const TOAST_RESIZE_DEBOUNCE_MS = 220
+    const TOAST_RO_SUPPRESS_MS = 320
+    const MEASURE_EXPAND_CLASS = 'sidekick-toast-measure-expanded'
     const applySize = () => {
       const shellRect = shell.getBoundingClientRect()
       const cardEl = shell.querySelector('[data-emotion-toast-menu-fallback]')
@@ -98,7 +105,11 @@ export function useAppModeShell({
           : shell.firstElementChild instanceof HTMLElement
             ? shell.firstElementChild.getBoundingClientRect().width
             : shellRect.width
-      const h = Math.ceil(shellRect.height) + 8
+      const measuredH =
+        cardEl instanceof HTMLElement
+          ? Math.max(shellRect.height, cardEl.scrollHeight)
+          : shellRect.height
+      const h = Math.ceil(measuredH) + 8
       const w = clampToastWindowWidthPx(cardW)
       if (
         Math.abs(w - lastAppliedRef.w) <= 1 &&
@@ -112,6 +123,17 @@ export function useAppModeShell({
         height: Math.min(480, Math.max(52, h)),
         width: w,
       })
+    }
+    const applySizeWithOptionalMeasure = (measureExpanded: boolean) => {
+      const cardEl = shell.querySelector('[data-emotion-toast-menu-fallback]')
+      if (measureExpanded && cardEl instanceof HTMLElement) {
+        cardEl.classList.add(MEASURE_EXPAND_CLASS)
+        applySize()
+        cardEl.classList.remove(MEASURE_EXPAND_CLASS)
+      } else {
+        applySize()
+      }
+      suppressRoUntil = performance.now() + TOAST_RO_SUPPRESS_MS
     }
     const scheduleSize = (immediate = false) => {
       if (immediate) {
@@ -137,7 +159,33 @@ export function useAppModeShell({
       })
     }
     scheduleSize(true)
+    const onLayoutSync = (event: Event) => {
+      const detail = (event as CustomEvent<ToastLayoutSyncDetail>).detail
+      if (detail?.measureExpanded) {
+        if (debounceTimer != null) {
+          window.clearTimeout(debounceTimer)
+          debounceTimer = null
+        }
+        if (roRaf) {
+          window.cancelAnimationFrame(roRaf)
+          roRaf = 0
+        }
+        applySizeWithOptionalMeasure(true)
+        return
+      }
+      if (debounceTimer != null) {
+        window.clearTimeout(debounceTimer)
+        debounceTimer = null
+      }
+      if (roRaf) {
+        window.cancelAnimationFrame(roRaf)
+        roRaf = 0
+      }
+      applySizeWithOptionalMeasure(false)
+    }
+    window.addEventListener(TOAST_LAYOUT_SYNC_EVENT, onLayoutSync)
     const ro = new ResizeObserver(() => {
+      if (performance.now() < suppressRoUntil) return
       scheduleSize(false)
     })
     ro.observe(shell)
@@ -152,6 +200,7 @@ export function useAppModeShell({
       cancelAnimationFrame(id)
       if (roRaf) window.cancelAnimationFrame(roRaf)
       if (debounceTimer != null) window.clearTimeout(debounceTimer)
+      window.removeEventListener(TOAST_LAYOUT_SYNC_EVENT, onLayoutSync)
       ro.disconnect()
     }
   }, [isToastMode, toastMessageFromQuery, toastDetachTailPointsDown, menuOpen, spriteMenuSurface, toastShellRef])

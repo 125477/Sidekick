@@ -3,10 +3,7 @@ import type { EmotionToastProps } from './emotionToastTypes'
 import type { EmotionToastChrome } from './useEmotionToastChrome'
 import { EmotionToastTail } from './EmotionToastTail'
 import { EmotionToastMessageCell } from './EmotionToastMessageCell'
-import {
-  EmotionToastLockedChrome,
-  EmotionToastLockedPassthroughSlop,
-} from './EmotionToastLockedChrome'
+import { EmotionToastLockedPassthroughSlop } from './EmotionToastLockedPassthroughSlop'
 import { EmotionToastUnlockedToolbar } from './EmotionToastUnlockedToolbar'
 import { EmotionToastIntroActions } from './EmotionToastIntroActions'
 import { ToastLightFeedbackRow } from './ToastLightFeedbackRow'
@@ -155,73 +152,52 @@ export function EmotionToastCard({
               className="flex w-full min-w-0 flex-col"
               onPointerEnter={() => onPointerEnteredToastChrome?.()}
             >
-              {chrome.showLockedOnlyToolbar ? (
-                <EmotionToastLockedChrome
-                  detached={detached}
-                  motionEnabled={motionEnabled}
-                  regenerating={chrome.regenerating}
-                  lockedBarOpen={chrome.lockedBarOpen}
-                  messageCell={messageCell}
-                  showLightFeedback={false}
-                  lightFeedbackMessage={message}
-                  compactMessageLayout={chrome.compactMessageLayout}
-                  lockedChromeGroupRef={chrome.lockedChromeGroupRef}
-                  lockedMessageChromeRef={chrome.lockedMessageChromeRef}
-                  lockedToolbarRef={chrome.lockedToolbarRef}
-                  toastUnlockHitRef={chrome.toastUnlockHitRef}
-                  setLockedMsgHot={chrome.setLockedMsgHot}
-                  setLockedToolbarHot={chrome.setLockedToolbarHot}
-                  setUnlockedToolbarHot={chrome.setUnlockedToolbarHot}
-                  {...(onSpriteInteractionLockedChange
-                    ? { onSpriteInteractionLockedChange }
-                    : {})}
-                />
-              ) : (
-                <EmotionToastUnlockedToolbar
-                  detached={detached}
-                  motionEnabled={motionEnabled}
-                  regenerating={chrome.regenerating}
-                  copyDone={chrome.copyDone}
-                  favorite={favorite}
-                  {...(maxChars !== undefined ? { maxChars } : {})}
-                  toastBarPinnedOpen={chrome.toastBarPinnedOpen}
-                  unlockedToolbarHot={chrome.unlockedToolbarHot}
-                  toolbarMenuHoldOpen={chrome.toolbarMenuHoldOpen}
-                  unlockedToastbarGroupRef={chrome.unlockedToastbarGroupRef}
-                  copyResetTimerRef={chrome.copyResetTimerRef}
-                  setUnlockedToolbarHot={chrome.setUnlockedToolbarHot}
-                  setLockedToolbarHot={chrome.setLockedToolbarHot}
-                  setLockedMsgHot={chrome.setLockedMsgHot}
-                  setCopyDone={chrome.setCopyDone}
-                  regenInToolbar={chrome.regenInToolbar}
-                  showCopy={chrome.showCopy}
-                  showReplay={chrome.showReplay}
-                  showFavorite={chrome.showFavorite}
-                  showEmotionFeedback={chrome.showEmotionFeedback}
-                  showLockControl={chrome.showLockControl}
-                  showSkin={chrome.showSkin}
-                  showSettings={chrome.showSettings}
-                  showSpriteMenu={chrome.showSpriteMenu}
-                  messageCell={messageCell}
-                  introActions={introActions}
-                  introMode={introMode}
-                  showLightFeedback={showLightFeedback && !introMode}
-                  lightFeedbackMessage={message}
-                  compactMessageLayout={chrome.compactMessageLayout}
-                  {...(onCopy ? { onCopy } : {})}
-                  {...(onReplayTts ? { onReplayTts } : {})}
-                  {...(onToggleFavorite ? { onToggleFavorite } : {})}
-                  {...(onOpenEmotion ? { onOpenEmotion } : {})}
-                  {...(onOpenSkin ? { onOpenSkin } : {})}
-                  {...(onOpenSettings ? { onOpenSettings } : {})}
-                  {...(onOpenMenu ? { onOpenMenu } : {})}
-                  {...(onSpriteInteractionLockedChange
-                    ? { onSpriteInteractionLockedChange }
-                    : {})}
-                  onClose={onClose}
-                  runRegenerate={chrome.runRegenerate}
-                />
-              )}
+              <EmotionToastUnlockedToolbar
+                detached={detached}
+                motionEnabled={motionEnabled}
+                regenerating={chrome.regenerating}
+                copyDone={chrome.copyDone}
+                favorite={favorite}
+                {...(maxChars !== undefined ? { maxChars } : {})}
+                toastBarPinnedOpen={chrome.toastBarPinnedOpen}
+                unlockedToolbarHot={chrome.unlockedToolbarHot}
+                toolbarMenuHoldOpen={chrome.toolbarMenuHoldOpen}
+                spriteInteractionLockedOnly={chrome.showLockedOnlyToolbar}
+                toastUnlockHitRef={chrome.toastUnlockHitRef}
+                unlockedToastbarGroupRef={chrome.unlockedToastbarGroupRef}
+                copyResetTimerRef={chrome.copyResetTimerRef}
+                setUnlockedToolbarHot={chrome.setUnlockedToolbarHot}
+                setCopyDone={chrome.setCopyDone}
+                regenInToolbar={chrome.regenInToolbar}
+                showCopy={chrome.showCopy}
+                showReplay={chrome.showReplay}
+                showFavorite={chrome.showFavorite}
+                showEmotionFeedback={chrome.showEmotionFeedback}
+                showLockControl={chrome.showLockControl}
+                showSkin={chrome.showSkin}
+                showSettings={chrome.showSettings}
+                showSpriteMenu={chrome.showSpriteMenu}
+                messageCell={messageCell}
+                introActions={introActions}
+                introMode={introMode}
+                showLightFeedback={
+                  showLightFeedback && !introMode && !chrome.showLockedOnlyToolbar
+                }
+                lightFeedbackMessage={message}
+                compactMessageLayout={chrome.compactMessageLayout}
+                {...(onCopy ? { onCopy } : {})}
+                {...(onReplayTts ? { onReplayTts } : {})}
+                {...(onToggleFavorite ? { onToggleFavorite } : {})}
+                {...(onOpenEmotion ? { onOpenEmotion } : {})}
+                {...(onOpenSkin ? { onOpenSkin } : {})}
+                {...(onOpenSettings ? { onOpenSettings } : {})}
+                {...(onOpenMenu ? { onOpenMenu } : {})}
+                {...(onSpriteInteractionLockedChange
+                  ? { onSpriteInteractionLockedChange }
+                  : {})}
+                onClose={onClose}
+                runRegenerate={chrome.runRegenerate}
+              />
             </div>
           ) : (
             plainMessageChrome
@@ -233,13 +209,11 @@ export function EmotionToastCard({
           show={
             chrome.toastPassthroughLocked &&
             chrome.showLockedOnlyToolbar &&
-            !chrome.lockedBarOpen
+            !chrome.toolbarChromeRevealed
           }
-          lockedPassthroughSlopRef={chrome.lockedPassthroughSlopRef}
-          lockedToolbarRef={chrome.lockedToolbarRef}
-          lockedMessageChromeRef={chrome.lockedMessageChromeRef}
-          setLockedToolbarHot={chrome.setLockedToolbarHot}
-          setLockedMsgHot={chrome.setLockedMsgHot}
+          slopRef={chrome.lockedPassthroughSlopRef}
+          toastbarGroupRef={chrome.unlockedToastbarGroupRef}
+          setToolbarHot={chrome.setUnlockedToolbarHot}
         />
 
       </div>

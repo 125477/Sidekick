@@ -9,5 +9,6 @@
 | [DECISIONS.md](./DECISIONS.md) | 人 + AI | 架构决策记录（ADR）索引 |
 | [adr/001-drag-star-trail-overlay.md](./adr/001-drag-star-trail-overlay.md) | 人 + AI | 拖动星星拖尾：小窗 overlay 方案 |
 | [../CHANGELOG.md](../CHANGELOG.md) | 人 + AI | 实现层面变更日志 |
+| [RELEASE.md](./RELEASE.md) | 维护者 | GitHub Releases 发版流程 |
 
-根目录 [README.md](../README.md)：安装、脚本、FAQ。
+根目录 [README.md](../README.md)：产品介绍、下载、开发安装、FAQ。

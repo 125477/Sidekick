@@ -563,4 +563,11 @@
   .sk-toast-clickable:disabled {
     cursor: not-allowed;
   }
+
+  /** 独立 toast：收起态下按完全展开测量窗高（同步、无闪屏）。 */
+  .sidekick-toast-measure-expanded .emotion-toast-chrome-below {
+    grid-template-rows: 1fr !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
 }

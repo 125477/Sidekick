@@ -8,6 +8,7 @@
 
 ### Added
 
+- `docs/RELEASE.md`：GitHub Releases 发版流程；README 增加「下载（桌面版）」链接。
 - 根目录 `AGENTS.md`、`docs/README.md`、`docs/IPC.md`、`docs/DECISIONS.md`、`docs/adr/*` 文档体系。
 - 拖动星星拖尾：独立 `drag-trail` 小窗 overlay（ADR-001）、彩色高亮粒子、IPC 批量打点。
 - 面板背景透明度、情绪趋势图、轻量反馈 chips 等 V1.1 相关 UI（详见 FEATURE_PLAN）。

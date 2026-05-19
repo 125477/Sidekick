@@ -1,10 +1,11 @@
-import type { ReactNode, RefObject } from 'react'
+import { useLayoutEffect, type ReactNode, type RefObject } from 'react'
 import { ToastLightFeedbackRow } from './ToastLightFeedbackRow'
 import { EmotionToastToolbarIconButton } from './EmotionToastToolbarButton'
 import {
   IconToolbarClose,
   IconToolbarCopy,
   IconToolbarEmotion,
+  IconToolbarLockClosed,
   IconToolbarLockOpen,
   IconToolbarMenu,
   IconToolbarRefresh,
@@ -14,7 +15,7 @@ import {
   IconToolbarStar,
   IconToolbarStarFilled,
 } from './EmotionToastToolbarIcons'
-import { toastCollapseRevealClass } from './toastChromeReveal'
+import { toastChromeRevealClass } from './toastChromeReveal'
 import {
   toastBarGroupClass,
   toastMessageChromeClass,
@@ -29,6 +30,8 @@ const toastToolbarChromeClassName = (detached: boolean) =>
 const toastToolbarIconsRowClassName =
   'flex min-h-7 min-w-0 shrink-0 flex-nowrap items-center justify-center gap-0 px-0.5 py-1'
 
+import { requestToastLayoutSync } from './toastLayoutSync'
+
 export type EmotionToastUnlockedToolbarProps = {
   detached: boolean
   motionEnabled: boolean
@@ -39,11 +42,12 @@ export type EmotionToastUnlockedToolbarProps = {
   toastBarPinnedOpen: boolean
   unlockedToolbarHot: boolean
   toolbarMenuHoldOpen: boolean
+  /** 已锁定：仅展示解锁按钮，悬停显隐与未锁定共用一套逻辑。 */
+  spriteInteractionLockedOnly?: boolean
+  toastUnlockHitRef?: RefObject<HTMLDivElement | null>
   unlockedToastbarGroupRef: RefObject<HTMLDivElement | null>
   copyResetTimerRef: RefObject<number | null>
   setUnlockedToolbarHot: (v: boolean) => void
-  setLockedToolbarHot: (v: boolean) => void
-  setLockedMsgHot: (v: boolean) => void
   setCopyDone: (v: boolean) => void
   regenInToolbar: boolean
   showCopy: boolean
@@ -82,11 +86,11 @@ export function EmotionToastUnlockedToolbar({
   toastBarPinnedOpen,
   unlockedToolbarHot,
   toolbarMenuHoldOpen,
+  spriteInteractionLockedOnly = false,
+  toastUnlockHitRef,
   unlockedToastbarGroupRef,
   copyResetTimerRef,
   setUnlockedToolbarHot,
-  setLockedToolbarHot,
-  setLockedMsgHot,
   setCopyDone,
   regenInToolbar,
   showCopy,
@@ -116,14 +120,27 @@ export function EmotionToastUnlockedToolbar({
 }: EmotionToastUnlockedToolbarProps) {
   const chromeRevealed =
     introMode ||
-    toastBarPinnedOpen ||
+    toolbarMenuHoldOpen ||
     unlockedToolbarHot ||
-    toolbarMenuHoldOpen
+    (!spriteInteractionLockedOnly && toastBarPinnedOpen)
+
+  useLayoutEffect(() => {
+    if (!detached) return
+    requestToastLayoutSync(
+      chromeRevealed ? { measureExpanded: true } : undefined,
+    )
+  }, [detached, chromeRevealed])
 
   return (
     <div
       ref={unlockedToastbarGroupRef}
       className={toastBarGroupClass(compactMessageLayout, 'group/toastbar')}
+      onPointerEnter={() => {
+        if (detached) {
+          requestToastLayoutSync({ measureExpanded: true })
+        }
+        setUnlockedToolbarHot(true)
+      }}
       onPointerLeave={(e) => {
         const t = e.relatedTarget
         if (
@@ -148,9 +165,10 @@ export function EmotionToastUnlockedToolbar({
       {introActions ? (
         <div className="relative z-[1] w-full">{introActions}</div>
       ) : null}
-      {showLightFeedback && !regenerating ? (
+      {showLightFeedback && !regenerating && introMode ? (
         <div
-          className={`emotion-toast-light-feedback relative z-[1] -mt-0.5 ${toastCollapseRevealClass(
+          className={`emotion-toast-light-feedback relative z-[1] -mt-0.5 ${toastChromeRevealClass(
+            detached,
             motionEnabled,
             chromeRevealed,
             'toastbar',
@@ -166,19 +184,44 @@ export function EmotionToastUnlockedToolbar({
         </div>
       ) : null}
       {!introMode && !regenerating ? (
-        <>
-          <div aria-hidden className="h-1.5 w-full shrink-0" />
-          <div
-            className={`emotion-toast-toolbar relative z-[1] -mt-1.5 overflow-hidden rounded-b-2xl ${toastCollapseRevealClass(
-              motionEnabled,
-              chromeRevealed,
-              'toastbar',
-            )}`}
-          >
-            <div className="min-h-0 overflow-hidden">
+        <div
+          className={`emotion-toast-chrome-below relative z-[1] ${toastChromeRevealClass(
+            detached,
+            motionEnabled,
+            chromeRevealed,
+            'toastbar',
+          )}`}
+        >
+          <div className="min-h-0 overflow-hidden">
+            {showLightFeedback ? (
+              <div className="emotion-toast-light-feedback -mt-0.5">
+                <ToastLightFeedbackRow
+                  message={lightFeedbackMessage}
+                  disabled={regenerating}
+                  centered={compactMessageLayout}
+                />
+              </div>
+            ) : null}
+            <div aria-hidden className="h-1.5 w-full shrink-0" />
+            <div className="emotion-toast-toolbar -mt-1.5 overflow-hidden rounded-b-2xl">
               <div className={toastToolbarChromeClassName(detached)}>
                 <div className={toastToolbarIconsRowClassName}>
-            {regenInToolbar ? (
+            {spriteInteractionLockedOnly ? (
+              <div ref={toastUnlockHitRef} className="pointer-events-auto">
+                <EmotionToastToolbarIconButton
+                  title="解锁"
+                  ariaLabel="解锁形象"
+                  disabled={regenerating}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onSpriteInteractionLockedChange?.(false)
+                  }}
+                >
+                  <IconToolbarLockClosed className="h-[15px] w-[15px] shrink-0" />
+                </EmotionToastToolbarIconButton>
+              </div>
+            ) : null}
+            {!spriteInteractionLockedOnly && regenInToolbar ? (
               <EmotionToastToolbarIconButton
                 title={
                   maxChars != null
@@ -195,7 +238,7 @@ export function EmotionToastUnlockedToolbar({
                 <IconToolbarRefresh className="h-[15px] w-[15px] shrink-0" />
               </EmotionToastToolbarIconButton>
             ) : null}
-            {showCopy ? (
+            {!spriteInteractionLockedOnly && showCopy ? (
               <EmotionToastToolbarIconButton
                 title={copyDone ? '已复制' : '复制'}
                 ariaLabel={copyDone ? '已复制' : '复制'}
@@ -221,7 +264,7 @@ export function EmotionToastUnlockedToolbar({
                 <IconToolbarCopy className="h-[15px] w-[15px] shrink-0" />
               </EmotionToastToolbarIconButton>
             ) : null}
-            {showReplay ? (
+            {!spriteInteractionLockedOnly && showReplay ? (
               <EmotionToastToolbarIconButton
                 title="再听一遍"
                 ariaLabel="再听一遍"
@@ -234,7 +277,7 @@ export function EmotionToastUnlockedToolbar({
                 <IconToolbarSpeaker className="h-[15px] w-[15px] shrink-0" />
               </EmotionToastToolbarIconButton>
             ) : null}
-            {showFavorite ? (
+            {!spriteInteractionLockedOnly && showFavorite ? (
               <EmotionToastToolbarIconButton
                 title={favorite ? '点击取消收藏' : '收藏'}
                 ariaLabel={favorite ? '取消收藏' : '收藏'}
@@ -251,7 +294,7 @@ export function EmotionToastUnlockedToolbar({
                 )}
               </EmotionToastToolbarIconButton>
             ) : null}
-            {showEmotionFeedback ? (
+            {!spriteInteractionLockedOnly && showEmotionFeedback ? (
               <EmotionToastToolbarIconButton
                 title="情绪反馈"
                 ariaLabel="打开情绪反馈"
@@ -264,22 +307,20 @@ export function EmotionToastUnlockedToolbar({
                 <IconToolbarEmotion className="h-[15px] w-[15px] shrink-0" />
               </EmotionToastToolbarIconButton>
             ) : null}
-            {showLockControl ? (
+            {!spriteInteractionLockedOnly && showLockControl ? (
               <EmotionToastToolbarIconButton
                 title="锁定"
                 ariaLabel="锁定形象"
                 disabled={regenerating}
                 onClick={(event) => {
                   event.stopPropagation()
-                  setLockedToolbarHot(true)
-                  setLockedMsgHot(false)
                   onSpriteInteractionLockedChange?.(true)
                 }}
               >
                 <IconToolbarLockOpen className="h-[15px] w-[15px] shrink-0" />
               </EmotionToastToolbarIconButton>
             ) : null}
-            {showSkin ? (
+            {!spriteInteractionLockedOnly && showSkin ? (
               <EmotionToastToolbarIconButton
                 title="更换形象"
                 ariaLabel="打开更换形象"
@@ -292,7 +333,7 @@ export function EmotionToastUnlockedToolbar({
                 <IconToolbarSkin className="h-[15px] w-[15px] shrink-0" />
               </EmotionToastToolbarIconButton>
             ) : null}
-            {showSettings ? (
+            {!spriteInteractionLockedOnly && showSettings ? (
               <EmotionToastToolbarIconButton
                 title="设置"
                 ariaLabel="打开设置"
@@ -305,7 +346,7 @@ export function EmotionToastUnlockedToolbar({
                 <IconToolbarSettings className="h-[15px] w-[15px] shrink-0" />
               </EmotionToastToolbarIconButton>
             ) : null}
-            {showSpriteMenu ? (
+            {!spriteInteractionLockedOnly && showSpriteMenu ? (
               <EmotionToastToolbarIconButton
                 title="菜单"
                 ariaLabel="打开菜单"
@@ -321,22 +362,24 @@ export function EmotionToastUnlockedToolbar({
                 <IconToolbarMenu className="h-[15px] w-[15px] shrink-0" />
               </EmotionToastToolbarIconButton>
             ) : null}
-            <EmotionToastToolbarIconButton
-              title="关闭"
-              ariaLabel="关闭气泡"
-              disabled={regenerating}
-              onClick={(event) => {
-                event.stopPropagation()
-                onClose()
-              }}
-            >
-              <IconToolbarClose className="h-[15px] w-[15px] shrink-0" />
-            </EmotionToastToolbarIconButton>
+            {!spriteInteractionLockedOnly ? (
+              <EmotionToastToolbarIconButton
+                title="关闭"
+                ariaLabel="关闭气泡"
+                disabled={regenerating}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onClose()
+                }}
+              >
+                <IconToolbarClose className="h-[15px] w-[15px] shrink-0" />
+              </EmotionToastToolbarIconButton>
+            ) : null}
                 </div>
               </div>
             </div>
           </div>
-        </>
+        </div>
       ) : null}
     </div>
   )

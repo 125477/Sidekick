@@ -1,6 +1,6 @@
 /** 桌面级拖动星星拖尾（小窗 overlay + 屏幕坐标）。 */
 
-const MIN_SCREEN_PUSH_PX = 18
+const MIN_SCREEN_PUSH_PX = 10
 const WIDGET_FLUSH_MS = 48
 
 let lastPushScreenX = NaN
@@ -26,15 +26,21 @@ function scheduleScreenFlush() {
 }
 
 export function beginDesktopDragTrail(screenX: number, screenY: number): void {
-  lastPushScreenX = screenX
-  lastPushScreenY = screenY
+  lastPushScreenX = NaN
+  lastPushScreenY = NaN
   pendingScreenX = NaN
   pendingScreenY = NaN
   if (flushTimer != null) {
     window.clearTimeout(flushTimer)
     flushTimer = null
   }
-  void window.sidekickDesktop?.beginDragTrail?.({ screenX, screenY })
+  void (async () => {
+    try {
+      await window.sidekickDesktop?.beginDragTrail?.({ screenX, screenY })
+    } finally {
+      pushDesktopDragTrailPoint(screenX, screenY)
+    }
+  })()
 }
 
 export function pushDesktopDragTrailPoint(

@@ -78,7 +78,7 @@ export type BuildCompanionPromptInput = {
 
 const STYLE_GUIDE: Record<CompanionCopyStyle, string> = {
   治愈:
-    '格言或短诗气质：人生、时光、温柔、成长、陪伴；一句一个重心。可用自然或日常小物（风雨、路口、茶杯、灯火）承接情绪，禁止办公设备与电脑操作描写。',
+    '格言或短诗气质：人生、时光、温柔、成长、陪伴；一句一个重心。可用自然或日常小物承接情绪，但须让人感到被体谅或被托住，禁止纯宿命感叹（「再亮也照不亮…」）；禁止办公设备与电脑操作描写。',
   励志:
     '可多用「我」或无人称格言；聚焦态度与微小可能，禁止鸡血口号与抽象成功学；禁止写键盘、光标、加班赶场等办公套话，勿照抄常见鸡汤句。',
   搞笑: '仅当用户情绪为「开心」时启用；生活化自嘲或轻巧反差，禁止在焦虑/低落情绪下用幽默转移感受；禁止办公梗。',
@@ -176,6 +176,83 @@ export function companionTextHasMotivationalParallelTemplate(text: string): bool
 
 export function buildMotivationalParallelRetryUserSuffix(): string {
   return '【硬约束】禁止「有些…，…」「不是所有…但总有一些…」及常见鸡汤网句。改写成单分句许可或极短判断，句式与最近句明显不同，勿照抄示范句。'
+}
+
+/** 模型易写「再…也…不…」式宿命感叹：听似格言，却无接纳或托住感。 */
+export const COMPANION_BLEAK_MARKERS = [
+  '照不亮',
+  '照不进',
+  '暖不了',
+  '填不满',
+  '留不住',
+  '回不去',
+  '无能为力',
+  '所有黑',
+  '所有暗',
+  '救不了',
+  '醒不来',
+  '停不下来',
+] as const
+
+const COMFORT_SIGNALS = [
+  '可以',
+  '不妨',
+  '允许',
+  '没关系',
+  '慢慢来',
+  '陪着',
+  '留一盏',
+  '留灯',
+  '会好',
+  '值得',
+  '接纳',
+  '歇',
+  '休息',
+  '抱抱',
+  '还好',
+  '够用',
+  '仍有',
+  '依然',
+  '总会',
+  '还有',
+  '为你',
+  '陪你',
+  '托住',
+  '体谅',
+  '不妨',
+  '先',
+] as const
+
+const BLEAK_WITHOUT_COMFORT_BAN_LINE =
+  '【禁止宿命感叹】禁止「再…也…不/没法…」式无力格言（如「灯火再亮，也照不亮所有黑夜」）；若写夜/暗/难，须带接纳、许可或温柔指望，让人感到被托住。'
+
+export function companionTextHasBleakWithoutComfort(text: string): boolean {
+  const t = text.trim()
+  if (!t) return false
+  if (COMFORT_SIGNALS.some((s) => t.includes(s))) {
+    return false
+  }
+  if (COMPANION_BLEAK_MARKERS.some((m) => t.includes(m))) {
+    return true
+  }
+  if (/再[^，,。！？]{1,16}也(不|没|无法|不能|没法)/.test(t)) {
+    return true
+  }
+  if (/就算[^，,。！？]{1,20}也(不|没|无法|不能|没法)/.test(t)) {
+    return true
+  }
+  if (
+    /也(不|没|无法|不能|没法)[^，,。！？]{0,20}(黑|暗|痛|冷|空|尽头|意义|用)/.test(
+      t,
+    )
+  ) {
+    return true
+  }
+  return false
+}
+
+export function buildBleakWithoutComfortRetryUserSuffix(): string {
+  return '【硬约束】上一句像宿命感叹、只有无力感。请改写成让人被体谅或被托住的短句：允许慢下来、温柔许可或微小指望；禁止「再…也…不…」与「照不亮所有黑夜」式格言。'
 }
 
 export function companionTextHasPoeticTemplate(text: string): boolean {
@@ -339,7 +416,8 @@ export function buildCompanionSystemPrompt(input: BuildCompanionPromptInput): st
     DESKTOP_CLICHE_BAN_LINE,
     POETIC_TEMPLATE_BAN_LINE,
     MOTIVATIONAL_PARALLEL_BAN_LINE,
-    '【陪伴感底线】每句须让人感到被体谅或被托住：允许慢下来、肯定努力、温柔提议；禁止整句只有衰败感描写而无安抚。',
+    BLEAK_WITHOUT_COMFORT_BAN_LINE,
+    '【陪伴感底线】每句须让人感到被体谅或被托住：允许慢下来、肯定努力、温柔提议；禁止整句只有衰败/无力感而无接纳或指望。',
     `避免广告式文艺腔：不要叠用「${OVERUSED_ADVERBS}」；不要写「你…，我…」对称陪伴模板。`,
     '禁止输出编号、解释、引号、标题、前后缀。',
     '禁止医学建议、极端表述、负向暗示。',
@@ -409,6 +487,11 @@ function buildOpeningConstraint(recent: string[], seed: number): string {
     if (companionTextHasMotivationalParallelTemplate(last)) {
       rules.push(
         '上一句是「有些…，…」或「不是所有…但总有一些…」励志套句，本句须换完全不同的句式与起笔。',
+      )
+    }
+    if (companionTextHasBleakWithoutComfort(last)) {
+      rules.push(
+        '上一句是宿命感叹、缺少托住感；本句须写接纳、许可或温柔指望，禁止「再…也…不…」式无力格言。',
       )
     }
     const bannedOpeners = ['风起', '茶凉', '暮色', '雨落', '雪落', '窗', '有些']

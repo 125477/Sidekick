@@ -1,7 +1,7 @@
 export const EXPLICIT_UI_URL = process.env.SIDEKICK_UI_URL
 export const DEV_SERVER_URL_CANDIDATES = EXPLICIT_UI_URL
   ? [EXPLICIT_UI_URL]
-  : [5173, 5174, 5175, 5176, 5177, 5178].map((port) => `http://localhost:${port}`)
+  : [ 5174, 5175, 5176, 5177, 5178].map((port) => `http://localhost:${port}`)
 
 export const WIDGET_WINDOW_WIDTH = 360
 /** Initial height; renderer measures sprite layer and IPC-resizes to fit. */

@@ -254,12 +254,33 @@ export async function beginDragTrailSession(screenX, screenY) {
   clearDragTrailFlushTimer()
   state.dragTrailDragging = true
   state.dragTrailPendingPoints = []
-  const ok = await ensureDragTrailWindow(screenX, screenY)
-  if (ok) {
+  state.dragTrailFlushScheduled = false
+  state.dragTrailSessionStarting = true
+  state.dragTrailQueuedScreen = []
+  try {
+    const ok = await ensureDragTrailWindow(screenX, screenY)
+    if (!ok) {
+      state.dragTrailDragging = false
+      return false
+    }
     keepSpriteAboveDragTrail()
     sendToDragTrail('sidekick:drag-trail-reset')
+    const queued = state.dragTrailQueuedScreen
+    state.dragTrailQueuedScreen = []
+    for (const p of queued) {
+      pushDragTrailScreenPoint(p.screenX, p.screenY)
+    }
+    const sx = Number(screenX)
+    const sy = Number(screenY)
+    if (Number.isFinite(sx) && Number.isFinite(sy)) {
+      pushDragTrailScreenPoint(sx, sy)
+    }
+    flushPendingTrailPoints()
+    return true
+  } finally {
+    state.dragTrailSessionStarting = false
+    state.dragTrailQueuedScreen = []
   }
-  return ok
 }
 
 function flushPendingTrailPoints() {
@@ -280,6 +301,14 @@ function scheduleFlushTrailPoints() {
 
 export function pushDragTrailScreenPoint(screenX, screenY) {
   if (!Number.isFinite(screenX) || !Number.isFinite(screenY)) return
+  if (state.dragTrailSessionStarting) {
+    const q = state.dragTrailQueuedScreen
+    const last = q[q.length - 1]
+    if (last && last.screenX === screenX && last.screenY === screenY) return
+    q.push({ screenX, screenY })
+    if (q.length > 24) q.splice(0, q.length - 24)
+    return
+  }
   if (!state.dragTrailWindow || state.dragTrailWindow.isDestroyed()) {
     void ensureDragTrailWindow(screenX, screenY).then((ok) => {
       if (ok) pushDragTrailScreenPoint(screenX, screenY)
@@ -287,7 +316,16 @@ export function pushDragTrailScreenPoint(screenX, screenY) {
     return
   }
   maybeRepositionTrailWindow(screenX, screenY)
-  const origin = state.dragTrailOrigin
+  let origin = state.dragTrailOrigin
+  if (
+    !origin &&
+    state.dragTrailDragging &&
+    state.dragTrailWindow &&
+    !state.dragTrailWindow.isDestroyed()
+  ) {
+    positionTrailWindowAt(screenX, screenY)
+    origin = state.dragTrailOrigin
+  }
   if (!origin) return
   const localX = Math.round(screenX - origin.x)
   const localY = Math.round(screenY - origin.y)
@@ -304,6 +342,8 @@ export function pushDragTrailScreenPoint(screenX, screenY) {
 
 export function endDragTrailSession() {
   state.dragTrailDragging = false
+  state.dragTrailSessionStarting = false
+  state.dragTrailQueuedScreen = []
   state.dragTrailRepositionLocked = false
   flushPendingTrailPoints()
   sendToDragTrail('sidekick:drag-trail-reset-sampler')
@@ -314,6 +354,8 @@ export function destroyDragTrailWindow() {
   clearDragTrailHideTimer()
   clearDragTrailFlushTimer()
   state.dragTrailDragging = false
+  state.dragTrailSessionStarting = false
+  state.dragTrailQueuedScreen = []
   state.dragTrailRepositionLocked = false
   state.dragTrailPendingPoints = []
   if (state.dragTrailWindow && !state.dragTrailWindow.isDestroyed()) {

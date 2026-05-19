@@ -75,8 +75,9 @@ export function SpriteShell({
         if (Math.hypot(dx0, dy0) < POINTER_DRAG_THRESHOLD_PX) return
         st.passedThreshold = true
         onDragTrailStart?.(e.screenX, e.screenY)
+      } else {
+        onDragTrailPoint?.(e.screenX, e.screenY)
       }
-      onDragTrailPoint?.(e.screenX, e.screenY)
       const api = window.sidekickDesktop?.moveWidgetBy
       if (!api) return
       void api({ dx: e.movementX, dy: e.movementY })

@@ -65,6 +65,8 @@ export function resolveInitialBaseUrl() {
  *   dragTrailStarWidth: number
  *   dragTrailStarHeight: number
  *   dragTrailLastRepositionMs: number
+ *   dragTrailSessionStarting: boolean
+ *   dragTrailQueuedScreen: Array<{ screenX: number; screenY: number }>
  * }}
  */
 export const state = {
@@ -105,6 +107,8 @@ export const state = {
   dragTrailStarWidth: 144,
   dragTrailStarHeight: 144,
   dragTrailLastRepositionMs: 0,
+  dragTrailSessionStarting: false,
+  dragTrailQueuedScreen: [],
 }
 
 state.baseUrl = resolveInitialBaseUrl()
