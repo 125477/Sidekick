@@ -53,7 +53,7 @@ export function JimengTab({
       >
         生成
       </button>
-      <p className="rounded-lg bg-slate-50 p-2 text-xs text-slate-600">
+      <p className="rounded-lg border border-[color:var(--sk-callout-border)] p-2 text-xs text-[color:var(--sk-text-muted)]">
         {state === 'idle' && '待生成'}
         {state === 'loading' && '生成中...'}
         {state === 'success' && '生成成功，可应用当前预览'}

@@ -69,6 +69,7 @@ export function EmotionToastCard({
   showLightFeedback = false,
   toastMode = 'normal',
   onIntroDismiss,
+  onSimilar,
   chrome,
 }: EmotionToastCardProps) {
   const introMode = toastMode === 'intro'
@@ -194,6 +195,14 @@ export function EmotionToastCard({
                   : {})}
                 onClose={onClose}
                 runRegenerate={chrome.runRegenerate}
+                showSimilar={Boolean(onSimilar && !introMode)}
+                {...(onSimilar
+                  ? {
+                      runSimilar: async () => {
+                        await Promise.resolve(onSimilar())
+                      },
+                    }
+                  : {})}
               />
             </div>
           ) : (

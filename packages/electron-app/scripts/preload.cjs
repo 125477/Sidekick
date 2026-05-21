@@ -183,14 +183,27 @@ contextBridge.exposeInMainWorld('sidekickDesktop', {
     ipcRenderer.send('sidekick:toast-regenerate-request')
     return Promise.resolve()
   },
+  requestSimilarCopy() {
+    ipcRenderer.send('sidekick:toast-similar-request')
+    return Promise.resolve()
+  },
   onRegenerateCopyRequested(callback) {
     const channel = 'sidekick:regenerate-copy'
     const listener = () => callback()
     ipcRenderer.on(channel, listener)
     return () => ipcRenderer.removeListener(channel, listener)
   },
+  onSimilarCopyRequested(callback) {
+    const channel = 'sidekick:similar-copy'
+    const listener = () => callback()
+    ipcRenderer.on(channel, listener)
+    return () => ipcRenderer.removeListener(channel, listener)
+  },
   dashscopeChat(payload) {
     return ipcRenderer.invoke('sidekick:dashscope-chat', payload)
+  },
+  dashscopeAgent(payload) {
+    return ipcRenderer.invoke('sidekick:dashscope-agent', payload)
   },
   dashscopeTts(payload) {
     return ipcRenderer.invoke('sidekick:dashscope-tts', payload)

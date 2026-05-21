@@ -133,6 +133,18 @@ export async function loadSettings(): Promise<SidekickSettings> {
   if (typeof merged.launchAtLogin !== 'boolean') {
     merged.launchAtLogin = defaultSettings.launchAtLogin
   }
+  if (typeof merged.companionUseBailianAgent !== 'boolean') {
+    merged.companionUseBailianAgent = defaultSettings.companionUseBailianAgent
+  }
+  if (
+    merged.bailianAgentSessionId != null &&
+    typeof merged.bailianAgentSessionId !== 'string'
+  ) {
+    merged.bailianAgentSessionId = null
+  }
+  if (merged.bailianAgentSessionId === '') {
+    merged.bailianAgentSessionId = null
+  }
 
   return merged
 }

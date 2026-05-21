@@ -52,7 +52,7 @@ export function FavoriteTextsPanel({
         {rows.map((t) => (
           <li key={t.id} className="sk-favorite-row">
             <p className="whitespace-pre-wrap break-words">{t.content}</p>
-            <div className="mt-2 flex items-center justify-between gap-2 border-t border-[color:var(--sk-divider)] pt-2">
+            <div className="mt-2 flex items-center justify-between gap-2">
               <span className="sk-muted text-[10px] tabular-nums">
                 {new Date(t.createdAt).toLocaleString()}
               </span>

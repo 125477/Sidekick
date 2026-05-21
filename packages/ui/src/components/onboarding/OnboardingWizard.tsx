@@ -19,6 +19,7 @@ const STYLE_OPTIONS: CompanionCopyStyle[] = [
   '搞笑',
   '助眠',
   '职场解压',
+  '抽象',
 ]
 
 const INTEREST_PRESETS = COMPANION_INTEREST_TAG_OPTIONS
@@ -97,7 +98,7 @@ export function OnboardingWizard({
   }
 
   const skipButtonClass =
-    'rounded-lg border border-dashed border-slate-300 px-3 py-1.5 text-xs text-slate-600 hover:border-violet-300 hover:bg-violet-50/60 hover:text-violet-800 disabled:opacity-50'
+    'rounded-lg border border-dashed border-[color:var(--sk-chip-off-border)] bg-transparent px-3 py-1.5 text-xs text-[color:var(--sk-text-secondary)] hover:border-[color:var(--sk-accent-border)] hover:text-[color:var(--sk-accent-on-subtle)] disabled:opacity-50'
 
   const handleSkipDefaults = async () => {
     if (submitting) return
@@ -120,7 +121,7 @@ export function OnboardingWizard({
 
   return (
     <div className="grid h-full min-h-0 w-full grid-cols-[140px_1fr] gap-3 overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-lg sm:grid-cols-[160px_1fr] sm:gap-4 sm:p-4">
-      <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-xl bg-slate-50 p-1.5 sm:p-2">
+      <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-xl border border-[color:var(--sk-callout-border)] p-1.5 sm:p-2">
         <div className="min-h-0 flex-1">
           {STEPS.map((s, i) => (
             <button
@@ -137,7 +138,7 @@ export function OnboardingWizard({
         </div>
       </nav>
 
-      <div className="min-h-0 overflow-y-auto rounded-xl border border-slate-100 p-3 sm:p-4">
+      <div className="min-h-0 overflow-y-auto rounded-xl border border-[color:var(--sk-callout-border)] p-3 sm:p-4">
         {step === 'avatar' && (
           <div className="grid gap-3 text-sm">
             <p className="font-medium text-slate-800">选择陪伴形象</p>
@@ -207,7 +208,7 @@ export function OnboardingWizard({
             <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
               <button
                 type="button"
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+                className="sk-emotion-chip-outline-btn px-3 py-1.5 text-xs"
                 onClick={goPrev}
               >
                 上一步
@@ -246,10 +247,8 @@ export function OnboardingWizard({
                   key={t}
                   type="button"
                   onClick={() => toggleTag(t)}
-                  className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
-                    tags.has(t)
-                      ? 'border-violet-400 bg-violet-50 text-violet-800'
-                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  className={`sk-chip px-2.5 py-1 text-xs transition-colors ${
+                    tags.has(t) ? 'sk-chip-active' : ''
                   }`}
                 >
                   {t}
@@ -271,7 +270,7 @@ export function OnboardingWizard({
             <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
               <button
                 type="button"
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+                className="sk-emotion-chip-outline-btn px-3 py-1.5 text-xs"
                 onClick={goPrev}
               >
                 上一步
@@ -325,7 +324,7 @@ export function OnboardingWizard({
             <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
               <button
                 type="button"
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+                className="sk-emotion-chip-outline-btn px-3 py-1.5 text-xs"
                 onClick={goPrev}
               >
                 上一步

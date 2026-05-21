@@ -67,7 +67,7 @@
   --sk-input-placeholder: rgb(148 163 184);
 
   --sk-segmented-bg: rgb(241 245 249);
-  --sk-segmented-active-bg: rgb(255 255 255);
+  --sk-segmented-active-bg: rgb(245 243 255);
 
   --sk-callout-border: rgb(221 214 254);
   --sk-callout-bg: rgb(245 243 255 / 0.72);
@@ -120,6 +120,8 @@
   --sk-space-tab-gap: 1rem;
   --sk-space-card-inner: 0.75rem;
   --sk-space-card-inner-titled: 0.625rem;
+  /** 情绪页：说明 / 小标题 / chip 等同级区块的垂直间距 */
+  --sk-emotion-section-gap: 1.25rem;
 }
 
 html[data-theme='dark'] {
@@ -181,7 +183,7 @@ html[data-theme='dark'] {
   --sk-input-placeholder: rgb(113 113 122);
 
   --sk-segmented-bg: rgb(24 24 27);
-  --sk-segmented-active-bg: rgb(39 39 42);
+  --sk-segmented-active-bg: rgb(91 33 182 / 0.28);
 
   --sk-callout-border: rgb(139 92 246 / 0.3);
   --sk-callout-bg: rgb(91 33 182 / 0.16);

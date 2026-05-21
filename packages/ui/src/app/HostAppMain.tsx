@@ -22,6 +22,7 @@ export type HostAppMainProps = {
   setSpriteMenuSurface: Dispatch<SetStateAction<'sprite' | 'toast-bubble'>>
   setSpriteShellHovered: (v: boolean) => void
   requestCompanionText: (keyword?: string) => Promise<void>
+  requestCompanionSimilar: () => Promise<void>
   dispatch: Dispatch<UiAction>
   handleMenuAction: (action: MenuAction) => void
   toastAnchorReplayNonce: number
@@ -56,6 +57,7 @@ export function HostAppMain({
   setSpriteMenuSurface,
   setSpriteShellHovered,
   requestCompanionText,
+  requestCompanionSimilar,
   dispatch,
   handleMenuAction,
   toastAnchorReplayNonce,
@@ -132,6 +134,7 @@ export function HostAppMain({
                   message={uiState.toastMessage}
                   maxChars={settings.textMaxChars}
                   onRegenerate={() => requestCompanionText('换一句')}
+                  onSimilar={() => requestCompanionSimilar()}
                   showLightFeedback
                   onClose={hideEmotionToast}
                   linkedTextId={toastMeta?.id ?? null}

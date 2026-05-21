@@ -11,9 +11,11 @@ type MoodSummaryMediaPickerProps = {
   onChange: (next: MoodMediaAttachment[]) => void
   disabled?: boolean
   onError?: (message: string) => void
+  /** 嵌入写作区底部：紧凑标签、透明底 */
+  embedded?: boolean
 }
 
-/** 预览与「+」统一宽度（约为早期尺寸的 2 倍）。 */
+/** 预览与「+」统一宽度。 */
 const MOOD_MEDIA_TILE =
   'relative min-w-0 w-[9.5rem] shrink-0 sm:w-[10.5rem]'
 
@@ -32,7 +34,7 @@ function MoodMediaDeleteButton({
       disabled={disabled}
       aria-label={`删除${label}`}
       title="删除"
-      className="absolute right-1 top-1 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--sk-card-border)] bg-[color:var(--sk-content-surface)] text-rose-500 shadow-md opacity-0 pointer-events-none transition-opacity duration-150 motion-reduce:transition-none group-hover/moodmedia:pointer-events-auto group-hover/moodmedia:opacity-100 group-focus-within/moodmedia:pointer-events-auto group-focus-within/moodmedia:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-rose-500 hover:bg-rose-500/10 disabled:opacity-50 [-webkit-app-region:no-drag]"
+      className="absolute right-1 top-1 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--sk-callout-border)] bg-[color:var(--sk-content-surface)] text-rose-500 shadow-md opacity-0 pointer-events-none transition-opacity duration-150 motion-reduce:transition-none group-hover/moodmedia:pointer-events-auto group-hover/moodmedia:opacity-100 group-focus-within/moodmedia:pointer-events-auto group-focus-within/moodmedia:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-rose-500 hover:bg-rose-500/10 disabled:opacity-50 [-webkit-app-region:no-drag]"
       onClick={(event) => {
         event.stopPropagation()
         onClick()
@@ -67,8 +69,8 @@ function MoodMediaPreviewTile({
   const a11yLabel = att.type === 'video' ? '视频' : '图片'
   return (
     <li className={`group/moodmedia ${MOOD_MEDIA_TILE}`}>
-      <div className="overflow-hidden rounded-xl border border-[color:var(--sk-card-border)] p-1 sm:p-1.5">
-        <div className="relative flex aspect-square w-full min-h-0 min-w-0 items-center justify-center overflow-hidden rounded-lg bg-[color:var(--sk-card-bg)]">
+      <div className="overflow-hidden rounded-xl border border-[color:var(--sk-callout-border)] p-1 sm:p-1.5">
+        <div className="relative flex aspect-square w-full min-h-0 min-w-0 items-center justify-center overflow-hidden rounded-lg bg-[color:var(--sk-content-surface)]">
           {att.type === 'video' ? (
             <video
               src={att.dataUrl}
@@ -102,6 +104,7 @@ export function MoodSummaryMediaPicker({
   onChange,
   disabled = false,
   onError,
+  embedded = false,
 }: MoodSummaryMediaPickerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const canAdd = canAddMoodAttachments(attachments, 1)
@@ -134,7 +137,7 @@ export function MoodSummaryMediaPicker({
 
   return (
     <div className="grid gap-2">
-      <span className="sk-label">图片与视频</span>
+      <span className={embedded ? 'sk-emotion-heading' : 'sk-label'}>图片/视频</span>
       <input
         ref={fileInputRef}
         type="file"
@@ -164,9 +167,9 @@ export function MoodSummaryMediaPicker({
               aria-label="添加图片或视频"
               title="添加图片或视频"
               onClick={() => fileInputRef.current?.click()}
-              className="block w-full overflow-hidden rounded-xl border border-[color:var(--sk-chip-off-border)] p-1 transition-[border-color,background-color] hover:border-[color:var(--sk-chip-on-border)] hover:bg-[color:var(--sk-accent-subtle-bg)] disabled:opacity-50 sm:p-1.5 [-webkit-app-region:no-drag]"
+              className="block w-full cursor-pointer overflow-hidden rounded-xl border border-dashed border-[color:var(--sk-chip-off-border)] p-1 transition-[border-color,background-color] duration-200 hover:border-[color:var(--sk-chip-on-border)] hover:bg-[color:var(--sk-accent-subtle-bg)] disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none sm:p-1.5 [-webkit-app-region:no-drag]"
             >
-              <span className="flex aspect-square w-full items-center justify-center rounded-lg bg-[color:var(--sk-card-bg)] text-4xl font-medium leading-none text-[color:var(--sk-accent-on-subtle)] transition-colors">
+              <span className="flex aspect-square w-full items-center justify-center rounded-lg bg-[color:var(--sk-content-surface)] text-4xl font-medium leading-none text-[color:var(--sk-accent-on-subtle)] transition-colors">
                 +
               </span>
             </button>

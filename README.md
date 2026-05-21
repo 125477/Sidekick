@@ -1,6 +1,8 @@
 # 灵伴（Sidekick）
 
-在桌面角落陪你的小精灵：**陪伴短句**、**情绪气泡**、**换肤与形象**、**每日抽签**与**收藏历史**，同一套 UI 既跑在 **Electron 挂件**里，也能在浏览器里调试。
+**在桌面养一个会说话的小精灵** ✨ —— 透明挂件贴在屏幕一角，不催你变高效，只在合适的时候轻轻说上一句人话。
+
+陪伴短句由**智能体**按语气、兴趣、情绪与反馈生成（可**换一句** / **类似这句**、收藏、朗读）；情绪与日记**只存本机**；今日小结带**引导 / 润色 / 保存收束**；解锁、专注结束等时刻可情境问候。另有换肤、抽签、收藏与勿扰专注。同一套 UI 跑在 **Electron 挂件**里，也可浏览器调试。
 
 ## 预览
 
@@ -11,18 +13,20 @@
 桌面角落精灵；陪伴短句可重新生成、收藏与朗读，悬停可展开工具栏。
 
 ![桌面挂件与陪伴气泡](docs/images/readme/widget-toast.png)
-
-### 精灵菜单
-
-右键菜单进入换肤、情绪、收藏、抽签与设置等能力。
-
-![精灵菜单](docs/images/readme/sprite-menu.png)
-
+    
 ### 更换形象
 
 内置多套 Lottie / 图片形象，支持上传 JPG、PNG、WebP、GIF、MP4。
 
 ![更换形象](docs/images/readme/skin-panel.png)
+
+
+### 精灵菜单
+
+点击精灵打开换肤、情绪、收藏、抽签与设置等能力。
+
+![精灵菜单](docs/images/readme/sprite-menu.png)
+
 
 ### 情绪反馈
 
@@ -84,8 +88,8 @@ macOS、Windows 安装包见 **[最新版本](https://github.com/125477/Sidekick
 |------|------|
 | **形态** | 桌面透明挂件 + 可选**独立气泡窗** + 设置/换肤等**独立辅窗**；同一 `packages/ui` 通过 URL `mode` 切换壳层。 |
 | **形象** | 内置 Lottie / GIF / 视频等预设；可扩展上传与「即梦」等生成流（以当前面板为准）。 |
-| **陪伴** | 定时或手动推送短句；气泡内支持**重新生成**、复制、收藏、**TTS 朗读**与快捷入口。 |
-| **数据** | 本地优先存储；多窗通过 `broadcastSettingsSync` 等保持设置与形象列表一致。 |
+| **陪伴** | 百炼 / 通义**陪伴智能体**写 10–32 字短句；定时、情绪、换一句、**类似这句**；轻反馈**越点越像你**；情境：昨日续接、解锁、专注结束、小结收束、连续记录、兴趣问句（均限频）。 |
+| **数据** | 本地优先存储，情绪/日记不上传；多窗 `broadcastSettingsSync` 同步设置与形象。 |
 | **工程** | **pnpm workspace** + **Turbo**；`core` 与 UI 解耦，便于单测与复用（含可选 **MV3 扩展**包）。 |
 
 ---
@@ -101,10 +105,14 @@ macOS、Windows 安装包见 **[最新版本](https://github.com/125477/Sidekick
 
 ### 内容与玩法
 
-- **陪伴文案**：与 `@sidekick/core` 中的用例与提示词配合，可接 DashScope 等模型；支持字数上限、推送间隔、是否常驻气泡等设置项（以设置面板为准）。
-- **情绪**：快捷反馈与趋势图（Chart.js）。
-- **每日抽签**：独立面板玩法。
-- **收藏与历史**：文案收藏、历史列表与面板内管理。
+- **陪伴智能体**（`VITE_BAILIAN_APP_ID` + `VITE_DASHSCOPE_API_KEY`，可回退 chat）：
+  - 气泡短句：定时推送、手动换一句、**类似这句**、情绪反馈后生成。
+  - **情境一句**（遵守推送开关 / 勿扰 / 专注 / 时段）：昨日情绪续接、解锁屏幕、专注结束、保存今日小结后的**收束**、连续写日记里程碑、每日兴趣深化问句（1–2 次）。
+  - **轻反馈**：喜欢 / 一般 / 少推 → 归纳偏好，后续生成优先顺应。
+- **今日小结**（独立智能体可选）：写日记 **3 条引导问**、正文**润色**；保存后陪伴 Agent 生成一句收束（见 `docs/BAILIAN_MOOD_JOURNAL_AGENTS.md`）。
+- **情绪**：「此刻」快捷反馈 + 「今日小结」+ 本地趋势图（Chart.js）；数据不出本机。
+- **每日抽签**：独立面板小仪式。
+- **收藏与历史**：陪伴句收藏、历史列表。
 
 ### 浏览器与扩展
 
@@ -241,6 +249,10 @@ pnpm pack:desktop:win   # 需在 Windows 上执行
 | [docs/IPC.md](./docs/IPC.md) | `window.sidekickDesktop` 与 IPC channel。 |
 | [docs/DECISIONS.md](./docs/DECISIONS.md) | 架构决策（ADR）与 FEATURE_PLAN 差异说明。 |
 | [CHANGELOG.md](./CHANGELOG.md) | 实现变更日志。 |
+| [docs/PROMO.md](./docs/PROMO.md) | 对外推广文案（短版 / 长版）。 |
+| [docs/BAILIAN_AGENT_PROMPT.md](./docs/BAILIAN_AGENT_PROMPT.md) | 陪伴百炼系统提示词（全选复制）。 |
+| [docs/BAILIAN_COMPANION_AGENT.md](./docs/BAILIAN_COMPANION_AGENT.md) | 陪伴 Agent 接入与变量说明。 |
+| [docs/BAILIAN_MOOD_JOURNAL_AGENTS.md](./docs/BAILIAN_MOOD_JOURNAL_AGENTS.md) | 今日小结引导 / 润色智能体。 |
 | `.cursor/rules/sidekick-project.mdc` | 包边界、常用命令（若仓库内存在）。 |
 
 ---

@@ -16,6 +16,7 @@ import { broadcastSettingsSync } from '../state/settingsSync'
 import type { UiAction, UiState } from '../state/uiState'
 import { saveSettings } from '../state/settingsStorage'
 import { APP_SELF_INTRO_LONG_COPY } from '../constants/appSelfIntroCopy'
+import type { FetchCompanionCopyOptions } from './companionCopy'
 
 export type AppPanelContentProps = {
   uiState: UiState
@@ -38,6 +39,9 @@ export type AppPanelContentProps = {
     keyword?: string,
     emotion?: EmotionKind,
   ) => Promise<void>
+  pushProactiveCompanion?: (
+    fetchOptions: FetchCompanionCopyOptions,
+  ) => Promise<string | null>
   showToastMessage: (
     message: string,
     opts?: {
@@ -70,6 +74,7 @@ export function AppPanelContent({
   emotionRecords,
   setEmotionRecords,
   requestCompanionText,
+  pushProactiveCompanion,
   showToastMessage,
   restartOnboarding,
   isPanelMode,
@@ -177,7 +182,10 @@ export function AppPanelContent({
       </div>
     </div>
   ) : uiState.activePanel === 'emotion' ? (
-    <div className={`${panelShellClass} [&_.sk-panel-chrome-title]:mb-2`}>
+    <div
+      className={`${panelShellClass} sk-emotion-page-shell [&_.sk-panel-chrome-title]:mb-1`}
+      data-sk-emotion-panel="on"
+    >
       <h2 className="sk-panel-chrome-title shrink-0">{panelTitle}</h2>
       <div className="flex min-h-0 flex-1 flex-col">
         <DailyMoodPanel
@@ -189,6 +197,9 @@ export function AppPanelContent({
           emotionRecords={emotionRecords}
           setEmotionRecords={setEmotionRecords}
           requestCompanionText={requestCompanionText}
+          {...(pushProactiveCompanion
+            ? { pushProactiveCompanion }
+            : {})}
         />
       </div>
     </div>

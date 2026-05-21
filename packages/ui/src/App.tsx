@@ -30,6 +30,7 @@ import { useAppMenuMachine } from './app/useAppMenuMachine'
 import { useCompanionActions } from './app/useCompanionActions'
 import { useAppSelfIntroBubble } from './app/useAppSelfIntroBubble'
 import { useYesterdayEmotionGreeting } from './app/useYesterdayEmotionGreeting'
+import { useCompanionRituals } from './app/useCompanionRituals'
 import { PanelBackgroundLayer } from './components/panel/PanelBackgroundLayer'
 import { readAppSearchParams } from './app/readAppSearchParams'
 import { AppPanelContent } from './app/AppPanelContent'
@@ -315,6 +316,8 @@ function App() {
     handleMenuAction,
     completeOnboarding,
     requestCompanionText,
+    requestCompanionSimilar,
+    pushProactiveCompanion,
   } = useCompanionActions({
     isWidgetMode,
     isPanelMode,
@@ -340,6 +343,22 @@ function App() {
     setSelectedAvatarId,
     setSettings,
     handleMenuActionRef,
+    blockScheduledPushRef,
+  })
+
+  useCompanionRituals({
+    isWidgetMode,
+    settingsReady,
+    settings,
+    settingsRef,
+    emotionRecords,
+    onboardingDone,
+    blockScheduledPushRef,
+    recentCompanionLinesRef,
+    widgetMeasureRef,
+    showToastMessage,
+    setToastMeta,
+    setSpriteState,
   })
 
   useAppSelfIntroBubble({
@@ -413,6 +432,7 @@ function App() {
       emotionRecords={emotionRecords}
       setEmotionRecords={setEmotionRecords}
       requestCompanionText={requestCompanionText}
+      pushProactiveCompanion={pushProactiveCompanion}
       showToastMessage={showToastMessage}
       restartOnboarding={restartOnboarding}
       isPanelMode={isPanelMode}
@@ -444,6 +464,7 @@ function App() {
       setSpriteMenuSurface={setSpriteMenuSurface}
       setSpriteShellHovered={setSpriteShellHovered}
       requestCompanionText={requestCompanionText}
+      requestCompanionSimilar={requestCompanionSimilar}
       dispatch={dispatch}
       handleMenuAction={handleMenuAction}
       toastAnchorReplayNonce={toastAnchorReplayNonce}
@@ -616,6 +637,7 @@ function App() {
       setSpriteMenuSurface={setSpriteMenuSurface}
       setSpriteShellHovered={setSpriteShellHovered}
       requestCompanionText={requestCompanionText}
+      requestCompanionSimilar={requestCompanionSimilar}
       dispatch={dispatch}
       handleMenuAction={handleMenuAction}
       toastAnchorReplayNonce={toastAnchorReplayNonce}

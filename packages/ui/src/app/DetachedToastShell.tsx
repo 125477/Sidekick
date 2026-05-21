@@ -116,6 +116,9 @@ export function DetachedToastShell({
                     onRegenerate: () => {
                       void window.sidekickDesktop?.requestRegenerateCopy?.()
                     },
+                    onSimilar: () => {
+                      void window.sidekickDesktop?.requestSimilarCopy?.()
+                    },
                     keepRegenerateLoadingUntilUnmount: true,
                     messageRegeneratesOnClick: true,
                   })}

@@ -21,7 +21,12 @@ import {
 import { reportSpriteAnchorToMain } from '../utils/reportSpriteAnchor'
 import { SIDEKICK_MORE_FEATURES_PLACEHOLDER } from '../constants/toastCopy'
 import { openEmotionPanel } from './openEmotionPanel'
-import { fetchCompanionCopy } from './companionCopy'
+import {
+  fetchCompanionCopy,
+  persistBailianAgentSessionId,
+  type FetchCompanionCopyOptions,
+} from './companionCopy'
+import { pushProactiveCompanionCopy } from './companionProactivePush'
 import { RECENT_COMPANION_LINES_MAX } from './recentCompanionLines'
 import {
   shouldApplyCompanionCopyResult,
@@ -55,6 +60,7 @@ export type UseCompanionActionsArgs = {
   setSelectedAvatarId: Dispatch<SetStateAction<string>>
   setSettings: Dispatch<SetStateAction<SidekickSettings>>
   handleMenuActionRef: MutableRefObject<(action: MenuAction) => void>
+  blockScheduledPushRef?: MutableRefObject<boolean>
 }
 
 export function useCompanionActions({
@@ -82,6 +88,7 @@ export function useCompanionActions({
   setSelectedAvatarId,
   setSettings,
   handleMenuActionRef,
+  blockScheduledPushRef,
 }: UseCompanionActionsArgs) {
   const showToastMessage = async (
     message: string,
@@ -318,15 +325,30 @@ export function useCompanionActions({
     ],
   )
 
-  async function requestCompanionText(keyword?: string, emotion?: EmotionKind) {
+  async function requestCompanionText(
+    keyword?: string,
+    emotion?: EmotionKind,
+    fetchOptions?: FetchCompanionCopyOptions,
+  ) {
     const fetchId = startCompanionCopyRequest()
     const avoid = recentCompanionLinesRef.current
+    const trigger =
+      fetchOptions?.trigger ??
+      (emotion
+        ? ('emotion' as const)
+        : keyword?.trim() === '换一句'
+          ? ('regenerate' as const)
+          : keyword?.trim() === '类似这句'
+            ? ('similar' as const)
+            : ('manual' as const))
     const result = await fetchCompanionCopy(
       settingsRef.current,
       keyword,
       emotion,
       avoid.length > 0 ? avoid : undefined,
+      { trigger, ...fetchOptions },
     )
+    await persistBailianAgentSessionId(settingsRef, result.sessionId)
     if (!shouldApplyCompanionCopyResult(fetchId, result.source)) return
 
     const next = await appendText({
@@ -359,13 +381,55 @@ export function useCompanionActions({
     window.setTimeout(() => setSpriteState('idle'), 520)
   }
 
+  async function requestCompanionSimilar(similarToLine?: string) {
+    const line = (similarToLine ?? uiState.toastMessage).replace(/\s+/g, ' ').trim()
+    if (!line || line === SIDEKICK_MORE_FEATURES_PLACEHOLDER) return
+    await requestCompanionText('类似这句', undefined, {
+      trigger: 'similar',
+      similarToLine: line,
+    })
+  }
+
+  async function pushProactiveCompanion(fetchOptions: FetchCompanionCopyOptions) {
+    const autoTriggers = new Set([
+      'scheduled',
+      'yesterday-greeting',
+      'unlock',
+      'focus-end',
+      'streak-nudge',
+      'interest-deepen',
+    ])
+    const requireAutoPushGate = autoTriggers.has(
+      fetchOptions.trigger ?? 'manual',
+    )
+    return pushProactiveCompanionCopy({
+      settingsRef,
+      recentCompanionLinesRef,
+      ...(blockScheduledPushRef ? { blockScheduledPushRef } : {}),
+      showToastMessage,
+      setToastMeta,
+      setSpriteState,
+      widgetMeasureRef,
+      isWidgetMode,
+      fetchOptions,
+      requireAutoPushGate,
+    })
+  }
+
   requestCompanionTextRef.current = requestCompanionText
 
   useEffect(() => {
     if (!isWidgetMode) return
-    return window.sidekickDesktop?.onRegenerateCopyRequested?.(() => {
+    const unRegen = window.sidekickDesktop?.onRegenerateCopyRequested?.(() => {
       void requestCompanionTextRef.current?.('换一句')
     })
+    const unSimilar = window.sidekickDesktop?.onSimilarCopyRequested?.(() => {
+      void requestCompanionSimilar()
+    })
+    return () => {
+      unRegen?.()
+      unSimilar?.()
+    }
   }, [isWidgetMode, requestCompanionTextRef])
 
   return {
@@ -375,5 +439,7 @@ export function useCompanionActions({
     handleMenuAction,
     completeOnboarding,
     requestCompanionText,
+    requestCompanionSimilar,
+    pushProactiveCompanion,
   }
 }

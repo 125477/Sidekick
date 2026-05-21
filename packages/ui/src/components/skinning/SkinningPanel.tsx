@@ -27,7 +27,7 @@ export function SkinningPanel({
   return (
     <section>
       <div
-        className="mb-4 inline-flex rounded-xl bg-slate-100 p-1"
+        className="sk-segmented mb-4"
         role="tablist"
         onKeyDown={onKeyDown}
       >
@@ -35,7 +35,7 @@ export function SkinningPanel({
           type="button"
           role="tab"
           aria-selected={activeTab === 'jimeng'}
-          className={`cursor-pointer rounded-lg px-4 py-2 text-sm ${activeTab === 'jimeng' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}
+          className={`sk-segmented-btn cursor-pointer px-4 py-2 text-sm ${activeTab === 'jimeng' ? 'sk-segmented-btn-active' : ''}`}
           onClick={() => onTabChange('jimeng')}
         >
           AI生成
@@ -44,7 +44,7 @@ export function SkinningPanel({
           type="button"
           role="tab"
           aria-selected={activeTab === 'upload'}
-          className={`cursor-pointer rounded-lg px-4 py-2 text-sm ${activeTab === 'upload' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}
+          className={`sk-segmented-btn cursor-pointer px-4 py-2 text-sm ${activeTab === 'upload' ? 'sk-segmented-btn-active' : ''}`}
           onClick={() => onTabChange('upload')}
         >
           上传形象

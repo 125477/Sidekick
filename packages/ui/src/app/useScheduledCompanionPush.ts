@@ -1,7 +1,11 @@
 import type { MutableRefObject, Dispatch, SetStateAction } from 'react'
 import { useEffect, useRef } from 'react'
 import { appendText } from '@sidekick/core'
-import { fetchCompanionCopy, canPushNow } from './companionCopy'
+import {
+  fetchCompanionCopy,
+  canPushNow,
+  persistBailianAgentSessionId,
+} from './companionCopy'
 import { RECENT_COMPANION_LINES_MAX } from './recentCompanionLines'
 import {
   shouldApplyCompanionCopyResult,
@@ -90,7 +94,9 @@ export function useScheduledCompanionPush({
           undefined,
           undefined,
           avoidPush.length > 0 ? avoidPush : undefined,
+          { trigger: 'scheduled' },
         )
+        await persistBailianAgentSessionId(settingsRef, result.sessionId)
         if (!shouldApplyCompanionCopyResult(fetchId, result.source)) return
         const next = await appendText({
           id: `text-${Date.now()}`,

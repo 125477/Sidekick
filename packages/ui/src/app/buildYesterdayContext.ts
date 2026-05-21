@@ -44,6 +44,20 @@ export async function buildYesterdayContext(
   }
 }
 
+/** 百炼 `user_prompt_params.yesterday_context` 用的一行摘要。 */
+export function formatYesterdayContextForAgent(ctx: YesterdayContext): string {
+  const parts: string[] = []
+  if (ctx.moodLabel) {
+    parts.push(`昨日心情「${ctx.moodLabel}」`)
+  } else if (ctx.dominantEmotion) {
+    parts.push(`昨日情绪反馈「${ctx.dominantEmotion}」`)
+  }
+  if (ctx.notePreview) {
+    parts.push(`日记摘录：${ctx.notePreview}`)
+  }
+  return parts.length > 0 ? parts.join('；') : '无昨日记录'
+}
+
 export function buildYesterdayGreetingText(ctx: YesterdayContext): string {
   const parts: string[] = []
   if (ctx.moodLabel) {

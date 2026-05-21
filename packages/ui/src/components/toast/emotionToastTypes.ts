@@ -12,6 +12,7 @@ export type EmotionToastProps = {
   zIndexClass?: string
   dwellSeconds?: number
   onRegenerate?: () => void | Promise<void>
+  onSimilar?: () => void | Promise<void>
   keepRegenerateLoadingUntilUnmount?: boolean
   maxChars?: number
   onClose: () => void

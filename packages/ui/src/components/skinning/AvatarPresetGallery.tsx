@@ -49,9 +49,9 @@ export function AvatarPresetGallery({
                 <button
                   type="button"
                   onClick={() => onSelect(avatar.id)}
-                  className={`min-w-0 w-full overflow-hidden rounded-xl border p-0.5 text-left sm:p-1 ${selectedAvatarId === avatar.id ? 'border-[color:var(--sk-accent-border-strong)] ring-2 ring-[color:var(--sk-accent-border)]' : 'border-[color:var(--sk-card-border)]'}`}
+                  className={`min-w-0 w-full overflow-hidden rounded-xl border p-0.5 text-left sm:p-1 ${selectedAvatarId === avatar.id ? 'border-[color:var(--sk-accent-border-strong)] ring-2 ring-[color:var(--sk-accent-border)]' : 'border-[color:var(--sk-callout-border)]'}`}
                 >
-                  <div className="relative flex aspect-square w-full min-h-0 min-w-0 items-center justify-center overflow-hidden rounded-lg bg-[color:var(--sk-card-bg)]">
+                  <div className="relative flex aspect-square w-full min-h-0 min-w-0 items-center justify-center overflow-hidden rounded-lg bg-transparent">
                     {isVideoAvatarSrc(avatar.src) ? (
                       <video
                         key={avatar.src}
@@ -91,7 +91,7 @@ export function AvatarPresetGallery({
                     type="button"
                     aria-label={`删除${displayName}`}
                     title="删除"
-                    className="absolute right-0.5 top-0.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-[color:var(--sk-card-border)] bg-[color:var(--sk-content-surface)] text-rose-500 shadow-md opacity-0 pointer-events-none transition-opacity duration-150 motion-reduce:transition-none group-hover/preset:pointer-events-auto group-hover/preset:opacity-100 group-focus-within/preset:pointer-events-auto group-focus-within/preset:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-rose-500 hover:bg-rose-500/10 [-webkit-app-region:no-drag]"
+                    className="absolute right-0.5 top-0.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-[color:var(--sk-callout-border)] bg-[color:var(--sk-content-surface)] text-rose-500 shadow-md opacity-0 pointer-events-none transition-opacity duration-150 motion-reduce:transition-none group-hover/preset:pointer-events-auto group-hover/preset:opacity-100 group-focus-within/preset:pointer-events-auto group-focus-within/preset:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-rose-500 hover:bg-rose-500/10 [-webkit-app-region:no-drag]"
                     onClick={(event) => {
                       event.stopPropagation()
                       onRemovePreset?.(avatar.id)

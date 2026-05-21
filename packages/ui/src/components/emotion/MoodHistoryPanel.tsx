@@ -151,7 +151,7 @@ function MoodHistoryDetail({
               {attachments.map((att) => (
                 <li
                   key={att.id}
-                  className="overflow-hidden rounded-lg border border-[color:var(--sk-card-border)] bg-[color:var(--sk-card-bg)]"
+                  className="overflow-hidden rounded-lg border border-[color:var(--sk-callout-border)]"
                 >
                   {att.type === 'video' ? (
                     <video

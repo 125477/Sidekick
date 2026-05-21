@@ -11,7 +11,7 @@ import {
 } from './emotionChips'
 
 export function EmotionQuickFeedback({ onSelect }: EmotionQuickFeedbackProps) {
-  const [selected, setSelected] = useState<string | null>(null)
+  const [selected, setSelected] = useState<string>('开心')
   const [busy, setBusy] = useState(false)
   const [hint, setHint] = useState<string | null>(null)
   const hintTimerRef = useRef<number | null>(null)
@@ -41,7 +41,7 @@ export function EmotionQuickFeedback({ onSelect }: EmotionQuickFeedbackProps) {
         hintTimerRef.current = null
       }, 4500)
     } catch {
-      setSelected(null)
+      setSelected('开心')
       setHint('记录失败，请稍后再试。')
       hintTimerRef.current = window.setTimeout(() => {
         setHint(null)
@@ -53,9 +53,9 @@ export function EmotionQuickFeedback({ onSelect }: EmotionQuickFeedbackProps) {
   }
 
   return (
-    <section className="relative rounded-xl">
-      <h3 className="mb-1 text-sm font-medium leading-snug text-[color:var(--sk-text-body)]">现在的情绪是？</h3>
-      <div className="flex flex-wrap gap-1.5">
+    <section className="sk-emotion-intro-stack">
+      <h3 className="sk-emotion-heading">现在的情绪是？</h3>
+      <div className="flex flex-wrap gap-2">
         {EMOTION_CHIP_LABELS.map((emotion) => {
           const active = selected === emotion
           return (
@@ -71,25 +71,29 @@ export function EmotionQuickFeedback({ onSelect }: EmotionQuickFeedbackProps) {
           )
         })}
       </div>
-      <div
-        className={`mt-1 flex items-start ${busy ? 'min-h-5' : ''}`}
-        aria-live="polite"
-        aria-busy={busy}
-      >
-        {busy ? (
-          <div className="flex items-center gap-2">
-            <div
-              className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-violet-500 border-t-transparent motion-reduce:animate-none motion-reduce:border-t-violet-500"
-              aria-hidden
-            />
-            <span className="text-xs font-medium text-[color:var(--sk-accent-on-subtle)]">正在记录情绪…</span>
-          </div>
-        ) : hint ? (
-          <p className="sk-muted text-xs leading-relaxed" role="status">
-            {hint}
-          </p>
-        ) : null}
-      </div>
+      {busy || hint ? (
+        <div
+          className={`flex items-start ${busy ? 'min-h-5' : ''}`}
+          aria-live="polite"
+          aria-busy={busy}
+        >
+          {busy ? (
+            <div className="flex items-center gap-2">
+              <div
+                className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-violet-500 border-t-transparent motion-reduce:animate-none motion-reduce:border-t-violet-500"
+                aria-hidden
+              />
+              <span className="text-xs font-medium text-[color:var(--sk-accent-on-subtle)]">
+                正在记录情绪…
+              </span>
+            </div>
+          ) : hint ? (
+            <p className="sk-muted text-xs leading-relaxed" role="status">
+              {hint}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   )
 }

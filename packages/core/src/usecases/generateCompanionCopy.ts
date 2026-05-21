@@ -26,8 +26,10 @@ import {
   companionTextHasFunctionalTone,
   companionTextHasMotivationalParallelTemplate,
   companionTextHasPoeticTemplate,
+  buildCompanionTriggerContextLines,
   parseCompanionInterestTags,
   type CompanionCopyStyle,
+  type CompanionCopyTrigger,
 } from '../prompts/textPrompt'
 import { getCompanionText, type CompanionTextResult } from './getCompanionText'
 
@@ -53,6 +55,10 @@ export type GenerateCompanionCopyInput = {
   companionInterests?: string[]
   /** 轻反馈经模型归纳后的提示行，见 `buildCompanionSystemPrompt`。 */
   companionLightFeedbackHints?: string[]
+  trigger?: CompanionCopyTrigger
+  yesterdayContextText?: string | null
+  momentContextText?: string | null
+  similarToLine?: string | null
 }
 
 function stripEmojisFromText(text: string): string {
@@ -105,7 +111,17 @@ export async function generateCompanionCopy(
   const { tags: interestTags } = parseCompanionInterestTags(
     input.companionInterests,
   )
-  const userPrompt = buildCompanionUserPromptWithInterests(
+  const triggerLines = buildCompanionTriggerContextLines({
+    ...(input.trigger !== undefined ? { trigger: input.trigger } : {}),
+    ...(input.momentContextText != null
+      ? { momentContextText: input.momentContextText }
+      : {}),
+    ...(input.similarToLine != null ? { similarToLine: input.similarToLine } : {}),
+    ...(input.yesterdayContextText != null
+      ? { yesterdayContextText: input.yesterdayContextText }
+      : {}),
+  })
+  const userPromptBase = buildCompanionUserPromptWithInterests(
     input.keyword,
     input.emotion,
     input.avoidRecentOutputs && input.avoidRecentOutputs.length > 0
@@ -113,6 +129,10 @@ export async function generateCompanionCopy(
       : undefined,
     interestTags,
   )
+  const userPrompt =
+    triggerLines.length > 0
+      ? `${triggerLines.join('\n')}\n${userPromptBase}`
+      : userPromptBase
 
   const recentCount = input.avoidRecentOutputs?.length ?? 0
   const baseTemperature = input.temperature ?? 0.7

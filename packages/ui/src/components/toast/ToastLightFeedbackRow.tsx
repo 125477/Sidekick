@@ -22,7 +22,7 @@ const CHIPS: { kind: LightFeedbackKind; label: string }[] = [
   { kind: 'less', label: '少推这类' },
 ]
 
-const HINT_OK_MS = 2600
+const HINT_OK_MS = 3000
 const HINT_ERR_MS = 5000
 
 export function ToastLightFeedbackRow({
@@ -101,7 +101,7 @@ export function ToastLightFeedbackRow({
       setHint('已记录，后续陪伴句会参考你的偏好')
       scheduleHintHide(HINT_OK_MS)
     } catch {
-      setHint('反馈失败，请检查通义 API 配置')
+      setHint('反馈失败，请检查配置')
       scheduleHintHide(HINT_ERR_MS)
     } finally {
       setBusyKind(null)

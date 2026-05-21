@@ -1,25 +1,159 @@
 import {
   generateCompanionCopy,
+  generateCompanionCopyViaAgent,
   isWithinQuietHours,
+  type CompanionCopyTrigger,
+  type CompanionTextResult,
   type DashScopeTextRequest,
   type EmotionKind,
 } from '@sidekick/core'
-import { getCompanionLightFeedbackHints } from './companionLightFeedbackStorage'
+import { broadcastSettingsSync } from '../state/settingsSync'
+import { saveSettings } from '../state/settingsStorage'
 import type { SidekickSettings } from '../state/settingsState'
+import { getCompanionLightFeedbackHints } from './companionLightFeedbackStorage'
+
+export type FetchCompanionCopyOptions = {
+  trigger?: CompanionCopyTrigger
+  yesterdayContextText?: string | null
+  momentContextText?: string | null
+  similarToLine?: string | null
+}
+
+export type FetchCompanionCopyResult = CompanionTextResult & {
+  sessionId?: string | null
+}
+
+function bailianAppIdFromEnv(): string | undefined {
+  const raw = import.meta.env.VITE_BAILIAN_APP_ID as string | undefined
+  const id = raw?.trim()
+  return id || undefined
+}
+
+function dashscopeRequestBase(): string | undefined {
+  if (typeof window === 'undefined') return undefined
+  if (import.meta.env.DEV) {
+    const { protocol } = window.location
+    if (protocol === 'http:' || protocol === 'https:') {
+      return `${window.location.origin}/dashscope`
+    }
+  }
+  return undefined
+}
+
+function resolveFetchTrigger(
+  keyword: string | undefined,
+  emotion: EmotionKind | undefined,
+  explicit?: CompanionCopyTrigger,
+): CompanionCopyTrigger {
+  if (explicit) return explicit
+  if (emotion) return 'emotion'
+  if (keyword?.trim() === '换一句') return 'regenerate'
+  if (keyword?.trim() === '类似这句') return 'similar'
+  return 'manual'
+}
+
+function shouldUseBailianAgent(settings: SidekickSettings): boolean {
+  if (settings.companionUseBailianAgent === false) return false
+  return Boolean(bailianAppIdFromEnv())
+}
+
+export async function persistBailianAgentSessionId(
+  settingsRef: { current: SidekickSettings },
+  sessionId: string | null | undefined,
+): Promise<void> {
+  const id = sessionId?.trim()
+  if (!id || id === settingsRef.current.bailianAgentSessionId) return
+  const next: SidekickSettings = {
+    ...settingsRef.current,
+    bailianAgentSessionId: id,
+  }
+  settingsRef.current = next
+  await saveSettings(next)
+  broadcastSettingsSync()
+}
+
 export async function fetchCompanionCopy(
   settings: SidekickSettings,
   keyword?: string,
   emotion?: EmotionKind,
   avoidRecentOutputs?: string[],
-) {
-  const dashscopeIpc =
+  options?: FetchCompanionCopyOptions,
+): Promise<FetchCompanionCopyResult> {
+  const apiKey = import.meta.env.VITE_DASHSCOPE_API_KEY as string | undefined
+  const appId = bailianAppIdFromEnv()
+  const trigger = resolveFetchTrigger(keyword, emotion, options?.trigger)
+  const lightHints = getCompanionLightFeedbackHints()
+  const common = {
+    style: settings.textStyle,
+    allowEmoji: settings.allowEmoji,
+    maxChars: settings.textMaxChars,
+    ...(keyword !== undefined ? { keyword } : {}),
+    ...(emotion !== undefined ? { emotion } : {}),
+    ...(avoidRecentOutputs?.length ? { avoidRecentOutputs } : {}),
+    ...(settings.companionInterests?.length
+      ? { companionInterests: settings.companionInterests }
+      : {}),
+    ...(lightHints.length ? { companionLightFeedbackHints: lightHints } : {}),
+    ...(options?.yesterdayContextText != null
+      ? { yesterdayContextText: options.yesterdayContextText }
+      : {}),
+    ...(options?.momentContextText != null
+      ? { momentContextText: options.momentContextText }
+      : {}),
+    ...(options?.similarToLine != null
+      ? { similarToLine: options.similarToLine }
+      : {}),
+    trigger,
+  }
+
+  const dashscopeAgentIpc =
+    typeof window !== 'undefined'
+      ? window.sidekickDesktop?.dashscopeAgent
+      : undefined
+  const dashscopeChatIpc =
     typeof window !== 'undefined'
       ? window.sidekickDesktop?.dashscopeChat
       : undefined
 
-  /** DashScope blocks browser/renderer CORS; dev uses Vite proxy; Electron uses main IPC. */
+  if (shouldUseBailianAgent(settings) && appId) {
+    try {
+      const requestBasePath = dashscopeRequestBase()
+      const agentResult = await generateCompanionCopyViaAgent({
+        apiKey,
+        appId,
+        sessionId: settings.bailianAgentSessionId,
+        ...common,
+        ...(dashscopeAgentIpc
+          ? {
+              invokeAgent: (payload) =>
+                dashscopeAgentIpc({
+                  apiKey,
+                  appId: payload.appId,
+                  prompt: payload.prompt,
+                  ...(payload.sessionId ? { sessionId: payload.sessionId } : {}),
+                  userPromptParams: payload.userPromptParams,
+                }),
+            }
+          : {}),
+        ...(requestBasePath !== undefined ? { requestBasePath } : {}),
+      })
+      return {
+        text: agentResult.text,
+        source: agentResult.source,
+        sessionId: agentResult.sessionId,
+      }
+    } catch (err) {
+      if (typeof console !== 'undefined' && console.warn) {
+        console.warn(
+          '[sidekick] 百炼智能体失败，回退 chat/completions',
+          err instanceof Error ? err.message : err,
+        )
+      }
+    }
+  }
+
   let chatCompletionsUrl: string | undefined
-  if (!dashscopeIpc && import.meta.env.DEV && typeof window !== 'undefined') {
+  if (!dashscopeChatIpc && import.meta.env.DEV && typeof window !== 'undefined') {
     const { protocol } = window.location
     if (protocol === 'http:' || protocol === 'https:') {
       chatCompletionsUrl = `${window.location.origin}/dashscope/compatible-mode/v1/chat/completions`
@@ -30,29 +164,19 @@ export async function fetchCompanionCopy(
     | string
     | undefined
 
-  return generateCompanionCopy({
-    apiKey: import.meta.env.VITE_DASHSCOPE_API_KEY as string | undefined,
+  const chatResult = await generateCompanionCopy({
+    apiKey,
     model:
       (import.meta.env.VITE_DASHSCOPE_MODEL as string | undefined) ??
       'qwen-turbo',
     ...(modelFallbackEnv !== undefined ? { modelFallbackEnv } : {}),
-    style: settings.textStyle,
-    keyword,
-    allowEmoji: settings.allowEmoji,
-    maxChars: settings.textMaxChars,
     temperature: settings.textTemperature,
-    ...(emotion !== undefined ? { emotion } : {}),
-    ...(avoidRecentOutputs?.length ? { avoidRecentOutputs } : {}),
-    ...(settings.companionInterests?.length
-      ? { companionInterests: settings.companionInterests }
-      : {}),
-    ...(getCompanionLightFeedbackHints().length
-      ? { companionLightFeedbackHints: getCompanionLightFeedbackHints() }
-      : {}),
-    ...(dashscopeIpc
+    keyword,
+    ...common,
+    ...(dashscopeChatIpc
       ? {
           invokeDashScope: (req: DashScopeTextRequest) =>
-            dashscopeIpc({
+            dashscopeChatIpc({
               ...req,
               ...(modelFallbackEnv !== undefined ? { modelFallbackEnv } : {}),
             }),
@@ -60,6 +184,8 @@ export async function fetchCompanionCopy(
       : {}),
     ...(chatCompletionsUrl !== undefined ? { chatCompletionsUrl } : {}),
   })
+
+  return chatResult
 }
 
 export function canPushNow(settings: SidekickSettings): boolean {

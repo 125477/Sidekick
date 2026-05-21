@@ -1,6 +1,11 @@
 /**
- * 陪伴文案：默认在一次请求里把「风格 + 可选情绪」写进 system/user prompt。
- * 追问（多轮对话）更适合需要澄清意图的场景；这里固定输出一条短句，单轮注入成本更低、延迟更稳。
+ * 陪伴文案提示词与校验（双路径）：
+ *
+ * - **百炼智能体（主路径）**：控制台系统提示词见 `docs/BAILIAN_AGENT_PROMPT.md`；接入说明见 `docs/BAILIAN_COMPANION_AGENT.md`；
+ *   本文件提供 `buildCompanionAgentUserPromptParams` / `buildCompanionAgentUserPrompt`。
+ * - **chat/completions（回退）**：`buildCompanionSystemPrompt` + user 提示 + 生成后校验/重试。
+ *
+ * 勿删本模块：回退链路、轻反馈、兜底句过滤仍依赖此处。
  *
  * ## 定稿原则（勿反复横跳）
  * 1. **通顺完整** > 文艺；禁止半截句（如「包括被自己。」）。
@@ -17,6 +22,7 @@ export type CompanionCopyStyle =
   | '搞笑'
   | '助眠'
   | '职场解压'
+  | '抽象'
 
 /** UI 标签 → 存储枚举，用于情绪反馈与文案联动 */
 export function emotionCnLabelToKind(label: string): EmotionKind | undefined {
@@ -96,6 +102,8 @@ const STYLE_GUIDE: Record<CompanionCopyStyle, string> = {
     '语气极轻、安静；写静与许可歇着，仍须写满最短字数、通顺完整，禁止只有「歇会儿」式过短套句；禁止「像…一样」与轻轻停驻；禁止睡眠指令、布置步骤与未来承诺；禁止屏幕蓝光、敲键等提神意象。',
   职场解压:
     '用人生节奏、取舍、边界感来减压（例：允许慢下来、不必一次做完），禁止会议、邮件、通知、文件、光标、键盘等办公名词；禁止命令式加班打气与条件价值。',
+  抽象:
+    '偏旁观、留白或轻荒诞：一句看似有道理又不完全落地的话，可自嘲或网感哲学碎片，但不刻薄、不攻击用户。禁止治愈套句（累了就歇/像…一样/风起茶凉）、禁止鸡血励志、禁止睡眠指令与办公词；禁止命令、拯救口号与条件价值；若语境偏低落/焦虑，荒诞须克制，勿用幽默否定感受。',
 }
 
 /** 各语气类型下的「反功能性相处」写作约束（写入 system，与生成后校验一致）。 */
@@ -110,6 +118,8 @@ const STYLE_ANTI_FUNCTIONAL: Record<CompanionCopyStyle, string> = {
     '【助眠·相处】只写轻、静、许可歇着；禁止任何步骤作业（先…/试试深呼吸/快睡）、禁止加油撑住与条件价值。',
   职场解压:
     '【职场解压·相处】写边界与允许慢下来，禁止更高效/冲一把/你应该扛住、禁止只要你努力就…式交换。',
+  抽象:
+    '【抽象·相处】禁止你应该/撑住/只要你…就…；禁止「笑一笑」「别难过了」；允许旁观留白，禁止布置任务与拯救口号。',
 }
 
 const ANTI_FUNCTIONAL_RELATIONSHIP_LINE =
@@ -383,6 +393,7 @@ const STYLE_FUNCTIONAL_EXTRA_MARKERS: Record<CompanionCopyStyle, readonly string
   搞笑: [],
   助眠: ['快睡', '睡吧', '早点睡', '赶紧睡'],
   职场解压: ['更高效', '冲一把', '赶进度', '扛住'],
+  抽象: ['加油', '撑住', '你必须'],
 }
 
 function companionTextHasInstruction(t: string): boolean {
@@ -426,6 +437,8 @@ export function companionTextHasFunctionalTone(
       return instruction || rescue || conditional || extra
     case '职场解压':
       return instruction || rescue || conditional || extra
+    case '抽象':
+      return instruction || rescue || conditional || extra
     default:
       return instruction || rescue || conditional
   }
@@ -445,6 +458,8 @@ export function buildFunctionalToneRetryUserSuffix(
       '上一句像在布置作业或打气。请极轻、极短，只写静与许可歇着，禁止应该先…/深呼吸/快睡/加油/撑住。',
     职场解压:
       '上一句像在要求更高效或扛住。请写边界与允许慢下来，禁止你应该、冲一把、更高效、只要你努力就…。',
+    抽象:
+      '上一句像治愈/励志或在下指令。请写旁观、留白或轻荒诞的一句，禁止你应该、撑住、只要你…就…、累了就歇、像…一样。',
   }
   return `【硬约束·${style}·反功能性相处】${byStyle[style]}`
 }
@@ -729,6 +744,7 @@ export function buildCompanionSystemPrompt(input: BuildCompanionPromptInput): st
 /** 应用内触发的占位词，不是用户想扩写的「主题」；勿走「围绕关键词」分支，否则易套同一两句自我关怀。 */
 const COMPANION_META_KEYWORDS = new Set([
   '换一句',
+  '类似这句',
   '再来一句',
   '换一条',
   '点击精灵互动',
@@ -740,6 +756,31 @@ function compactLineForPrompt(line: string): string {
   const t = line.replace(/\s+/g, ' ').trim()
   if (!t) return ''
   return t.length <= PROMPT_SNIPPET_MAX ? t : `${t.slice(0, PROMPT_SNIPPET_MAX)}…`
+}
+
+export function buildCompanionTriggerContextLines(input: {
+  trigger?: CompanionCopyTrigger
+  momentContextText?: string | null
+  similarToLine?: string | null
+  yesterdayContextText?: string | null
+}): string[] {
+  const lines: string[] = []
+  if (input.trigger) {
+    lines.push(`【触发场景】${input.trigger}。`)
+  }
+  const moment = input.momentContextText?.trim()
+  if (moment) lines.push(`【本轮情境】${moment}`)
+  const similar = input.similarToLine?.trim()
+  if (similar) {
+    lines.push(
+      `【参考句（similar）】${compactLineForPrompt(similar)}。请语气与骨架相近，措辞明显换新，禁止照抄。`,
+    )
+  }
+  const yesterday = input.yesterdayContextText?.trim()
+  if (yesterday && yesterday !== '无昨日记录') {
+    lines.push(`【昨日情境】${compactLineForPrompt(yesterday)}`)
+  }
+  return lines
 }
 
 function pickDiversityAngle(seed: number): string {
@@ -926,5 +967,210 @@ export function buildCompanionUserPromptWithInterests(
   const hasQuote = interestTags.some((t) => QUOTE_FORWARD_INTERESTS.has(t))
   if (!hasQuote) return base
   return `${base}\n【本条】用户选了影视或书籍类兴趣：请写出像文学作品里摘出的一句格言（可改写），贴合 system 语气；禁止「电影」「剧集」及合书、翻页等动作，禁止光标/键盘等办公词。（${Math.floor(Math.random() * 1_000_000_000)}）`
+}
+
+/** 百炼智能体应用：本轮触发场景（写入 user_prompt_params.trigger）。 */
+export type CompanionCopyTrigger =
+  | 'scheduled'
+  | 'regenerate'
+  | 'similar'
+  | 'emotion'
+  | 'manual'
+  | 'yesterday-greeting'
+  | 'focus-end'
+  | 'unlock'
+  | 'journal-closure'
+  | 'streak-nudge'
+  | 'interest-deepen'
+
+export type BuildCompanionAgentContextInput = {
+  trigger: CompanionCopyTrigger
+  style: CompanionCopyStyle
+  keyword?: string
+  allowEmoji: boolean
+  maxChars: number
+  emotion?: EmotionKind
+  companionInterests?: string[]
+  companionLightFeedbackHints?: string[]
+  yesterdayContextText?: string | null
+  /** ritual / 收束 / streak 等本轮情境（写入 moment_context） */
+  momentContextText?: string | null
+  /** similar 触发时用户喜欢的参考句（写入 similar_to_line） */
+  similarToLine?: string | null
+  avoidRecentOutputs?: string[]
+  now?: Date
+  seed?: number
+}
+
+function formatInterestsForAgent(tags: string[]): string {
+  return tags.length > 0 ? tags.join('、') : '无'
+}
+
+function buildStyleGuideForAgent(style: CompanionCopyStyle): string {
+  return `${STYLE_GUIDE[style]}\n${STYLE_ANTI_FUNCTIONAL[style]}`
+}
+
+/** 仅注入与 interests 匹配的兴趣写作说明（无重复桌面场景条）。 */
+function buildInterestGuideForAgent(
+  tags: string[],
+  style: CompanionCopyStyle,
+  note: string,
+): string {
+  if (tags.length === 0 && !note) return '无'
+  const parts: string[] = []
+  for (const tag of tags) {
+    const line = INTEREST_TAG_GUIDE[tag]
+    if (line) parts.push(line)
+  }
+  if (tags.some((t) => QUOTE_FORWARD_INTERESTS.has(t))) {
+    parts.push(
+      `影视/书籍：宜像文学作品摘出的格言，再按「${style}」收束；禁止仅装饰性比喻。`,
+    )
+  } else if (tags.length > 0) {
+    parts.push('兴趣仅轻点意象，与情绪或语气冲突时忽略。')
+  }
+  if (note) parts.push(`用户补充：${note}（轻量参考，勿喧宾夺主）`)
+  return parts.join('\n')
+}
+
+function formatLightFeedbackForAgent(hints: string[] | undefined): string {
+  const list = (hints ?? [])
+    .map((s) => s.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .slice(-6)
+  return list.length > 0 ? list.join('；') : '无'
+}
+
+function resolveCompanionCopyTrigger(
+  trigger: CompanionCopyTrigger,
+  keyword?: string,
+): CompanionCopyTrigger {
+  if (trigger !== 'manual') return trigger
+  const trimmed = keyword?.trim()
+  if (trimmed === '类似这句') return 'similar'
+  if (trimmed && COMPANION_META_KEYWORDS.has(trimmed)) return 'regenerate'
+  return 'manual'
+}
+
+/** 百炼控制台自定义变量 → `input.user_prompt_params`。 */
+export function buildCompanionAgentUserPromptParams(
+  input: BuildCompanionAgentContextInput,
+): Record<string, string> {
+  const seed = input.seed ?? Math.floor(Math.random() * 1_000_000_000)
+  const effectiveStyle: CompanionCopyStyle =
+    input.emotion != null
+      ? companionStyleForEmotion(input.emotion)
+      : input.style
+  const { tags, note } = parseCompanionInterestTags(input.companionInterests)
+  const emotionLabel =
+    input.emotion != null ? EMOTION_CN_LABEL[input.emotion] : '无'
+  const emotionGuide =
+    input.emotion != null ? EMOTION_GUIDE[input.emotion] : '无'
+  const yesterday =
+    input.yesterdayContextText?.trim() || '无昨日记录'
+  const moment = input.momentContextText?.trim() || '无'
+  const similarLine = input.similarToLine?.trim() || '无'
+  const avoidBlock = buildAvoidRecentBlock(input.avoidRecentOutputs, seed)
+  const trigger = resolveCompanionCopyTrigger(input.trigger, input.keyword)
+  const minChars = companionMinCharsForStyle(input.maxChars, effectiveStyle)
+
+  return {
+    trigger,
+    text_style: effectiveStyle,
+    style_guide: buildStyleGuideForAgent(effectiveStyle),
+    interests: formatInterestsForAgent(tags),
+    interest_guide: buildInterestGuideForAgent(tags, effectiveStyle, note),
+    interest_note: note.length > 0 ? note : '无',
+    light_feedback_hints: formatLightFeedbackForAgent(
+      input.companionLightFeedbackHints,
+    ),
+    emotion_label: emotionLabel,
+    emotion_guide: emotionGuide,
+    yesterday_context: yesterday,
+    moment_context: moment,
+    similar_to_line: similarLine,
+    local_time_hint: buildLocalTimeHintLine(input.now ?? new Date()),
+    writing_angle: pickDiversityAngle(seed),
+    avoid_recent_block: avoidBlock.trim().length > 0 ? avoidBlock.trim() : '无',
+    min_chars: String(minChars),
+    max_chars: String(input.maxChars),
+    allow_emoji: input.allowEmoji ? '是' : '否',
+  }
+}
+
+/** 百炼应用 completion 的 `input.prompt`（短句任务说明）。 */
+export function buildCompanionAgentUserPrompt(
+  input: BuildCompanionAgentContextInput,
+): string {
+  const trigger = resolveCompanionCopyTrigger(input.trigger, input.keyword)
+  const trimmed = input.keyword?.trim()
+  const isMeta = trimmed ? COMPANION_META_KEYWORDS.has(trimmed) : false
+  const kw = trimmed && !isMeta ? trimmed : undefined
+
+  const zhOnly =
+    '仅输出一条简体中文短句，禁止出现任何英文字母或英文单词；勿写中英夹杂。'
+
+  if (trigger === 'regenerate') {
+    return `请换一句全新的陪伴短句，与最近展示明显不同；禁止照抄提示词中的示范句。${zhOnly}`
+  }
+  if (trigger === 'similar') {
+    return [
+      '用户对当前气泡句点了「类似这句」；请根据 similar_to_line 与轻反馈偏好，',
+      '写一句语气与骨架相近、措辞明显换新的陪伴短句；禁止照抄参考句。',
+      zhOnly,
+    ].join('')
+  }
+  if (trigger === 'scheduled') {
+    return `请生成一句定时陪伴短句。${zhOnly}`
+  }
+  if (trigger === 'emotion') {
+    return `用户刚完成情绪反馈，请给一句严格贴合当前情绪的陪伴短句。${zhOnly}`
+  }
+  if (trigger === 'yesterday-greeting') {
+    return [
+      '用户今天第一次打开应用或从休眠恢复；请根据 yesterday_context 写一句昨日情绪续接的关怀短句，',
+      '自然提及昨日心情或日记关键词，勿说教、勿列步骤；与定时推送句明显不同。',
+      zhOnly,
+    ].join('')
+  }
+  if (trigger === 'unlock') {
+    return [
+      '用户刚解锁屏幕或从休眠恢复（非昨日续接场景）；结合 moment_context 与本地时段，',
+      '写一句轻柔的情境陪伴，像刚回到桌面的招呼；勿列步骤。',
+      zhOnly,
+    ].join('')
+  }
+  if (trigger === 'focus-end') {
+    return [
+      '用户刚结束专注会话；结合 moment_context，写一句认可这段专注、邀请松一口气的陪伴短句，',
+      '禁止命令式「你应该休息」。',
+      zhOnly,
+    ].join('')
+  }
+  if (trigger === 'journal-closure') {
+    return [
+      '用户刚保存今日小结；结合 moment_context 写一句收束陪伴，承接日记情绪与关键词，',
+      '让人感到「被看见、已收好」，勿展开聊天、勿说教。',
+      zhOnly,
+    ].join('')
+  }
+  if (trigger === 'streak-nudge') {
+    return [
+      '用户连续多日记录心情/日记；结合 moment_context 写一句轻激励，肯定坚持本身，',
+      '禁止内疚式「你怎么断档」、禁止夸张口号。',
+      zhOnly,
+    ].join('')
+  }
+  if (trigger === 'interest-deepen') {
+    return [
+      '每日兴趣深化：结合 interests / interest_note，写一句极短、温柔的问句（须以？结尾），',
+      '用于收集用户兴趣补充；禁止医学建议、禁止命令句；仍须控制在字数上限内。',
+      zhOnly,
+    ].join('')
+  }
+  if (kw) {
+    return `请围绕关键词生成一句陪伴短句：${kw}。${zhOnly}`
+  }
+  return `请给一句陪伴短句：通顺完整、写满字数，换与上一句不同骨架。${zhOnly}`
 }
 

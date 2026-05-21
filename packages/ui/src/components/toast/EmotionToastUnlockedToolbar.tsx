@@ -77,6 +77,8 @@ export type EmotionToastUnlockedToolbarProps = {
   onSpriteInteractionLockedChange?: (locked: boolean) => void
   onClose: () => void
   runRegenerate: () => Promise<void>
+  runSimilar?: () => Promise<void>
+  showSimilar?: boolean
 }
 
 export function EmotionToastUnlockedToolbar({
@@ -246,6 +248,25 @@ export function EmotionToastUnlockedToolbar({
                 <IconToolbarRefresh className="h-[15px] w-[15px] shrink-0" />
               </EmotionToastToolbarIconButton>
             ) : null}
+            {/* 类似这句：暂不展示
+            {!spriteInteractionLockedOnly && showSimilar && runSimilar ? (
+              <EmotionToastToolbarIconButton
+                title={
+                  maxChars != null
+                    ? `类似这句（不超过 ${maxChars} 个字）`
+                    : '类似这句'
+                }
+                ariaLabel="类似这句"
+                disabled={regenerating}
+                onClick={async (event) => {
+                  event.stopPropagation()
+                  await runSimilar()
+                }}
+              >
+                <span className="text-[11px] font-semibold leading-none">似</span>
+              </EmotionToastToolbarIconButton>
+            ) : null}
+            */}
             {!spriteInteractionLockedOnly && showCopy ? (
               <EmotionToastToolbarIconButton
                 title={copyDone ? '已复制' : '复制'}

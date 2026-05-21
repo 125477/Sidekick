@@ -8,6 +8,7 @@
 
 ### Added
 
+- 陪伴智能体扩展：`similar` / `unlock` / `focus-end` / `journal-closure` / `streak-nudge` / `interest-deepen` 等 trigger；气泡「类似这句」；轻反馈提示 3s；`docs/PROMO.md` 推广文案。
 - `docs/RELEASE.md`：GitHub Releases 发版流程；README 增加「下载（桌面版）」链接。
 - 根目录 `AGENTS.md`、`docs/README.md`、`docs/IPC.md`、`docs/DECISIONS.md`、`docs/adr/*` 文档体系。
 - 拖动星星拖尾：独立 `drag-trail` 小窗 overlay（ADR-001）、彩色高亮粒子、IPC 批量打点。

@@ -26,6 +26,7 @@ const COPY_STYLE_OPTIONS: CompanionCopyStyle[] = [
   '搞笑',
   '助眠',
   '职场解压',
+  '抽象',
 ]
 
 type SettingsPanelProps = {
@@ -54,9 +55,9 @@ const TABS: Array<{ id: SettingTab; label: string }> = [
   { id: 'copy', label: '文案展示' },
   { id: 'avatar', label: '形象' },
   { id: 'push', label: '推送' },
-  { id: 'general', label: '通用' },
   { id: 'speech', label: '语音' },
   { id: 'ai', label: 'AI' },
+  { id: 'general', label: '通用' },
   { id: 'privacy', label: '隐私政策' },
 ]
 
@@ -367,7 +368,7 @@ export function SettingsPanel({
                 {focusSessionActive ? (
                   <button
                     type="button"
-                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+                    className="sk-emotion-chip-outline-btn px-3 py-1.5 text-sm"
                     onClick={() =>
                       onSettingsChange({
                         ...settings,
@@ -582,9 +583,6 @@ export function SettingsPanel({
             </SettingsSubsection>
 
             <SettingsSubsection title="兴趣偏好（可选）">
-              <p className="sk-muted leading-relaxed">
-                选「影视/书籍」时会化用台词或名句神韵（贴合语气类型）；场景在电脑前，不会写「合上书」等读纸书动作。
-              </p>
               <div className="flex flex-wrap gap-1.5">
                 {COMPANION_INTEREST_TAG_OPTIONS.map((t) => {
                   const { tags, note } = parseCompanionInterestNote(

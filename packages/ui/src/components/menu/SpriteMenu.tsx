@@ -68,7 +68,7 @@ export function SpriteMenuPanel({
           <button
             key={item.id}
             type="button"
-            className={`${cornerClass} flex h-9 w-full cursor-pointer items-center border-0 bg-transparent py-0 pl-5 pr-3 text-left text-sm leading-none text-[color:var(--sk-text-body)] transition-colors hover:bg-[color:var(--sk-card-bg)] focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--sk-focus-ring)] [-webkit-app-region:no-drag]`}
+            className={`${cornerClass} flex h-9 w-full cursor-pointer items-center border-0 bg-transparent py-0 pl-5 pr-3 text-left text-sm leading-none text-[color:var(--sk-text-body)] transition-colors hover:bg-[color:var(--sk-accent-subtle-bg)] focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--sk-focus-ring)] [-webkit-app-region:no-drag]`}
             onClick={() => onPick(item.id)}
           >
             {item.label}

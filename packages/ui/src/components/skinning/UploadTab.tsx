@@ -138,7 +138,7 @@ export function UploadTab({ onApply }: UploadTabProps) {
           {sizeRejectMessage}
         </p>
       ) : null}
-      <div className="flex items-center gap-3 rounded-xl bg-[color:var(--sk-card-bg)] p-3">
+      <div className="flex items-center gap-3 rounded-xl border border-[color:var(--sk-callout-border)] p-3">
         {fileSrc ? (
           showVideoPreview ? (
             <video

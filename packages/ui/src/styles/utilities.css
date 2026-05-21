@@ -61,21 +61,23 @@
   }
 
   .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-settings-card {
-    background: rgb(255 255 255 / 0.52);
+    background: transparent;
     border-color: rgb(255 255 255 / 0.55);
   }
 
   .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-settings-content .sk-callout {
-    background: rgb(255 255 255 / 0.52);
+    background: transparent;
     border-color: rgb(255 255 255 / 0.55);
   }
 
   .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-segmented {
-    background: rgb(255 255 255 / 0.4);
+    background: transparent;
+    border-color: rgb(255 255 255 / 0.55);
   }
 
   .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-segmented-btn-active {
-    background: rgb(255 255 255 / 0.78);
+    background: rgb(245 243 255 / 0.92);
+    color: var(--sk-accent-on-subtle);
   }
 
   .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-chip {
@@ -124,12 +126,12 @@
   }
 
   html[data-theme='dark'] .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-settings-card {
-    background: rgb(39 39 42 / 0.58);
+    background: transparent;
     border-color: rgb(63 63 70 / 0.5);
   }
 
   html[data-theme='dark'] .sk-panel-outer:has([data-sk-panel-bg='on']) .sk-settings-content .sk-callout {
-    background: rgb(39 39 42 / 0.58);
+    background: transparent;
     border-color: rgb(63 63 70 / 0.5);
   }
 
@@ -147,6 +149,36 @@
     line-height: 1.5rem;
     font-weight: 600;
     color: var(--sk-text-primary);
+  }
+
+  /* 情绪反馈：纯白底、少层灰卡片 */
+  .sk-panel-outer:has([data-sk-emotion-panel='on']) {
+    background: var(--sk-frame-bg);
+  }
+
+  .sk-emotion-page-shell {
+    background: transparent;
+    overflow-x: hidden;
+  }
+
+  /* 仅外层 shell 滚动，避免「查看历史」旁出现第二条竖线/滚动轨 */
+  .sk-emotion-page-shell .sk-emotion-panel-stack {
+    overflow: visible;
+  }
+
+  .sk-emotion-page {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    gap: var(--sk-emotion-section-gap);
+  }
+
+  /** 说明文案 → 小标题 → 操作区：垂直间距一致 */
+  .sk-emotion-intro-stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sk-emotion-section-gap);
   }
 
   /* —— 设置页 —— */
@@ -221,8 +253,8 @@
   .sk-settings-card {
     display: grid;
     border-radius: var(--sk-radius-card);
-    border: 1px solid var(--sk-card-border);
-    background: var(--sk-card-bg);
+    border: 1px solid var(--sk-callout-border);
+    background: transparent;
     padding: var(--sk-space-card-inner);
     gap: 0.75rem;
   }
@@ -244,11 +276,11 @@
     gap: 0.75rem;
   }
 
-  /* 设置页说明块与卡片同色（避免紫色 sk-callout 与上方脱节） */
+  /* 设置页说明块：与卡片一致，仅描边无底填 */
   .sk-settings-content .sk-callout {
     border-radius: var(--sk-radius-card);
-    border: 1px solid var(--sk-card-border);
-    background: var(--sk-card-bg);
+    border: 1px solid var(--sk-callout-border);
+    background: transparent;
     padding: var(--sk-space-card-inner);
   }
 
@@ -425,7 +457,8 @@
   .sk-segmented {
     display: inline-flex;
     border-radius: var(--sk-radius-md);
-    background: var(--sk-segmented-bg);
+    border: 1px solid var(--sk-callout-border);
+    background: transparent;
     padding: 0.25rem;
   }
 
@@ -445,8 +478,8 @@
 
   .sk-segmented-btn-active {
     background: var(--sk-segmented-active-bg);
-    color: var(--sk-text-primary);
-    box-shadow: var(--sk-nav-btn-active-shadow);
+    color: var(--sk-chip-on-text);
+    box-shadow: none;
   }
 
   .sk-chip {
@@ -477,7 +510,7 @@
   .sk-callout {
     border-radius: var(--sk-radius-md);
     border: 1px solid var(--sk-callout-border);
-    background: var(--sk-callout-bg);
+    background: transparent;
     padding: 0.75rem;
   }
 
@@ -627,7 +660,7 @@
   .group\/toastbar:focus-within .sk-toast-message-panel,
   .group\/toastbar-plain:hover .sk-toast-message-panel,
   .group\/toastbar-plain:focus-within .sk-toast-message-panel {
-    background: var(--sk-card-bg);
+    background: transparent;
   }
 
   .sk-toast-message-cell {
@@ -762,18 +795,252 @@
 
   .sk-emotion-surface {
     border-radius: var(--sk-radius-card);
-    border: 1px solid var(--sk-card-border);
-    background: var(--sk-card-bg);
+    border: 1px solid var(--sk-callout-border);
+    background: transparent;
+  }
+
+  .sk-emotion-panel-stack {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    gap: var(--sk-emotion-section-gap);
+  }
+
+  .sk-emotion-panel-stack > * {
+    flex-shrink: 0;
+  }
+
+  .sk-emotion-topbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+  }
+
+  .sk-emotion-lead {
+    margin: 0;
+    min-width: 0;
+    flex: 1;
+    font-size: 0.8125rem;
+    line-height: 1.375rem;
+    color: var(--sk-text-muted);
+  }
+
+  .sk-emotion-link {
+    cursor: pointer;
+    flex-shrink: 0;
+    border: none;
+    background: transparent;
+    padding: 0;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+    color: var(--sk-accent-on-subtle);
+    text-decoration: none;
+    transition: color 150ms ease;
+  }
+
+  .sk-emotion-link:hover:not(:disabled) {
+    color: var(--sk-accent-hover);
+  }
+
+  .sk-emotion-block {
+    display: grid;
+    gap: var(--sk-emotion-section-gap);
+  }
+
+  .sk-emotion-heading {
+    margin: 0;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    line-height: 1.25rem;
+    color: var(--sk-text-secondary);
+  }
+
+  .sk-emotion-inspiration {
+    border-radius: var(--sk-radius-md);
+    border: 1px solid var(--sk-callout-border);
+    border-left-width: 3px;
+    border-left-color: var(--sk-accent);
+    background: transparent;
+    padding: 0.75rem 0.875rem 0.875rem;
+  }
+
+  .sk-emotion-inspiration-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.625rem;
+  }
+
+  .sk-emotion-inspiration-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1rem;
+    color: var(--sk-accent-on-subtle);
+  }
+
+  .sk-emotion-inspiration-list {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .sk-emotion-inspiration-item {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+    font-size: 0.8125rem;
+    line-height: 1.45rem;
+    color: var(--sk-text-body);
+  }
+
+  .sk-emotion-inspiration-num {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.45rem;
+    color: var(--sk-accent-on-subtle);
+  }
+
+  .sk-emotion-composer {
+    display: grid;
+    gap: 0;
+    overflow: hidden;
+    border-radius: var(--sk-radius-card);
+    border: 1px solid var(--sk-callout-border);
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .sk-emotion-composer-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.625rem 0.875rem;
+    border-bottom: 1px solid var(--sk-divider);
+  }
+
+  .sk-emotion-composer-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.25rem;
+    color: var(--sk-text-body);
+  }
+
+  .sk-emotion-textarea {
+    box-sizing: border-box;
+    display: block;
+    flex-shrink: 0;
+    min-height: 8.5rem;
+    height: auto;
+    width: 100%;
+    resize: vertical;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    padding: 0.875rem;
+    font-size: 0.9375rem;
+    line-height: 1.6rem;
+    color: var(--sk-input-text);
+    outline: none;
+    transition: background-color 150ms ease;
+  }
+
+  .sk-emotion-textarea::placeholder {
+    color: var(--sk-input-placeholder);
+  }
+
+  .sk-emotion-textarea:focus-visible {
+    background: transparent;
+    outline: 2px solid var(--sk-focus-ring);
+    outline-offset: -2px;
+  }
+
+  .sk-emotion-textarea:disabled {
+    cursor: not-allowed;
+    color: var(--sk-input-disabled-text);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sk-emotion-textarea {
+      transition: none;
+    }
+  }
+
+  .sk-emotion-composer-hint {
+    margin: 0;
+    padding: 0 0.875rem 0.625rem;
+    font-size: 0.75rem;
+    line-height: 1.25rem;
+    color: var(--sk-text-muted);
+  }
+
+  .sk-emotion-composer-media {
+    border-top: 1px solid var(--sk-callout-border);
+    padding: 0.75rem 0.875rem 0.875rem;
+    background: transparent;
+  }
+
+  .sk-emotion-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.625rem 0.75rem;
+    padding-top: 0.25rem;
+    padding-bottom: 1.25rem;
+  }
+
+  .sk-emotion-submit {
+    min-width: 8.5rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+
+  .sk-emotion-loading {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 0;
+    font-size: 0.8125rem;
+    color: var(--sk-text-muted);
+  }
+
+  .sk-emotion-history-shell {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: var(--sk-radius-card);
+    border: 1px solid var(--sk-callout-border);
+    background: transparent;
+  }
+
+  .sk-emotion-history-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.75rem 0.875rem;
+    border-bottom: 1px solid var(--sk-divider);
   }
 
   .sk-emotion-trend-chart {
-    background: var(--sk-card-bg);
+    background: transparent;
   }
 
   .sk-favorite-row {
     border-radius: var(--sk-radius-card);
-    border: 1px solid var(--sk-card-border);
-    background: var(--sk-card-bg);
+    border: 1px solid var(--sk-callout-border);
+    background: transparent;
     padding: 0.75rem;
     font-size: 13px;
     line-height: 1.625;

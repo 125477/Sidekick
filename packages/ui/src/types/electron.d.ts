@@ -42,6 +42,19 @@ type ScreenWorkArea = {
   height: number
 }
 
+type DashScopeAgentPayload = {
+  apiKey: string | undefined
+  appId: string
+  prompt: string
+  sessionId?: string | null
+  userPromptParams?: Record<string, string>
+}
+
+type DashScopeAgentResult = {
+  text: string
+  sessionId: string | null
+}
+
 type DashScopeChatPayload = {
   apiKey: string | undefined
   model: string | undefined
@@ -204,11 +217,14 @@ type SidekickDesktopApi = {
   /** Toast window → main → widget: ask for a new companion line; resolves when widget finishes. */
   /** Fire-and-forget: main forwards to widget; do not invoke from toast (loadURL would break the promise). */
   requestRegenerateCopy?: () => Promise<void>
+  requestSimilarCopy?: () => Promise<void>
   /** Widget only: main forwards clicks from the detached toast. */
   onRegenerateCopyRequested?: (callback: () => void) => () => void
+  onSimilarCopyRequested?: (callback: () => void) => () => void
   getWorkArea?: () => Promise<ScreenWorkArea | null>
   /** Main-process DashScope call (no renderer CORS). */
   dashscopeChat?: (payload: DashScopeChatPayload) => Promise<string>
+  dashscopeAgent?: (payload: DashScopeAgentPayload) => Promise<DashScopeAgentResult>
   dashscopeTts?: (payload: DashScopeTtsPayload) => Promise<DashScopeTtsResult>
   /** 退出桌面应用（主进程 `app.quit()`）。纯 Web 无注入时不存在。 */
   quitApp?: () => Promise<void>

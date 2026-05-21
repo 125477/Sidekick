@@ -48,6 +48,8 @@ TypeScript 声明：**`packages/ui/src/types/electron.d.ts`**。
 | `reportToastPassthroughInteractRect(rect)` | `sidekick:toast-passthrough-interact-rect` | send |
 | `requestRegenerateCopy()` | `sidekick:toast-regenerate-request` | send |
 | `onRegenerateCopyRequested(cb)` | `sidekick:regenerate-copy` | 主→widget |
+| `requestSimilarCopy()` | `sidekick:toast-similar-request` | send |
+| `onSimilarCopyRequested(cb)` | `sidekick:similar-copy` | 主→widget |
 
 ### 精灵挂件
 
@@ -92,6 +94,7 @@ TypeScript 声明：**`packages/ui/src/types/electron.d.ts`**。
 | preload | channel | 方向 |
 |---------|---------|------|
 | `dashscopeChat(payload)` | `sidekick:dashscope-chat` | invoke |
+| `dashscopeAgent(payload)` | `sidekick:dashscope-agent` | invoke → `{ text, sessionId }`（百炼智能体 `apps/{id}/completion`） |
 | `dashscopeTts(payload)` | `sidekick:dashscope-tts` | invoke |
 
 ### 系统

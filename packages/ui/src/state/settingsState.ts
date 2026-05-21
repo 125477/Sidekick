@@ -87,6 +87,12 @@ export type SidekickSettings = {
    * 用户标记的兴趣（如 音乐、影视）；写入 system prompt 作轻微偏好参考。
    */
   companionInterests: string[]
+  /**
+   * 使用百炼智能体应用生成陪伴短句（需 `VITE_BAILIAN_APP_ID`）；失败时回退 chat/completions。
+   */
+  companionUseBailianAgent: boolean
+  /** 百炼智能体会话 id：换一句与定时推送复用同一会话。 */
+  bailianAgentSessionId: string | null
   /** 今日心情：总开关（含面板与本地记录）。 */
   dailyMoodEnabled: boolean
   /** 到点系统通知提醒写今日小结（需 Electron 通知权限）。 */
@@ -189,6 +195,8 @@ export const defaultSettings: SidekickSettings = {
   companionTtsSpeechRate: 1,
   pushAutoSwitchAvatar: false,
   companionInterests: [],
+  companionUseBailianAgent: true,
+  bailianAgentSessionId: null,
   dailyMoodEnabled: true,
   dailyMoodReminderEnabled: true,
   dailyMoodReminderTime: '17:00',
