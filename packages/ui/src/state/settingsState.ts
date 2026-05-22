@@ -1,11 +1,22 @@
 import type { ToastAnchor } from './uiState'
 import type { CompanionCopyStyle, DashScopeTtsModel } from '@sidekick/core'
+import type { QuoteBubbleDisplayMode } from '../components/emotion/moodHistory/quoteBubbleSettings'
 
 /** 默认推送间隔（分钟）；气泡默认停留时长与之相同。 */
 export const DEFAULT_PUSH_INTERVAL_MINUTES = 3
 
 export const MIN_INTERVAL_MINUTES = 1
 export const MAX_INTERVAL_MINUTES = 60
+
+/** 设置 · 文案最大字数（陪伴短句硬约束上限）。 */
+export const MIN_TEXT_MAX_CHARS = 10
+export const MAX_TEXT_MAX_CHARS = 100
+
+export function clampTextMaxChars(chars: number): number {
+  const n = Number(chars)
+  if (!Number.isFinite(n)) return defaultSettings.textMaxChars
+  return Math.min(MAX_TEXT_MAX_CHARS, Math.max(MIN_TEXT_MAX_CHARS, Math.floor(n)))
+}
 
 /** 旧版持久化字段：停留秒数。 */
 export const LEGACY_DEFAULT_DWELL_SECONDS = 60
@@ -45,6 +56,8 @@ export type SidekickSettings = {
   quietStart: string
   quietEnd: string
   toastAnchor: ToastAnchor
+  /** 陪伴短句气泡样式；`auto` 时陪伴用标准尾泡、历史小结自动混排。 */
+  quoteBubbleVariant: QuoteBubbleDisplayMode
   /** 气泡停留时长（分钟）；与推送间隔默认同值。 */
   dwellMinutes: number
   toastAlwaysVisible: boolean
@@ -173,6 +186,7 @@ export const defaultSettings: SidekickSettings = {
   quietStart: '22:00',
   quietEnd: '08:00',
   toastAnchor: 'bottom',
+  quoteBubbleVariant: 'companion-tail',
   dwellMinutes: DEFAULT_PUSH_INTERVAL_MINUTES,
   toastAlwaysVisible: false,
   clickToFetchEnabled: true,

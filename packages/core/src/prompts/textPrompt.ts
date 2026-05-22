@@ -12,7 +12,7 @@
  * 2. **治愈** 三类轮换：直白许可 | 单处轻隐喻+许可 | 短格言；须写满最短字数、通顺完整，勿连刷同一句式。
  * 3. **只拦硬套**：「像…一样」、轻轻停驻、风起/茶凉/暮色爆款、励志对仗、办公词、指令/拯救/条件价值、「累了就歇」类口语套句。
  * 4. **允许** 一处克制意象（书页/故事里的停顿）；**禁止** 把治愈写成七字口号（如「累了就歇会儿。」）。
- * 5. 改规则时同步检查 `fallback/quotes.ts` 与生成后校验函数，避免提示与兜底打架。
+ * 5. 改规则时同步 `docs/BAILIAN_AGENT_PROMPT.md`、`COMPANION_ANTI_TEMPLATE_BLOCK` 与 `companionTextHasFormulaSkeleton`，避免提示与兜底打架。
  */
 import type { EmotionKind } from '../schema/data'
 
@@ -93,7 +93,7 @@ export type BuildCompanionPromptInput = {
 
 const STYLE_GUIDE: Record<CompanionCopyStyle, string> = {
   治愈:
-    '治愈=承接感受与存在许可，通顺好读、写满最短字数。可轮换：①直白许可（例：「疲惫时，休息也是正经事。」）；②单处轻隐喻+许可（例：「书页里的停顿，也该被允许存在。」）；③短格言（例：「晚一点也没关系，路还在。」）。一句一重心，须有实质内容，禁止七字口号。禁止「累了就歇」「歇会儿」作整句骨架；禁止「像…一样」、轻轻停驻、风起/茶凉/暮色；禁止命令、拯救与条件价值；禁止办公设备描写。',
+    '治愈=承接感受与存在许可，通顺好读、写满最短字数。可轮换：①直白许可（例：「疲惫时，休息也是正经事。」）；②单处轻隐喻+许可（例：「书页里的停顿，也该被允许存在。」）；③短格言（例：「晚一点也没关系，路还在。」）。一句一重心，须有实质内容，禁止七字口号。禁止连刷「馈赠」「安放」「化作」「静静流淌」「驻足也是前行」等散文套句；禁止「累了就歇」「歇会儿」作整句骨架；禁止「像…一样」、轻轻停驻、风起/茶凉/暮色；禁止命令、拯救与条件价值；禁止办公设备描写。',
   励志:
     '可多用「我」或无人称格言；聚焦态度与微小可能，禁止鸡血口号与抽象成功学；禁止命令式打气（加油/撑住/你必须）与「只要你…就…」式条件价值；禁止写键盘、光标、加班赶场等办公套话，勿照抄常见鸡汤句。',
   搞笑:
@@ -182,17 +182,82 @@ export const COMPANION_STIFF_HEALING_MARKERS = [
   '不妨像',
 ] as const
 
-/** 每次随机抽一种写法，避免连续落在「X时，像…」文艺模板。 */
+/**
+ * 每次随机抽一种写法（结合 seed + 最近句哈希），避免连续落在「X时，像…」「馈赠/安放/化作」文艺模板。
+ * 角度差异要够大，否则模型仍会收敛到同一治愈腔。
+ */
 const DIVERSITY_ANGLES = [
-  '用格言式判断句：具体、通顺，写满最短字数，禁止「X时，像…」对仗，禁止「有些…，…」励志对仗。',
-  '用直白许可或判断（例：「疲惫时，休息也是正经事。」），禁止「累了就歇」骨架，勿照抄上一句。',
-  '单处轻隐喻+许可（如「书页里的停顿，也该被允许存在。」），仅一处意象，禁止像…一样与风起/茶凉/暮色。',
-  '从成长或耐心直说，禁止暮色、风起、茶凉、窗台、杯底余温等爆款意象。',
-  '用极短问句或感叹，禁止「你…，我…」对称、禁止逗号后接「像…」。',
-  '用「可以」「不妨」邀请休息，禁止「不妨让心先停一停」式套句。',
-  '用对比结构（「不是…而是…」「与其…不如…」），禁止文艺散文腔。',
-  '第二人称单分句，无逗号对仗，禁止起笔「风起/茶凉/暮色」。',
+  '用格言式判断句：具体、通顺，写满最短字数，禁止「X时，像…」对仗，禁止「有些…，…」励志对仗，禁止馈赠/安放/化作。',
+  '用直白许可或判断（例：「疲惫时，休息也是正经事。」），禁止「累了就歇」骨架，禁止馈赠、安放、化作、静静流淌，勿照抄上一句。',
+  '单处轻隐喻+许可（如「书页里的停顿，也该被允许存在。」），仅一处意象，禁止像…一样、风起/茶凉/暮色、馈赠、化作。',
+  '从成长或耐心直说，禁止暮色、风起、茶凉、窗台、杯底余温、馈赠、安放等爆款词。',
+  '用极短问句或感叹，禁止「你…，我…」对称、禁止逗号后接「像…」，禁止馈赠/驻足/前行套句。',
+  '用「可以」「不妨」邀请休息，禁止「不妨让心先停一停」式套句，禁止馈赠/安放/化作。',
+  '用对比结构（「不是…而是…」「与其…不如…」），禁止文艺散文腔与馈赠式收束。',
+  '第二人称单分句，无逗号对仗，禁止起笔「风起/茶凉/暮色/时光静静」。',
+  '写口语白描、无隐喻（例：「今天先到这儿，也很好。」），禁止文学意象、馈赠、安放、化作、驻足。',
+  '写身体或具体感受（例：「肩膀松一点，就算进步。」），禁止时光/馈赠/安放/化作/前行类格言。',
 ] as const
+
+/** 模型连刷的「散文式收束」套句（与 POETIC 校验配合）。 */
+export const COMPANION_LITERARY_CLOSURE_MARKERS = [
+  '馈赠',
+  '温柔的馈赠',
+  '安放',
+  '妥善安放',
+  '化作',
+  '化作明日',
+  '化作养分',
+  '静静流淌',
+  '时光静静',
+  '也是前行',
+  '也是一种前行',
+  '平和也是一种前行',
+  '停驻',
+  '驻足',
+  '温柔的修行',
+  '生活的一种温柔',
+  '也是一种温柔',
+  '云朵',
+  '变幻',
+  '偶尔停下来',
+  '偶尔停',
+  '看看云',
+] as const
+
+const RECENT_LEXICAL_WATCH: ReadonlyArray<{
+  words: readonly string[]
+  ban: string
+}> = [
+  {
+    words: ['馈赠', '温柔的馈赠'],
+    ban: '最近已多次出现「馈赠」，本句禁止再用。',
+  },
+  {
+    words: ['安放', '妥善安放', '心情已经安放', '思绪已'],
+    ban: '最近已多次出现「安放」，本句禁止再用「安放/妥善安放」骨架。',
+  },
+  {
+    words: ['化作', '化作明日', '化作养分', '化作晨光'],
+    ban: '最近已多次出现「化作」，本句禁止再用「化作…」收束。',
+  },
+  {
+    words: ['静静流淌', '时光静静'],
+    ban: '最近已出现「静静流淌/时光静静」，本句换起笔。',
+  },
+  {
+    words: ['驻足', '也是前行', '也是一种前行'],
+    ban: '最近已出现「驻足/前行」格言，本句换骨架。',
+  },
+  {
+    words: ['云朵', '变幻', '看看云', '偶尔停', '偶尔停下来'],
+    ban: '最近已出现「停一停看云/变幻」骨架，本句禁止再用，改直白或许可。',
+  },
+  {
+    words: ['温柔的修行', '生活的一种温柔', '也是一种温柔'],
+    ban: '最近已出现「也是…温柔/修行」收束，本句换骨架与收束词。',
+  },
+]
 
 const OVERUSED_ADVERBS = '轻轻、慢慢、悄悄、静静、缓缓、默默'
 
@@ -243,6 +308,30 @@ const POETIC_TEMPLATE_BAN_LINE =
 
 const MOTIVATIONAL_PARALLEL_BAN_LINE =
   '【禁止励志套句】禁止：①以「有些」起头的对仗句（如「有些坚持，终会…」「有些努力，不必…」）；②「不是所有…但总有一些…」；③「终会落在心头」「不必等回应也能发光」等口号式后半句。'
+
+/**
+ * 通用防套句块（智能体 `style_guide` 注入 + chat system；与 `docs/BAILIAN_AGENT_PROMPT.md` 同步）。
+ */
+export const COMPANION_ANTI_TEMPLATE_BLOCK = [
+  '【防套句·总则】每句必须是新叙事骨架，禁止把同一模板只换个别词（如云朵↔天空、修行↔温柔）。',
+  '本轮以 writing_angle 为唯一允许的句式方向；与其冲突时以 writing_angle 为准。',
+  '须服从 avoid_recent_block：与列出的任一句不得同骨架，不得连续相同汉字超过 4 个。',
+  '',
+  '【禁止的叙事骨架（任一类命中即套句，须整体换掉）】',
+  'A. 停顿观景+感悟收束：偶尔停/停一停/看看云风月叶，逗号后「也是/便是…温柔/修行/前行/馈赠/生活的一种…」。',
+  'B. 时光/馈赠/安放/化作：静静流淌、温柔的馈赠、心情安放、化作明日/养分/晨光。',
+  'C. 爆款文艺：X时+像…、像…一样、风起/茶凉/暮色+窗台、轻轻停驻/驻足也是前行。',
+  'D. 励志对仗：有些…，…；不是所有…但总有一些…。',
+  'E. 对称陪伴：你…，我…。',
+  'F. 口令许可整句：累了就歇、歇会儿、不用怕耽误。',
+  'G. 办公数码：光标键盘屏幕追剧观影等。',
+  'H. 命令拯救条件：你应该、撑住加油、只要你…就…。',
+  'I. 半截尾巴：包括被自己。',
+  '',
+  '【鼓励且须轮换的写法（勿连刷同一类）】',
+  '① 直白判断或许可（例：疲惫时，休息也是正经事）；② 单处轻隐喻+许可（仅一处意象）；③ 短格言；④ 对比句；⑤ 极短问句；⑥ 身体/口语白描。',
+  '治愈禁止默认回到 A 类；须写满最短字数、通顺完整，禁止七字口号。',
+].join('\n')
 
 /** 模型高频「有些…，…」励志平行句（与 recent 去重、生成后校验共用）。 */
 export const COMPANION_MOTIVATIONAL_PARALLEL_MARKERS = [
@@ -496,9 +585,74 @@ export function buildBleakWithoutComfortRetryUserSuffix(): string {
   return '【硬约束】上一句像宿命感叹、只有无力感。请改写成让人被体谅或被托住的短句：允许慢下来、温柔许可或微小指望；禁止「再…也…不…」与「照不亮所有黑夜」式格言。'
 }
 
+export function companionTextHasLiteraryClosureTemplate(text: string): boolean {
+  const t = text.trim()
+  if (!t) return false
+  if (COMPANION_LITERARY_CLOSURE_MARKERS.some((m) => t.includes(m))) {
+    return true
+  }
+  if (/也是一?种.{0,8}(前行|馈赠|礼物|温柔|修行|生活)/.test(t)) {
+    return true
+  }
+  if (/也是.{0,6}一份/.test(t)) {
+    return true
+  }
+  if (/生活的一?种温柔/.test(t)) {
+    return true
+  }
+  if (/此刻的.+是.+的(馈赠|礼物)/.test(t)) {
+    return true
+  }
+  return false
+}
+
+/** 通用公式化骨架（景物铺垫 + 感悟收束等），与具体禁词列表互补。 */
+export function companionTextHasFormulaSkeleton(text: string): boolean {
+  const t = text.trim()
+  if (!t) return false
+  if (companionTextHasLiteraryClosureTemplate(t)) {
+    return true
+  }
+  if (
+    /偶尔.{0,8}停/.test(t) &&
+    /(看看|望望|瞧瞧|注视)/.test(t) &&
+    /(云|风|叶|天|变幻)/.test(t)
+  ) {
+    return true
+  }
+  if (
+    /(看看|望望|瞧瞧).{0,14}(云|风|叶|花|天|变幻)/.test(t) &&
+    /也是.{0,12}(温柔|修行|前行|馈赠|礼物|生活)/.test(t)
+  ) {
+    return true
+  }
+  if (/不妨让.{0,8}(心|自己|思绪)/.test(t)) {
+    return true
+  }
+  if (/时光.{0,8}(静静|缓缓|慢慢)/.test(t)) {
+    return true
+  }
+  if (/^[^，,。！？]{1,12}时[，,]/.test(t) && /(像|仿佛|好似)/.test(t)) {
+    return true
+  }
+  if (/^有些[^，,]{1,20}[，,]/.test(t)) {
+    return true
+  }
+  if (/不是所有[^，,]{1,24}但总有一些/.test(t)) {
+    return true
+  }
+  return false
+}
+
 export function companionTextHasPoeticTemplate(text: string): boolean {
   const t = text.trim()
   if (!t) return false
+  if (companionTextHasFormulaSkeleton(t)) {
+    return true
+  }
+  if (companionTextHasLiteraryClosureTemplate(t)) {
+    return true
+  }
   if (COMPANION_POETIC_TEMPLATE_MARKERS.some((m) => t.includes(m))) {
     return true
   }
@@ -567,7 +721,15 @@ export function companionTextNeedsPlainHealingCheck(
 }
 
 export function buildPoeticTemplateRetryUserSuffix(): string {
-  return `【硬约束】勿用风起/茶凉/暮色/像…一样等套句。${HEALING_QUALITY_RETRY_TAIL}`
+  return `【硬约束】上一句命中公式化骨架（停顿看云+也是温柔/修行、馈赠安放化作、X时像…、有些对仗等）。须换完全不同的叙事骨架，按 writing_angle 写；禁止同模板换词。${HEALING_QUALITY_RETRY_TAIL}`
+}
+
+export function buildFormulaSkeletonRetryUserSuffix(): string {
+  return buildPoeticTemplateRetryUserSuffix()
+}
+
+export function buildLiteraryClosureRetryUserSuffix(): string {
+  return `【硬约束】上一句像散文套句（馈赠、安放、化作、静静流淌、驻足前行）。改写成直白许可、身体感受或口语白描，禁止上述词与「X是Y的馈赠」骨架。${HEALING_QUALITY_RETRY_TAIL}`
 }
 
 export function buildStiffHealingRetryUserSuffix(): string {
@@ -730,6 +892,7 @@ export function buildCompanionSystemPrompt(input: BuildCompanionPromptInput): st
     POETIC_TEMPLATE_BAN_LINE,
     MOTIVATIONAL_PARALLEL_BAN_LINE,
     BLEAK_WITHOUT_COMFORT_BAN_LINE,
+    COMPANION_ANTI_TEMPLATE_BLOCK,
     ANTI_FUNCTIONAL_RELATIONSHIP_LINE,
     STYLE_ANTI_FUNCTIONAL[input.style],
     '【陪伴感底线】每句须让人感到被体谅或被托住：允许慢下来、肯定感受或当下的存在、温柔许可；禁止整句只有衰败/无力感而无接纳或指望。',
@@ -783,16 +946,39 @@ export function buildCompanionTriggerContextLines(input: {
   return lines
 }
 
-function pickDiversityAngle(seed: number): string {
-  const idx = Math.abs(seed) % DIVERSITY_ANGLES.length
+function hashStringForAngle(s: string): number {
+  let h = 0
+  for (let i = 0; i < s.length; i++) {
+    h = (Math.imul(33, h) + s.charCodeAt(i)) | 0
+  }
+  return Math.abs(h)
+}
+
+function hashRecentForAngle(recent: string[]): number {
+  return recent.reduce((acc, line) => acc + hashStringForAngle(line), 0)
+}
+
+function pickDiversityAngle(seed: number, recent: string[] = []): string {
+  const cleaned = recent.map(compactLineForPrompt).filter(Boolean)
+  const idx =
+    Math.abs(seed + hashRecentForAngle(cleaned) * 17 + cleaned.length * 13) %
+    DIVERSITY_ANGLES.length
   return DIVERSITY_ANGLES[idx] ?? DIVERSITY_ANGLES[0]
+}
+
+function buildRecentLexicalBanLines(recent: string[]): string[] {
+  const joined = recent.join(' ')
+  if (!joined) return []
+  return RECENT_LEXICAL_WATCH.filter(({ words }) =>
+    words.some((w) => joined.includes(w)),
+  ).map(({ ban }) => ban)
 }
 
 function buildOpeningConstraint(recent: string[], seed: number): string {
   const lines = recent.map(compactLineForPrompt).filter(Boolean)
   const last = lines[lines.length - 1]
-  const angle = pickDiversityAngle(seed)
-  const rules = [`【本次写法】${angle}`]
+  const angle = pickDiversityAngle(seed, lines)
+  const rules = [`【本次写法】${angle}`, ...buildRecentLexicalBanLines(lines)]
 
   if (last) {
     const firstChar = last[0]
@@ -821,9 +1007,21 @@ function buildOpeningConstraint(recent: string[], seed: number): string {
     const poeticInRecent = COMPANION_POETIC_TEMPLATE_MARKERS.filter((m) =>
       last.includes(m),
     )
-    if (poeticInRecent.length > 0 || companionTextHasPoeticTemplate(last)) {
+    if (
+      poeticInRecent.length > 0 ||
+      companionTextHasPoeticTemplate(last) ||
+      companionTextHasLiteraryClosureTemplate(last)
+    ) {
       rules.push(
-        `上一句是文艺套句（${poeticInRecent.length > 0 ? poeticInRecent.join('、') : '时+像比喻'}），本句须换完全不同的句式，禁止再起「X时，像…」。`,
+        `上一句是文艺/散文套句（${poeticInRecent.length > 0 ? poeticInRecent.join('、') : '馈赠/安放/化作/时+像'}），本句须换完全不同的句式，禁止再起「X时，像…」与馈赠式收束。`,
+      )
+    }
+    const closureInRecent = COMPANION_LITERARY_CLOSURE_MARKERS.filter((m) =>
+      lines.some((line) => line.includes(m)),
+    )
+    if (closureInRecent.length > 0) {
+      rules.push(
+        `最近句已出现「${closureInRecent.slice(0, 4).join('、')}」等，本句禁止再出现这些词。`,
       )
     }
     if (companionTextHasMotivationalParallelTemplate(last)) {
@@ -856,7 +1054,22 @@ function buildOpeningConstraint(recent: string[], seed: number): string {
         '上一句是「累了/歇」类套句；本句禁止再起「累了就…歇」骨架，改隐喻+许可或短格言，并写满最短字数。',
       )
     }
-    const bannedOpeners = ['风起', '茶凉', '暮色', '雨落', '雪落', '窗', '有些']
+    if (companionTextHasFormulaSkeleton(last)) {
+      rules.push(
+        '上一句是公式化骨架（停顿看云+也是温柔/修行、馈赠式收束等），本句须换到 writing_angle 指定的完全不同句式。',
+      )
+    }
+    const bannedOpeners = [
+      '风起',
+      '茶凉',
+      '暮色',
+      '雨落',
+      '雪落',
+      '窗',
+      '有些',
+      '偶尔',
+      '云',
+    ]
     for (const o of bannedOpeners) {
       if (last.startsWith(o)) {
         rules.push(`禁止以「${o}」起头。`)
@@ -902,7 +1115,7 @@ function buildAvoidRecentBlock(lines: string[] | undefined, seed: number): strin
   const quoted = cleaned.map((s) => `「${s}」`).join('、')
   return [
     `【禁止微改编述】以下为最近已向用户展示过的陪伴句（从旧到新）：${quoted}`,
-    '新句必须同时满足：1）不得与任一句采用同一「叙事骨架」（尤其禁止「X时，像…」「暮色+窗台」「茶凉+杯底」「有些…，…」「不是所有…但总有一些…」只换词）；2）若最近以景物比喻或励志对仗为主，本句改直白格言或许可；3）与最近一句不得共享超过 4 个连续汉字；4）禁止仅替换个别形容词应付。',
+    '新句必须同时满足：1）不得与任一句采用同一叙事骨架（禁止停顿看云+也是温柔/修行、馈赠安放化作、X时像…、有些对仗等只换词）；2）若最近以景物感悟或励志对仗为主，本句改直白许可/判断/身体感受/口语白描；3）与最近一句不得共享超过 4 个连续汉字；4）禁止仅替换个别形容词（云朵↔天空、修行↔温柔）。',
     buildOpeningConstraint(cleaned, seed + 17),
     '',
   ].join('\n')
@@ -921,7 +1134,8 @@ export function buildCompanionUserPrompt(
   const trimmed = keyword?.trim()
   const isMeta = trimmed ? COMPANION_META_KEYWORDS.has(trimmed) : false
   const kw = trimmed && !isMeta ? trimmed : undefined
-  const seed = Math.floor(Math.random() * 1_000_000_000)
+  const seed =
+    Date.now() ^ Math.floor(Math.random() * 1_000_000_000)
   const avoidBlock = buildAvoidRecentBlock(context?.avoidRecentOutputs, seed)
 
   const metaDiversity =
@@ -1007,7 +1221,7 @@ function formatInterestsForAgent(tags: string[]): string {
 }
 
 function buildStyleGuideForAgent(style: CompanionCopyStyle): string {
-  return `${STYLE_GUIDE[style]}\n${STYLE_ANTI_FUNCTIONAL[style]}`
+  return `${STYLE_GUIDE[style]}\n${STYLE_ANTI_FUNCTIONAL[style]}\n${COMPANION_ANTI_TEMPLATE_BLOCK}`
 }
 
 /** 仅注入与 interests 匹配的兴趣写作说明（无重复桌面场景条）。 */
@@ -1056,7 +1270,9 @@ function resolveCompanionCopyTrigger(
 export function buildCompanionAgentUserPromptParams(
   input: BuildCompanionAgentContextInput,
 ): Record<string, string> {
-  const seed = input.seed ?? Math.floor(Math.random() * 1_000_000_000)
+  const seed =
+    input.seed ??
+    (Date.now() ^ Math.floor(Math.random() * 1_000_000_000))
   const effectiveStyle: CompanionCopyStyle =
     input.emotion != null
       ? companionStyleForEmotion(input.emotion)
@@ -1090,7 +1306,17 @@ export function buildCompanionAgentUserPromptParams(
     moment_context: moment,
     similar_to_line: similarLine,
     local_time_hint: buildLocalTimeHintLine(input.now ?? new Date()),
-    writing_angle: pickDiversityAngle(seed),
+    writing_angle: pickDiversityAngle(seed, input.avoidRecentOutputs ?? []),
+    writing_angle_index: String(
+      Math.abs(
+        seed +
+          hashRecentForAngle(
+            (input.avoidRecentOutputs ?? []).map(compactLineForPrompt).filter(Boolean),
+          ) *
+            17 +
+          (input.avoidRecentOutputs?.length ?? 0) * 13,
+      ) % DIVERSITY_ANGLES.length,
+    ),
     avoid_recent_block: avoidBlock.trim().length > 0 ? avoidBlock.trim() : '无',
     min_chars: String(minChars),
     max_chars: String(input.maxChars),
@@ -1111,7 +1337,12 @@ export function buildCompanionAgentUserPrompt(
     '仅输出一条简体中文短句，禁止出现任何英文字母或英文单词；勿写中英夹杂。'
 
   if (trigger === 'regenerate') {
-    return `请换一句全新的陪伴短句，与最近展示明显不同；禁止照抄提示词中的示范句。${zhOnly}`
+    return [
+      '请换一句全新的陪伴短句：母题、起笔、句法、收束词均须与 avoid_recent_block 中任一句明显不同。',
+      '禁止同骨架换词（如云朵↔天空、修行↔温柔、馈赠↔礼物）；禁止停顿看云+也是温柔/修行类公式句。',
+      '严格按 writing_angle 指定的句式写，勿回到默认散文腔。禁止照抄提示词示范句。',
+      zhOnly,
+    ].join('')
   }
   if (trigger === 'similar') {
     return [

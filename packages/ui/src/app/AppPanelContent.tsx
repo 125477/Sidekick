@@ -1,5 +1,5 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
-import type { AvatarPreset, EmotionKind, EmotionRecord } from '@sidekick/core'
+import type { AvatarPreset, EmotionRecord } from '@sidekick/core'
 import { DailyMoodPanel } from '../components/emotion/DailyMoodPanel'
 import { SettingsPanel } from '../components/settings/SettingsPanel'
 import { AvatarPresetGallery } from '../components/skinning/AvatarPresetGallery'
@@ -35,10 +35,6 @@ export type AppPanelContentProps = {
   setToastAnchorReplayNonce: (v: SetStateAction<number>) => void
   emotionRecords: EmotionRecord[]
   setEmotionRecords: (v: EmotionRecord[]) => void
-  requestCompanionText: (
-    keyword?: string,
-    emotion?: EmotionKind,
-  ) => Promise<void>
   pushProactiveCompanion?: (
     fetchOptions: FetchCompanionCopyOptions,
   ) => Promise<string | null>
@@ -73,7 +69,6 @@ export function AppPanelContent({
   setToastAnchorReplayNonce,
   emotionRecords,
   setEmotionRecords,
-  requestCompanionText,
   pushProactiveCompanion,
   showToastMessage,
   restartOnboarding,
@@ -196,7 +191,6 @@ export function AppPanelContent({
           settings={settings}
           emotionRecords={emotionRecords}
           setEmotionRecords={setEmotionRecords}
-          requestCompanionText={requestCompanionText}
           {...(pushProactiveCompanion
             ? { pushProactiveCompanion }
             : {})}

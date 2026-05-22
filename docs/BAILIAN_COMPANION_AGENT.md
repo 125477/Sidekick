@@ -5,7 +5,8 @@
 
 ## 粘贴后检查
 
-- 百炼应用内声明 **18 个**自定义变量（见下文表格）；**勿**为 `style_guide` / `interest_guide` 填写默认长文（由客户端每轮注入）。
+- 百炼应用内声明 **18 个**自定义变量（见下文表格）；**勿**为 `style_guide` / `interest_guide` 填写默认长文（由客户端每轮注入，含 `COMPANION_ANTI_TEMPLATE_BLOCK` 防套句块）。
+- 系统提示词须含完整「防套句」章节（见 `BAILIAN_AGENT_PROMPT.md`）；仅改 `style_guide` 变量不够。
 - 语气细则真源：`packages/core/src/prompts/textPrompt.ts` 中 `STYLE_GUIDE` / `STYLE_ANTI_FUNCTIONAL`。
 
 ## 调用关系

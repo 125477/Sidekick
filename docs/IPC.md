@@ -34,6 +34,11 @@ TypeScript 声明：**`packages/ui/src/types/electron.d.ts`**。
 | `notifyOnboardingComplete()` | `sidekick:onboarding-complete` | invoke |
 | `onOnboardingFinished(cb)` | `sidekick:onboarding-finished` | 主→精灵 |
 | `quitApp()` | `sidekick:quit-app` | invoke |
+| `getAppUpdateStatus()` | `sidekick:app-update-get-status` | invoke |
+| `checkForAppUpdate()` | `sidekick:app-update-check` | invoke |
+| `downloadAppUpdate()` | `sidekick:app-update-download` | invoke |
+| `installAppUpdate()` | `sidekick:app-update-install` | invoke |
+| `onAppUpdateStatus(cb)` | `sidekick:app-update-status` | 主→各窗 |
 | `showSystemNotification(payload)` | `sidekick:show-system-notification` | invoke |
 
 ### 气泡窗

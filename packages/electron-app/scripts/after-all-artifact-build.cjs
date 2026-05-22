@@ -17,4 +17,15 @@ module.exports = async function afterAllArtifactBuild() {
   if (r.status !== 0) {
     throw new Error(`apply-dmg-file-icon.mjs exited with ${r.status}`)
   }
+
+  const syncYml = path.join(__dirname, 'sync-latest-mac-yml.mjs')
+  const y = spawnSync(process.execPath, [syncYml], {
+    stdio: 'inherit',
+    cwd: path.join(__dirname, '..'),
+    env: process.env,
+  })
+  if (y.error) throw y.error
+  if (y.status !== 0) {
+    throw new Error(`sync-latest-mac-yml.mjs exited with ${y.status}`)
+  }
 }

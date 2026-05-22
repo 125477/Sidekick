@@ -6,10 +6,16 @@
 
 ## [Unreleased]
 
+（暂无）
+
+## [1.1.0] - 2026-05-22
+
 ### Added
 
-- 陪伴智能体扩展：`similar` / `unlock` / `focus-end` / `journal-closure` / `streak-nudge` / `interest-deepen` 等 trigger；气泡「类似这句」；轻反馈提示 3s；`docs/PROMO.md` 推广文案。
-- `docs/RELEASE.md`：GitHub Releases 发版流程；README 增加「下载（桌面版）」链接。
+- 桌面应用内更新：`electron-updater`（GitHub `125477/Sidekick`）、启动自动检查与后台下载；设置 → 通用 → **版本更新**。
+- 陪伴智能体扩展：`similar` / `unlock` / `focus-end` / `journal-closure` / `streak-nudge` / `interest-deepen` 等 trigger；轻反馈提示 3s。
+- 情绪历史详情公众号式排版；今日小结多种**文案气泡**；设置 → 文案展示 → **气泡样式**。
+- `docs/RELEASE.md`、`docs/RELEASE_NOTES_v1.1.0.md`；`docs/PROMO.md` 推广文案。
 - 根目录 `AGENTS.md`、`docs/README.md`、`docs/IPC.md`、`docs/DECISIONS.md`、`docs/adr/*` 文档体系。
 - 拖动星星拖尾：独立 `drag-trail` 小窗 overlay（ADR-001）、彩色高亮粒子、IPC 批量打点。
 - 面板背景透明度、情绪趋势图、轻量反馈 chips 等 V1.1 相关 UI（详见 FEATURE_PLAN）。

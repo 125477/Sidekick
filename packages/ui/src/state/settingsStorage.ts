@@ -3,6 +3,7 @@ import {
   DEFAULT_QWEN_TTS_VOICE,
   QWEN_TTS_VOICE_IDS,
 } from '../constants/qwenTtsVoices'
+import { normalizeQuoteBubbleDisplayMode } from '../components/emotion/moodHistory/quoteBubbleSettings'
 import type { SidekickSettings } from './settingsState'
 import {
   DEFAULT_PUSH_INTERVAL_MINUTES,
@@ -10,6 +11,7 @@ import {
   clampDwellMinutes,
   normalizeFocusPresetMinutes,
   clampIntervalMinutes,
+  clampTextMaxChars,
   defaultSettings,
 } from './settingsState'
 
@@ -145,6 +147,10 @@ export async function loadSettings(): Promise<SidekickSettings> {
   if (merged.bailianAgentSessionId === '') {
     merged.bailianAgentSessionId = null
   }
+  merged.quoteBubbleVariant = normalizeQuoteBubbleDisplayMode(
+    merged.quoteBubbleVariant,
+  )
+  merged.textMaxChars = clampTextMaxChars(merged.textMaxChars)
 
   return merged
 }

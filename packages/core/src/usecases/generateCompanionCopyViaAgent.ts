@@ -3,7 +3,16 @@ import type { EmotionKind } from '../schema/data'
 import {
   buildCompanionAgentUserPrompt,
   buildCompanionAgentUserPromptParams,
+  buildPoeticTemplateRetryUserSuffix,
+  buildStiffHealingRetryUserSuffix,
+  buildTooShortRetryUserSuffix,
   companionMinCharsForStyle,
+  companionStyleForEmotion,
+  companionTextHasPoeticTemplate,
+  companionTextHasStiffHealingCliche,
+  companionTextNeedsPlainHealingCheck,
+  companionTextTooShort,
+  type BuildCompanionAgentContextInput,
   type CompanionCopyStyle,
   type CompanionCopyTrigger,
 } from '../prompts/textPrompt'
@@ -25,6 +34,8 @@ export type GenerateCompanionViaAgentInput = {
   yesterdayContextText?: string | null
   momentContextText?: string | null
   similarToLine?: string | null
+  /** 每轮生成唯一种子，驱动 writing_angle 与防重复块 */
+  seed?: number
   invokeAgent?: (payload: {
     appId: string
     prompt: string
@@ -89,14 +100,68 @@ function normalizeAgentLine(raw: string): string {
     .trim()
 }
 
+async function invokeCompanionAgentOnce(
+  input: GenerateCompanionViaAgentInput,
+  ctx: BuildCompanionAgentContextInput,
+  extraUserSuffix?: string,
+): Promise<{ line: string; sessionId: string | null }> {
+  const userPromptParams = buildCompanionAgentUserPromptParams(ctx)
+  const prompt = extraUserSuffix
+    ? `${buildCompanionAgentUserPrompt(ctx)}\n${extraUserSuffix}`
+    : buildCompanionAgentUserPrompt(ctx)
+  let capturedSessionId: string | null = input.sessionId ?? null
+
+  const raw = input.invokeAgent
+    ? await input.invokeAgent({
+        appId: input.appId,
+        prompt,
+        ...(input.sessionId ? { sessionId: input.sessionId } : {}),
+        userPromptParams,
+      })
+    : await requestDashScopeAgentCompletion(
+        {
+          apiKey: input.apiKey,
+          appId: input.appId,
+          prompt,
+          ...(input.sessionId != null ? { sessionId: input.sessionId } : {}),
+          userPromptParams,
+        },
+        input.requestBasePath !== undefined
+          ? { requestBasePath: input.requestBasePath }
+          : undefined,
+      )
+
+  capturedSessionId = raw.sessionId ?? capturedSessionId
+  let line = normalizeAgentLine(raw.text)
+  if (companionTextHasLatinLetters(line)) {
+    const zhOnly = keepChineseCompanionSegment(line)
+    const minChars = companionMinCharsForStyle(input.maxChars, input.style)
+    if (zhOnly.length >= minChars) {
+      line = zhOnly
+    } else {
+      throw new Error('mixed language agent line')
+    }
+  }
+  if (!line) throw new Error('empty agent line')
+  return { line, sessionId: capturedSessionId }
+}
+
 export async function generateCompanionCopyViaAgent(
   input: GenerateCompanionViaAgentInput,
 ): Promise<CompanionViaAgentResult> {
-  const ctx = {
+  const effectiveStyle: CompanionCopyStyle =
+    input.emotion != null
+      ? companionStyleForEmotion(input.emotion)
+      : input.style
+  const baseSeed =
+    input.seed ??
+    (Date.now() ^ Math.floor(Math.random() * 1_000_000_000))
+  const ctx: BuildCompanionAgentContextInput = {
     trigger: input.trigger,
     style: input.style,
     allowEmoji: input.allowEmoji,
     maxChars: input.maxChars,
+    seed: baseSeed,
     ...(input.keyword !== undefined ? { keyword: input.keyword } : {}),
     ...(input.emotion !== undefined ? { emotion: input.emotion } : {}),
     ...(input.companionInterests?.length
@@ -119,44 +184,54 @@ export async function generateCompanionCopyViaAgent(
       : {}),
   }
 
-  const userPromptParams = buildCompanionAgentUserPromptParams(ctx)
-  const prompt = buildCompanionAgentUserPrompt(ctx)
   let capturedSessionId: string | null = input.sessionId ?? null
-
   const result = await getCompanionText(async () => {
-    const raw = input.invokeAgent
-      ? await input.invokeAgent({
-          appId: input.appId,
-          prompt,
-          ...(input.sessionId ? { sessionId: input.sessionId } : {}),
-          userPromptParams,
-        })
-      : await requestDashScopeAgentCompletion(
-          {
-            apiKey: input.apiKey,
-            appId: input.appId,
-            prompt,
-            ...(input.sessionId != null ? { sessionId: input.sessionId } : {}),
-            userPromptParams,
-          },
-          input.requestBasePath !== undefined
-            ? { requestBasePath: input.requestBasePath }
-            : undefined,
-        )
+    let { line, sessionId } = await invokeCompanionAgentOnce(
+      input,
+      ctx,
+    )
+    capturedSessionId = sessionId ?? capturedSessionId
+    line = finalizeCompanionText(line, input.maxChars, input.allowEmoji)
 
-    capturedSessionId = raw.sessionId ?? capturedSessionId
-    let line = normalizeAgentLine(raw.text)
-    if (companionTextHasLatinLetters(line)) {
-      const zhOnly = keepChineseCompanionSegment(line)
-      const minChars = companionMinCharsForStyle(input.maxChars, input.style)
-      if (zhOnly.length >= minChars) {
-        line = zhOnly
-      } else {
-        throw new Error('mixed language agent line')
-      }
+    if (companionTextTooShort(line, input.maxChars, effectiveStyle)) {
+      const retry = await invokeCompanionAgentOnce(
+        input,
+        { ...ctx, seed: baseSeed + 1 },
+        buildTooShortRetryUserSuffix(input.maxChars, effectiveStyle),
+      )
+      line = finalizeCompanionText(retry.line, input.maxChars, input.allowEmoji)
+      capturedSessionId = retry.sessionId ?? capturedSessionId
     }
-    if (!line) throw new Error('empty agent line')
-    return finalizeCompanionText(line, input.maxChars, input.allowEmoji)
+    if (companionTextHasPoeticTemplate(line)) {
+      const retry = await invokeCompanionAgentOnce(
+        input,
+        { ...ctx, seed: baseSeed + 2 },
+        buildPoeticTemplateRetryUserSuffix(),
+      )
+      line = finalizeCompanionText(retry.line, input.maxChars, input.allowEmoji)
+      capturedSessionId = retry.sessionId ?? capturedSessionId
+    }
+    if (
+      companionTextNeedsPlainHealingCheck(effectiveStyle) &&
+      companionTextHasStiffHealingCliche(line)
+    ) {
+      const retry = await invokeCompanionAgentOnce(
+        input,
+        { ...ctx, seed: baseSeed + 3 },
+        buildStiffHealingRetryUserSuffix(),
+      )
+      line = finalizeCompanionText(retry.line, input.maxChars, input.allowEmoji)
+      capturedSessionId = retry.sessionId ?? capturedSessionId
+    }
+    if (
+      companionTextHasPoeticTemplate(line) ||
+      companionTextTooShort(line, input.maxChars, effectiveStyle) ||
+      (companionTextNeedsPlainHealingCheck(effectiveStyle) &&
+        companionTextHasStiffHealingCliche(line))
+    ) {
+      throw new Error('companion agent line still matches banned template')
+    }
+    return line
   }, { maxChars: input.maxChars })
 
   return {

@@ -641,6 +641,23 @@
     box-shadow: var(--sk-toast-shell-shadow-detached);
   }
 
+  /** 设置 · 自定义气泡样式：去掉外层白壳，只保留内层 MoodHistoryQuoteBubble */
+  .sk-toast-shell--styled-quote {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+    gap: 0.375rem;
+  }
+
+  .sk-toast-shell--styled-quote.sk-toast-shell--detached {
+    box-shadow: none;
+  }
+
+  .sk-toast-shell--styled-quote .sk-toast-message-cell {
+    padding: 0;
+  }
+
   /** 文案区底：默认透明，悬停/聚焦时再铺与设置卡片同色底 */
   .sk-toast-message-panel {
     border-radius: var(--sk-radius-md);
@@ -791,6 +808,335 @@
   .sk-emotion-chip-outline-btn:hover:not(:disabled) {
     border-color: var(--sk-accent-border-strong);
     background-color: var(--sk-accent-subtle-bg);
+  }
+
+  /** 历史小结详情 · 日记文案气泡（见 MoodHistoryQuoteBubble） */
+  .sk-mood-history-bubble {
+    --sk-mood-bubble-fill: var(--sk-toast-shell-bg);
+    --sk-mood-bubble-border: var(--sk-toast-shell-border);
+    --sk-mood-bubble-text: var(--sk-toast-shell-text);
+    max-width: 100%;
+  }
+
+  .sk-mood-history-bubble__text {
+    display: block;
+    font-size: 0.875rem;
+    line-height: 1.65;
+    color: var(--sk-mood-bubble-text);
+    white-space: pre-wrap;
+  }
+
+  .sk-mood-history-bubble__body {
+    border-radius: 1rem;
+    border: 1px solid var(--sk-mood-bubble-border);
+    background: var(--sk-mood-bubble-fill);
+    padding: 0.75rem 1rem;
+    box-shadow: var(--sk-toast-shell-shadow);
+  }
+
+  .sk-mood-history-bubble--companion-tail {
+    padding-bottom: 0.5rem;
+  }
+
+  .sk-mood-history-bubble--mirror .sk-mood-history-bubble__body {
+    margin-left: auto;
+    max-width: 92%;
+  }
+
+  .sk-mood-history-bubble--soft-violet {
+    border-radius: 1rem;
+    border: 1px solid var(--sk-callout-border);
+    background: var(--sk-callout-bg);
+    padding: 0.875rem 1rem;
+  }
+
+  .sk-mood-history-bubble--editorial .sk-mood-history-bubble__text {
+    font-size: 0.9375rem;
+    line-height: 1.75;
+    color: var(--sk-text-body);
+    letter-spacing: 0.01em;
+  }
+
+  .sk-mood-history-bubble--quote-bar {
+    border-left: 3px solid var(--sk-accent-border-strong);
+    padding: 0.5rem 0 0.5rem 0.875rem;
+    background: linear-gradient(
+      90deg,
+      var(--sk-accent-subtle-bg) 0%,
+      transparent 72%
+    );
+  }
+
+  .sk-mood-history-bubble--quote-bar .sk-mood-history-bubble__text {
+    font-weight: 500;
+    color: var(--sk-accent-on-subtle);
+  }
+
+  .sk-mood-history-bubble--pill {
+    display: inline-flex;
+    max-width: 100%;
+    border-radius: 9999px;
+    border: 1px solid var(--sk-chip-on-border);
+    background: var(--sk-chip-on-bg);
+    padding: 0.5rem 1rem;
+  }
+
+  .sk-mood-history-bubble--pill .sk-mood-history-bubble__text {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--sk-chip-on-text);
+    line-height: 1.4;
+  }
+
+  .sk-mood-history-bubble--whisper {
+    border-radius: 0.75rem;
+    border: 1px dashed var(--sk-accent-border);
+    background: var(--sk-card-bg);
+    padding: 0.75rem 1rem;
+  }
+
+  .sk-mood-history-bubble--whisper .sk-mood-history-bubble__text {
+    font-size: 0.8125rem;
+    font-style: italic;
+    color: var(--sk-text-muted);
+  }
+
+  .sk-mood-history-bubble--inset {
+    border-radius: var(--sk-radius-card);
+    border: 1px solid var(--sk-card-border);
+    background: var(--sk-card-bg);
+    padding: 0.875rem 1rem;
+    box-shadow: inset 0 1px 0 var(--sk-content-border);
+  }
+
+  .sk-mood-history-bubble--gradient-ring {
+    border-radius: 1rem;
+    padding: 1px;
+    background: linear-gradient(
+      135deg,
+      var(--sk-accent-border-strong),
+      var(--sk-accent-subtle-bg),
+      var(--sk-callout-border)
+    );
+  }
+
+  .sk-mood-history-bubble--gradient-ring .sk-mood-history-bubble__inner {
+    border-radius: calc(1rem - 1px);
+    background: var(--sk-content-surface);
+    padding: 0.75rem 1rem;
+  }
+
+  .sk-mood-history-bubble--highlight {
+    border-radius: 0.5rem;
+    background: var(--sk-accent-subtle-bg);
+    padding: 0.625rem 0.75rem;
+    box-decoration-break: clone;
+  }
+
+  .sk-mood-history-bubble--highlight .sk-mood-history-bubble__text {
+    font-weight: 500;
+    color: var(--sk-text-body);
+  }
+
+  .sk-mood-history-bubble--stamp {
+    position: relative;
+    margin-inline: auto;
+    max-width: 88%;
+    border-radius: 0.75rem;
+    border: 1px solid var(--sk-callout-btn-border);
+    background: var(--sk-callout-btn-bg);
+    padding: 1rem 1.25rem 0.875rem;
+    text-align: center;
+  }
+
+  .sk-mood-history-bubble--stamp .sk-mood-history-bubble__text {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--sk-callout-btn-text);
+  }
+
+  .sk-mood-history-bubble__stamp-mark {
+    position: absolute;
+    top: 0.375rem;
+    right: 0.5rem;
+    font-size: 0.625rem;
+    line-height: 1;
+    color: var(--sk-accent-border-strong);
+    opacity: 0.85;
+  }
+
+  .sk-mood-history-bubble--nested {
+    position: relative;
+    border-radius: 1.125rem;
+    padding: 0.375rem;
+    background: var(--sk-accent-subtle-bg);
+  }
+
+  .sk-mood-history-bubble__echo-ring {
+    pointer-events: none;
+    position: absolute;
+    inset: 0.25rem;
+    border-radius: 0.875rem;
+    border: 1px solid var(--sk-accent-border);
+    opacity: 0.45;
+  }
+
+  .sk-mood-history-bubble--nested .sk-mood-history-bubble__inner {
+    position: relative;
+    z-index: 1;
+    border-radius: 0.75rem;
+    border: 1px solid var(--sk-callout-border);
+    background: var(--sk-content-surface);
+    padding: 0.75rem 1rem;
+  }
+
+  .sk-mood-history-bubble--underline {
+    padding-bottom: 0.375rem;
+    border-bottom: 2px solid var(--sk-accent-border);
+  }
+
+  .sk-mood-history-bubble--underline .sk-mood-history-bubble__text {
+    color: var(--sk-text-body);
+  }
+
+  .sk-mood-history-bubble--border-card {
+    border-radius: 1.25rem;
+    border: 2px solid var(--sk-accent-border-strong);
+    background: var(--sk-content-surface);
+    padding: 1rem 1.125rem;
+    text-align: center;
+  }
+
+  .sk-mood-history-bubble--border-card .sk-mood-history-bubble__text {
+    color: var(--sk-accent-on-subtle);
+    line-height: 1.7;
+  }
+
+  .sk-mood-history-bubble--pill-solid {
+    display: flex;
+    justify-content: center;
+  }
+
+  .sk-mood-history-bubble--pill-solid .sk-mood-history-bubble__text {
+    border-radius: 9999px;
+    background: var(--sk-btn-primary-bg);
+    color: var(--sk-btn-primary-text);
+    padding: 0.625rem 1.25rem;
+    text-align: center;
+    font-weight: 600;
+    line-height: 1.5;
+    box-shadow: 0 2px 8px -2px color-mix(in srgb, var(--sk-accent) 35%, transparent);
+  }
+
+  .sk-mood-history-bubble--lavender-block {
+    border-radius: 1rem;
+    border: 1px solid var(--sk-callout-border);
+    background: var(--sk-callout-bg);
+    padding: 1rem 1.125rem;
+    text-align: center;
+  }
+
+  .sk-mood-history-bubble--lavender-block .sk-mood-history-bubble__text {
+    color: var(--sk-text-body);
+    line-height: 1.75;
+  }
+
+  .sk-mood-history-bubble--watercolor {
+    position: relative;
+    overflow: hidden;
+    border-radius: 1rem;
+    padding: 1.125rem 1rem;
+    text-align: center;
+  }
+
+  .sk-mood-history-bubble--watercolor::before {
+    content: '';
+    position: absolute;
+    inset: -15% -8%;
+    z-index: 0;
+    background:
+      radial-gradient(
+        ellipse 75% 55% at 18% 48%,
+        color-mix(in srgb, var(--sk-hero-section-border) 65%, var(--sk-content-surface)),
+        transparent 68%
+      ),
+      radial-gradient(
+        ellipse 70% 50% at 82% 42%,
+        var(--sk-callout-bg),
+        transparent 70%
+      );
+    filter: blur(10px);
+    opacity: 0.95;
+  }
+
+  .sk-mood-history-bubble--watercolor .sk-mood-history-bubble__text {
+    position: relative;
+    z-index: 1;
+    color: var(--sk-accent-on-subtle);
+    font-weight: 500;
+    line-height: 1.75;
+    text-align: center;
+  }
+
+  .sk-mood-history-bubble--arc-diamond {
+    display: flex;
+    justify-content: center;
+  }
+
+  .sk-mood-history-bubble__arc-wrap {
+    position: relative;
+    width: 100%;
+    max-width: 20rem;
+    min-height: 5.5rem;
+    padding: 1.25rem 1.5rem 1rem;
+  }
+
+  .sk-mood-history-bubble__arc-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  .sk-mood-history-bubble__arc-body {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    min-height: 4rem;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .sk-mood-history-bubble--arc-diamond .sk-mood-history-bubble__text {
+    color: var(--sk-accent-on-subtle);
+    font-weight: 500;
+    line-height: 1.65;
+    text-align: center;
+  }
+
+  .sk-mood-history-bubble--underline-accent {
+    text-align: left;
+  }
+
+  .sk-mood-history-bubble--underline-accent .sk-mood-history-bubble__text {
+    color: var(--sk-text-body);
+    line-height: 1.75;
+  }
+
+  .sk-mood-history-bubble--underline-accent::after {
+    content: '';
+    display: block;
+    width: min(100%, 12rem);
+    height: 3px;
+    margin-top: 0.625rem;
+    border-radius: 2px;
+    background: var(--sk-accent);
+  }
+
+  .sk-mood-history-detail {
+    isolation: isolate;
   }
 
   .sk-emotion-surface {
@@ -1031,6 +1377,64 @@
     gap: 0.5rem;
     padding: 0.75rem 0.875rem;
     border-bottom: 1px solid var(--sk-divider);
+  }
+
+  .sk-mood-history-back-btn {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 9999px;
+    color: var(--sk-accent-on-subtle);
+    transition: background-color 150ms ease;
+  }
+
+  .sk-mood-history-back-btn:hover:not(:disabled) {
+    background: var(--sk-accent-subtle-bg);
+  }
+
+  .sk-mood-history-back-btn:focus-visible {
+    outline: 2px solid var(--sk-focus-ring);
+    outline-offset: 2px;
+  }
+
+  .sk-mood-history-back-btn:disabled {
+    opacity: 0.5;
+  }
+
+  .sk-mood-history-head {
+    align-items: stretch;
+    padding-top: 0.625rem;
+    padding-bottom: 0.625rem;
+  }
+
+  .sk-mood-history-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem;
+  }
+
+  .sk-mood-history-mood-tag {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9999px;
+    border: 1px solid var(--sk-accent-border-strong);
+    background: var(--sk-chip-on-bg);
+    padding: 0.125rem 0.5rem;
+    font-size: 0.75rem;
+    line-height: 1.125rem;
+    font-weight: 600;
+    color: var(--sk-chip-on-text);
+  }
+
+  .sk-mood-history-meta-dot {
+    font-size: 0.75rem;
+    line-height: 1;
+    color: var(--sk-text-muted);
+    opacity: 0.65;
   }
 
   .sk-emotion-trend-chart {

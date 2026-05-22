@@ -8,7 +8,8 @@ import type {
   AvatarPreset,
   CompanionCopyStyle,
 } from '@sidekick/core'
-import { toggleTextFavorite } from '@sidekick/core'
+import { toggleToastFavorite } from './toastFavoriteToggle'
+import { resolveCompanionQuoteBubbleVariant } from '../components/emotion/moodHistory/quoteBubbleSettings'
 import { OnboardingWizard } from '../components/onboarding/OnboardingWizard'
 import { SpriteMenu, type MenuAction } from '../components/menu/SpriteMenu'
 import { SpriteShell } from '../components/sprite/SpriteShell'
@@ -201,6 +202,9 @@ export function WidgetSpriteLayer({
                 }
                 avatarSizePercent={settings.avatarSize}
                 message={uiState.toastMessage}
+                quoteBubbleVariant={resolveCompanionQuoteBubbleVariant(
+                  settings.quoteBubbleVariant,
+                )}
                 maxChars={settings.textMaxChars}
                 onRegenerate={() => requestCompanionText('换一句')}
                 onSimilar={() => requestCompanionSimilar()}
@@ -208,23 +212,20 @@ export function WidgetSpriteLayer({
                 onClose={hideEmotionToast}
                 linkedTextId={toastMeta?.id ?? null}
                 favorite={toastMeta?.favorite ?? false}
-                {...(toastMeta
-                  ? {
-                      onToggleFavorite: () => {
-                        void (async () => {
-                          const data = await toggleTextFavorite(toastMeta.id)
-                          const row = data.texts.history.find(
-                            (t) => t.id === toastMeta.id,
-                          )
-                          setToastMeta((prev) =>
-                            prev && row
-                              ? { id: row.id, favorite: row.favorite }
-                              : prev,
-                          )
-                        })()
-                      },
+                onToggleFavorite={() => {
+                  void (async () => {
+                    const result = await toggleToastFavorite({
+                      message: uiState.toastMessage,
+                      textId: toastMeta?.id,
+                    })
+                    if (result) {
+                      setToastMeta({
+                        id: result.id,
+                        favorite: result.favorite,
+                      })
                     }
-                  : {})}
+                  })()
+                }}
                 onCopy={() =>
                   navigator.clipboard.writeText(uiState.toastMessage)
                 }

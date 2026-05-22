@@ -5,7 +5,10 @@ import { PanelBackgroundPicker } from '../panel/PanelBackgroundPicker'
 import {
   clampDwellMinutes,
   clampIntervalMinutes,
+  clampTextMaxChars,
   isFocusPresetMinutesValid,
+  MAX_TEXT_MAX_CHARS,
+  MIN_TEXT_MAX_CHARS,
   defaultSettings,
   type SidekickSettings,
 } from '../../state/settingsState'
@@ -19,6 +22,7 @@ import {
   PRIVACY_POLICY_SECTIONS,
 } from '../../constants/privacyPolicyCopy'
 import { QWEN_TTS_VOICES } from '../../constants/qwenTtsVoices'
+import { AppUpdateSettingsSection } from './AppUpdateSettingsSection'
 
 const COPY_STYLE_OPTIONS: CompanionCopyStyle[] = [
   '治愈',
@@ -452,7 +456,7 @@ export function SettingsPanel({
                   !settings.dailyMoodEnabled || !settings.dailyMoodReminderEnabled
                 }
               />
-              {window.sidekickDesktop?.showCornerNotification ? (
+              {/* {window.sidekickDesktop?.showCornerNotification ? (
                 <button
                   type="button"
                   className="sk-btn-secondary sk-toast-clickable w-fit cursor-pointer text-sm"
@@ -471,7 +475,7 @@ export function SettingsPanel({
               ) : null}
               <p className="sk-muted text-xs leading-relaxed">
                 到点会在屏幕右下角弹出提醒卡片（使用应用图标），需手动关闭；点击「去写小结」打开情绪反馈并定位到「今日小结」。修改提醒时间会重新触发；记录仅存本机 IndexedDB。
-              </p>
+              </p> */}
             </SettingsSubsection>
 
             <SettingsSubsection title="推送后形象">
@@ -581,6 +585,15 @@ export function SettingsPanel({
                 </button>
               </div>
             </SettingsSubsection>
+
+            {/* <SettingsSubsection title="气泡样式">
+              <QuoteBubbleSettingsSection
+                value={settings.quoteBubbleVariant}
+                onChange={(next: QuoteBubbleDisplayMode) =>
+                  update('quoteBubbleVariant', next)
+                }
+              />
+            </SettingsSubsection> */}
 
             <SettingsSubsection title="兴趣偏好（可选）">
               <div className="flex flex-wrap gap-1.5">
@@ -745,11 +758,14 @@ export function SettingsPanel({
                 <span className="sk-label">文案最大字数</span>
                 <input
                   type="number"
-                  min={10}
-                  max={60}
+                  min={MIN_TEXT_MAX_CHARS}
+                  max={MAX_TEXT_MAX_CHARS}
                   value={settings.textMaxChars}
                   onChange={(event) =>
-                    update('textMaxChars', Number(event.target.value))
+                    update(
+                      'textMaxChars',
+                      clampTextMaxChars(Number(event.target.value)),
+                    )
                   }
                   className="sk-input"
                 />
@@ -802,6 +818,7 @@ export function SettingsPanel({
                 onCheckedChange={(v) => update('launchAtLogin', v)}
               />
             </SettingsSubsection>
+            <AppUpdateSettingsSection />
             <SettingsSubsection title="外观与语言">
               <div className="grid gap-2">
                 <span className="sk-label" id="settings-dark-mode-source-lbl">

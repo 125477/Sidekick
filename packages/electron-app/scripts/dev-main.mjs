@@ -2,6 +2,7 @@ import fs from 'node:fs'
 
 import { app, BrowserWindow, nativeImage } from 'electron'
 import { APP_DISPLAY_NAME } from './main/constants.mjs'
+import { registerAutoUpdaterLifecycle } from './main/autoUpdater.mjs'
 import { createSpriteWindow, registerSidekickIpcHandlers } from './main/ipcHandlers.mjs'
 import { registerDailyMoodReminderWatchdog } from './main/dailyMoodReminderWatchdog.mjs'
 import { registerPowerMonitorResume } from './main/powerMonitor.mjs'
@@ -25,6 +26,7 @@ app.whenReady().then(() => {
   }
 
   createSpriteWindow()
+  registerAutoUpdaterLifecycle()
   registerPowerMonitorResume()
   registerDailyMoodReminderWatchdog()
 

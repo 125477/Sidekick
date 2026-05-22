@@ -1,4 +1,8 @@
 import { app, ipcMain, screen } from 'electron'
+import {
+  registerAppUpdateIpcHandlers,
+  registerAutoUpdaterLifecycle,
+} from './autoUpdater.mjs'
 import { dashscopeTtsFetch } from '../dashscopeTtsFetch.mjs'
 import { dashscopeAgentComplete } from './dashscopeAgent.mjs'
 import { dashscopeChatCompleteWithFallback } from './dashscopeChat.mjs'
@@ -54,6 +58,8 @@ import {
 
 /** Register before `ready` so renderer `invoke` never races an empty IPC table (Electron guidance). */
 export function registerSidekickIpcHandlers() {
+  registerAppUpdateIpcHandlers()
+
   ipcMain.handle('sidekick:open-panel', (_event, payload) => {
     const panel =
       typeof payload === 'string'

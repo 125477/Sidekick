@@ -1,3 +1,6 @@
+import { MoodHistoryQuoteBubble } from '../emotion/moodHistory/MoodHistoryQuoteBubble'
+import type { MoodHistoryQuoteBubbleVariant } from '../emotion/moodHistory/moodHistoryQuoteBubbleVariants'
+import { usesCompanionToastShell } from '../emotion/moodHistory/quoteBubbleSettings'
 import {
   toastMessageCellWrapClass,
   toastMessageTextClass,
@@ -12,9 +15,8 @@ type EmotionToastMessageCellProps = {
   onRegenerateClick: () => void | Promise<void>
   multiline?: boolean
   compactLayout?: boolean
+  quoteBubbleVariant?: MoodHistoryQuoteBubbleVariant
 }
-
-// EmotionToastHoverTip 暂时关闭；文案区不显示悬停提示。
 
 export function EmotionToastMessageCell({
   message,
@@ -24,33 +26,57 @@ export function EmotionToastMessageCell({
   onRegenerateClick,
   multiline = false,
   compactLayout = false,
+  quoteBubbleVariant = 'companion-tail',
 }: EmotionToastMessageCellProps) {
   const textClass = toastMessageTextClass(compactLayout, multiline)
   const tipDisabled = regenerating || toastPassthroughLocked
+  const useStyledBubble = !usesCompanionToastShell(quoteBubbleVariant)
+
+  const plainContent = messageClickable ? (
+    <button
+      type="button"
+      disabled={tipDisabled}
+      onClick={async (event) => {
+        event.stopPropagation()
+        await onRegenerateClick()
+      }}
+      className={`${textClass} sk-toast-clickable rounded-md transition-colors outline-none focus-visible:outline-none disabled:cursor-wait disabled:opacity-90`}
+    >
+      {message}
+    </button>
+  ) : (
+    <span
+      className={`${textClass} ${
+        toastPassthroughLocked ? 'pointer-events-none' : ''
+      }`}
+    >
+      {message}
+    </span>
+  )
+
+  const bubbleInner = messageClickable ? (
+    <button
+      type="button"
+      disabled={tipDisabled}
+      onClick={async (event) => {
+        event.stopPropagation()
+        await onRegenerateClick()
+      }}
+      className="sk-toast-clickable w-full text-left outline-none focus-visible:outline-none disabled:cursor-wait disabled:opacity-90"
+    >
+      <MoodHistoryQuoteBubble variant={quoteBubbleVariant}>
+        {message}
+      </MoodHistoryQuoteBubble>
+    </button>
+  ) : (
+    <MoodHistoryQuoteBubble variant={quoteBubbleVariant}>
+      {message}
+    </MoodHistoryQuoteBubble>
+  )
 
   return (
     <div className={toastMessageCellWrapClass(compactLayout)}>
-      {messageClickable ? (
-        <button
-          type="button"
-          disabled={tipDisabled}
-          onClick={async (event) => {
-            event.stopPropagation()
-            await onRegenerateClick()
-          }}
-          className={`${textClass} sk-toast-clickable rounded-md transition-colors outline-none focus-visible:outline-none disabled:cursor-wait disabled:opacity-90`}
-        >
-          {message}
-        </button>
-      ) : (
-        <span
-          className={`${textClass} ${
-            toastPassthroughLocked ? 'pointer-events-none' : ''
-          }`}
-        >
-          {message}
-        </span>
-      )}
+      {useStyledBubble ? bubbleInner : plainContent}
     </div>
   )
 }

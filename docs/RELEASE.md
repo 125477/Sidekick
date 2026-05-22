@@ -11,10 +11,12 @@
 
 | 系统 | 安装包（文件名以 `electron-builder` 实际输出为准） | 说明 |
 |------|--------------------------------------------------|------|
-| **macOS** | `灵伴-<版本>.dmg`（或同目录下的 `.zip`） | Apple Silicon / Intel 以你本机打包架构为准；未公证时首次打开需在「系统设置 → 隐私与安全性」中允许。 |
-| **Windows** | `Sidekick Setup <版本>.exe`（NSIS 安装程序） | 当前配置为 **x64**；未代码签名时 SmartScreen 可能提示，需点「仍要运行」。 |
+| **macOS** | `Lingban-<版本>-arm64.dmg` | 应用内显示名仍为「灵伴」；未公证时首次打开需在「系统设置 → 隐私与安全性」中允许。 |
+| **Windows** | `Lingban-Setup-<版本>.exe` | 当前配置为 **x64**；进程名仍为 Sidekick；未代码签名时 SmartScreen 可能提示。 |
 
 产物目录（已 `.gitignore`）：`packages/electron-app/release/`
+
+**安装包文件名 vs 应用显示名**：GitHub Release 等资源 URL 对中文文件名支持差，上传后可能只剩 `1.1.0-arm64-mac.zip`。因此 **`productName` 仍为「灵伴」**（启动台、Dock、关于页显示），**发布文件名统一用 ASCII 前缀 `Lingban-`**（与 `appId` `app.lingban.companion` 一致）。用户看到的仍是灵伴，下载的是 `Lingban-1.1.0-arm64-mac.zip` 等。
 
 ---
 
@@ -63,14 +65,28 @@ git push origin v0.1.0
 
 1. 打开 <https://github.com/125477/Sidekick/releases/new>
 2. **Choose a tag**：选刚推送的 `v0.1.0`（或新建同名 tag）
-3. **Release title**：例如 `v0.1.0` 或 `灵伴 0.1.0`
-4. **Describe**：从 `CHANGELOG.md` 粘贴本版说明；可附上：
+3. **Release title**：例如 `v1.1.0` 或 `灵伴 1.1.0`
+4. **Describe**：从 `CHANGELOG.md` 粘贴，或直接使用 [`RELEASE_NOTES_v1.1.0.md`](./RELEASE_NOTES_v1.1.0.md)（GitHub 发布页正文，含下载表与自动更新说明）；可附上：
    - macOS / Windows 各下哪个文件
    - 未签名时的系统安全提示说明
    - 需要的系统版本（如 macOS 12+、Windows 10+）
-5. **Attach binaries**：把 `packages/electron-app/release/` 里对应安装包拖进 **Release assets**（建议至少上传面向用户的 `.dmg` 与 `.exe`；`.blockmap`、`.yml` 可选，用于自动更新时再考虑）
+5. **Attach binaries**：把 `packages/electron-app/release/` 里**全部**与版本相关的产物拖进 **Release assets**：
+   - **用户手动安装**：macOS `.dmg`、Windows `Sidekick Setup *.exe`
+   - **应用内自动更新（必须）**：
+     - macOS：`Lingban-<版本>-arm64-mac.zip`、`latest-mac.yml`、同名 `.zip.blockmap`（勿用中文文件名；`pack:mac` 末尾会同步 yml）
+     - Windows：`Sidekick Setup <版本>.exe`、`latest.yml`、对应 `.exe.blockmap`
+   - 仅上传 `.dmg` / 安装 `.exe` 时，已安装客户端**无法**通过 `electron-updater` 完成更新
 6. 若首版：可勾选 **Set as the latest release**
 7. 点击 **Publish release**
+
+也可用 `electron-builder` 直接发布（需 `GH_TOKEN`）：
+
+```bash
+# 打包并上传当前平台产物 + yml/blockmap 到 GitHub Release（标签须已存在且 version 一致）
+GH_TOKEN=<github_pat> pnpm --filter sidekick-electron exec electron-builder --publish always
+```
+
+`packages/electron-app/package.json` 的 `build.publish` 已指向 `125477/Sidekick`。
 
 ### 5. 验证
 
@@ -86,7 +102,7 @@ git push origin v0.1.0
 | **GitHub Actions 自动打包** | push tag 时在 CI 里跑 `electron-builder` 并上传 assets；省本机双平台，但需配置 macOS / Windows runner 与签名密钥。 |
 | **独立官网** | 静态页链到 `releases/latest` 即可，仍可不租服务器。 |
 | **mac 公证 / Win 签名** | 减少系统安全拦截；需 Apple Developer、Windows 代码签名证书（付费）。 |
-| **应用内自动更新** | `electron-updater` + Release 上的 `latest.yml`；可另开需求再做。 |
+| **应用内自动更新** | 已实现：`electron-updater`（启动约 12s 后检查、后台下载）；设置 → 通用 → **版本更新** 可手动检查 / 重启安装。 |
 
 ---
 

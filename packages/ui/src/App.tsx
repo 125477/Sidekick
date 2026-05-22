@@ -40,6 +40,7 @@ import { FortuneWidgetModal } from './app/FortuneWidgetModal'
 import { HostAppMain } from './app/HostAppMain'
 import { DragTrailOverlayPage } from './app/DragTrailOverlayPage'
 import { CornerNotificationPage } from './app/CornerNotificationPage'
+import { MoodHistoryQuoteBubbleGallery } from './components/emotion/moodHistory/MoodHistoryQuoteBubbleGallery'
 import type { MenuAction } from './components/menu/SpriteMenu'
 
 function App() {
@@ -192,6 +193,8 @@ function App() {
   const isSpriteMenuMode = mode === 'sprite-menu'
   const isDragTrailMode = mode === 'drag-trail'
   const isCornerNotificationMode = mode === 'corner-notification'
+  const isMoodHistoryBubbleGalleryMode =
+    mode === 'mood-history-bubble-gallery'
   /** sprite-menu 不在此同步：用 URL `?theme=`，且避免未 hydrate 的 settings 盖掉暗黑。 */
   const themeSyncApplies =
     isPanelMode ||
@@ -431,7 +434,6 @@ function App() {
       setToastAnchorReplayNonce={setToastAnchorReplayNonce}
       emotionRecords={emotionRecords}
       setEmotionRecords={setEmotionRecords}
-      requestCompanionText={requestCompanionText}
       pushProactiveCompanion={pushProactiveCompanion}
       showToastMessage={showToastMessage}
       restartOnboarding={restartOnboarding}
@@ -483,6 +485,10 @@ function App() {
       spriteMenuUsesBrowserPopup={spriteMenuUsesBrowserPopup}
     />
   )
+
+  if (isMoodHistoryBubbleGalleryMode) {
+    return <MoodHistoryQuoteBubbleGallery />
+  }
 
   if (isCornerNotificationMode) {
     return (

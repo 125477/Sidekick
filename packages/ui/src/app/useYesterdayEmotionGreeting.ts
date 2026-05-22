@@ -1,6 +1,6 @@
 import type { MutableRefObject } from 'react'
 import { useEffect, useRef } from 'react'
-import type { EmotionRecord } from '@sidekick/core'
+import { appendText, type EmotionRecord } from '@sidekick/core'
 import { localDayKey } from '../state/moodJournalStorage'
 import type { SidekickSettings } from '../state/settingsState'
 import {
@@ -31,6 +31,8 @@ export type UseYesterdayEmotionGreetingArgs = {
     opts?: {
       dwellSeconds?: number
       toastMode?: 'normal' | 'intro'
+      textId?: string | null
+      favorite?: boolean
     },
   ) => Promise<void>
 }
@@ -97,8 +99,17 @@ export function useYesterdayEmotionGreeting({
           text = buildYesterdayGreetingText(ctx)
         }
 
+        const next = await appendText({
+          id: `text-${Date.now()}`,
+          content: text,
+          createdAt: new Date().toISOString(),
+          source: 'model',
+          favorite: false,
+        })
+        const newId = next.texts.history[0]?.id
         await showToastMessage(text, {
           dwellSeconds: s.toastAlwaysVisible ? 0 : s.dwellMinutes * 60,
+          ...(newId ? { textId: newId, favorite: false } : {}),
         })
         await saveLastYesterdayGreetingDayKey(today)
         scheduleBlockClear()

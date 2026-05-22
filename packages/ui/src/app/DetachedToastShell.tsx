@@ -5,7 +5,8 @@ import {
   replayCompanionSpeech,
   speakCompanionLine,
 } from '../utils/companionTts'
-import { toggleTextFavorite } from '@sidekick/core'
+import { toggleToastFavorite } from './toastFavoriteToggle'
+import { resolveCompanionQuoteBubbleVariant } from '../components/emotion/moodHistory/quoteBubbleSettings'
 import type { SidekickSettings } from '../state/settingsState'
 import { saveAppSelfIntroShown } from '../state/appSelfIntroStorage'
 import { broadcastAppSelfIntroDismissed } from '../state/appSelfIntroSync'
@@ -109,6 +110,13 @@ export function DetachedToastShell({
               zIndexClass={zLayers.toast}
               dwellSeconds={0}
               message={toastMessageFromQuery}
+              quoteBubbleVariant={
+                introMode
+                  ? 'companion-tail'
+                  : resolveCompanionQuoteBubbleVariant(
+                      settings.quoteBubbleVariant,
+                    )
+              }
               {...(introMode ? {} : { maxChars: settings.textMaxChars })}
               {...(introMode
                 ? { messageRegeneratesOnClick: false }
@@ -124,21 +132,28 @@ export function DetachedToastShell({
                   })}
               linkedTextId={toastTextIdFromQuery}
               favorite={toastDetachFavorite}
-              {...(toastTextIdFromQuery
-                ? {
-                    onToggleFavorite: () => {
-                      void (async () => {
-                        const data = await toggleTextFavorite(
-                          toastTextIdFromQuery,
-                        )
-                        const row = data.texts.history.find(
-                          (t) => t.id === toastTextIdFromQuery,
-                        )
-                        if (row) setToastDetachFavorite(row.favorite)
-                      })()
-                    },
+              onToggleFavorite={() => {
+                void (async () => {
+                  const result = await toggleToastFavorite({
+                    message: toastMessageFromQuery,
+                    textId: toastTextIdFromQuery,
+                  })
+                  if (!result) return
+                  setToastDetachFavorite(result.favorite)
+                  if (
+                    result.id !== toastTextIdFromQuery &&
+                    window.sidekickDesktop?.showToastWindow
+                  ) {
+                    await window.sidekickDesktop.showToastWindow({
+                      message: toastMessageFromQuery,
+                      textId: result.id,
+                      favorite: result.favorite,
+                      anchor: toastDetachAnchor,
+                      dwellSeconds: 0,
+                    })
                   }
-                : {})}
+                })()
+              }}
               onCopy={() =>
                 navigator.clipboard.writeText(toastMessageFromQuery)
               }

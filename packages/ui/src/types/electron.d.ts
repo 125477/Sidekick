@@ -83,6 +83,25 @@ type DashScopeTtsResult = {
   mimeType?: string
 }
 
+type AppUpdatePhase =
+  | 'idle'
+  | 'checking'
+  | 'available'
+  | 'not-available'
+  | 'downloading'
+  | 'downloaded'
+  | 'error'
+
+type AppUpdateSnapshot = {
+  enabled: boolean
+  currentVersion: string
+  phase: AppUpdatePhase
+  version?: string
+  percent?: number
+  message?: string
+  releaseNotes?: string
+}
+
 type SidekickDesktopApi = {
   openPanelWindow: (
     panel: SidekickPanel,
@@ -228,6 +247,12 @@ type SidekickDesktopApi = {
   dashscopeTts?: (payload: DashScopeTtsPayload) => Promise<DashScopeTtsResult>
   /** 退出桌面应用（主进程 `app.quit()`）。纯 Web 无注入时不存在。 */
   quitApp?: () => Promise<void>
+  /** 应用内更新（仅打包版；`electron-updater` + GitHub Releases）。 */
+  getAppUpdateStatus?: () => Promise<AppUpdateSnapshot>
+  checkForAppUpdate?: () => Promise<AppUpdateSnapshot>
+  downloadAppUpdate?: () => Promise<AppUpdateSnapshot>
+  installAppUpdate?: () => Promise<boolean>
+  onAppUpdateStatus?: (callback: (snapshot: AppUpdateSnapshot) => void) => () => void
   /** 挂件：打开独立菜单窗（`mode=sprite-menu`），`bounds` 为屏幕坐标。 */
   openWidgetSpriteMenu?: (bounds: SidekickSpriteMenuAnchor) => Promise<void>
   /** 屏外预加载菜单页，减少首开白闪（挂件/气泡在主题就绪后调用）。 */

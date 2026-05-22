@@ -5,6 +5,11 @@ import {
   canAddMoodAttachments,
   fileToMoodAttachment,
 } from '../../state/moodJournalMedia'
+import {
+  MOOD_MEDIA_TILE_CLASS,
+  MoodMediaTileFrame,
+  MoodMediaTileMedia,
+} from './moodMediaTile'
 
 type MoodSummaryMediaPickerProps = {
   attachments: MoodMediaAttachment[]
@@ -14,10 +19,6 @@ type MoodSummaryMediaPickerProps = {
   /** 嵌入写作区底部：紧凑标签、透明底 */
   embedded?: boolean
 }
-
-/** 预览与「+」统一宽度。 */
-const MOOD_MEDIA_TILE =
-  'relative min-w-0 w-[9.5rem] shrink-0 sm:w-[10.5rem]'
 
 function MoodMediaDeleteButton({
   label,
@@ -68,28 +69,10 @@ function MoodMediaPreviewTile({
 }) {
   const a11yLabel = att.type === 'video' ? '视频' : '图片'
   return (
-    <li className={`group/moodmedia ${MOOD_MEDIA_TILE}`}>
-      <div className="overflow-hidden rounded-xl border border-[color:var(--sk-callout-border)] p-1 sm:p-1.5">
-        <div className="relative flex aspect-square w-full min-h-0 min-w-0 items-center justify-center overflow-hidden rounded-lg bg-[color:var(--sk-content-surface)]">
-          {att.type === 'video' ? (
-            <video
-              src={att.dataUrl}
-              className="max-h-full max-w-full rounded-lg object-contain"
-              muted
-              playsInline
-              loop
-              preload="metadata"
-              aria-label={a11yLabel}
-            />
-          ) : (
-            <img
-              src={att.dataUrl}
-              alt={a11yLabel}
-              className="max-h-full max-w-full rounded-lg object-contain"
-            />
-          )}
-        </div>
-      </div>
+    <li className={`group/moodmedia ${MOOD_MEDIA_TILE_CLASS}`}>
+      <MoodMediaTileFrame>
+        <MoodMediaTileMedia att={att} playback="preview" />
+      </MoodMediaTileFrame>
       <MoodMediaDeleteButton
         label={a11yLabel}
         disabled={disabled}
@@ -160,7 +143,7 @@ export function MoodSummaryMediaPicker({
           />
         ))}
         {canAdd ? (
-          <li className={MOOD_MEDIA_TILE}>
+          <li className={MOOD_MEDIA_TILE_CLASS}>
             <button
               type="button"
               disabled={disabled}

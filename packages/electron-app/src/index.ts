@@ -1,4 +1,4 @@
-export const ELECTRON_APP_PACKAGE = '@sidekick/electron-app'
+export const ELECTRON_APP_PACKAGE = 'sidekick-electron'
 
 export * from './main/scheduler'
 export * from './main/windowLayer'

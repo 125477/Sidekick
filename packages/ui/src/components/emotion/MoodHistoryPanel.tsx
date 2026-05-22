@@ -1,10 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { MoodJournalEntry } from '../../state/moodJournalStorage'
+import type { QuoteBubbleDisplayMode } from './moodHistory/quoteBubbleSettings'
 import { moodEntryDisplayLabel } from './emotionChips'
+import { MoodHistoryDetail } from './moodHistory/MoodHistoryDetail'
 
 type MoodHistoryPanelProps = {
   entries: MoodJournalEntry[]
+  quoteBubbleMode?: QuoteBubbleDisplayMode
   onDeleteEntry?: (id: string) => Promise<void>
+  /** 进入/离开详情时通知外层隐藏列表顶栏 */
+  onDetailOpenChange?: (open: boolean) => void
 }
 
 function notePreview(note: string, maxLen = 72): string {
@@ -15,11 +20,17 @@ function notePreview(note: string, maxLen = 72): string {
 
 export function MoodHistoryPanel({
   entries,
+  quoteBubbleMode = 'auto',
   onDeleteEntry,
+  onDetailOpenChange,
 }: MoodHistoryPanelProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const selected =
     selectedId != null ? entries.find((e) => e.id === selectedId) ?? null : null
+
+  useEffect(() => {
+    onDetailOpenChange?.(selectedId != null)
+  }, [selectedId, onDetailOpenChange])
 
   if (entries.length === 0) {
     return (
@@ -32,6 +43,7 @@ export function MoodHistoryPanel({
   if (selected) {
     const detailProps = {
       entry: selected,
+      quoteBubbleMode,
       onBack: () => setSelectedId(null),
       ...(onDeleteEntry
         ? {
@@ -70,109 +82,6 @@ export function MoodHistoryPanel({
           </li>
         ))}
       </ul>
-    </div>
-  )
-}
-
-function MoodHistoryDetail({
-  entry,
-  onBack,
-  onDelete,
-}: {
-  entry: MoodJournalEntry
-  onBack: () => void
-  onDelete?: () => Promise<void>
-}) {
-  const mood = moodEntryDisplayLabel(entry)
-  const attachments = entry.attachments ?? []
-  const [deleting, setDeleting] = useState(false)
-
-  const handleDelete = async () => {
-    if (!onDelete || deleting) return
-    const ok = window.confirm(
-      `确定删除 ${entry.dayKey} 的心情小结吗？此操作不可恢复。`,
-    )
-    if (!ok) return
-    setDeleting(true)
-    try {
-      await onDelete()
-    } finally {
-      setDeleting(false)
-    }
-  }
-
-  return (
-    <div className="flex max-h-[min(420px,60vh)] flex-col overflow-y-auto p-3">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          className="sk-emotion-chip-outline-btn"
-          onClick={onBack}
-          disabled={deleting}
-        >
-          返回列表
-        </button>
-        {onDelete ? (
-          <button
-            type="button"
-            className="rounded-full border border-rose-200 px-3 py-1 text-sm text-rose-700 hover:bg-rose-50 disabled:opacity-50"
-            onClick={() => void handleDelete()}
-            disabled={deleting}
-          >
-            {deleting ? '删除中…' : '删除这条记录'}
-          </button>
-        ) : null}
-      </div>
-      <div className="grid gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="sk-emotion-chip sk-emotion-chip--active inline-flex px-3 py-0.5 text-sm">
-            {mood}
-          </span>
-          <span className="text-base font-medium text-[color:var(--sk-text-body)] tabular-nums">
-            {entry.dayKey}
-          </span>
-        </div>
-        <section>
-          <h4 className="sk-label mb-1 text-xs">日记</h4>
-          {entry.note.trim() ? (
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-[color:var(--sk-text-body)]">
-              {entry.note}
-            </p>
-          ) : (
-            <p className="sk-muted text-sm">（无文字）</p>
-          )}
-        </section>
-        {attachments.length > 0 ? (
-          <section>
-            <h4 className="sk-label mb-2 text-xs">
-              图片与视频
-            </h4>
-            <ul className="grid grid-cols-2 gap-2">
-              {attachments.map((att) => (
-                <li
-                  key={att.id}
-                  className="overflow-hidden rounded-lg border border-[color:var(--sk-callout-border)]"
-                >
-                  {att.type === 'video' ? (
-                    <video
-                      src={att.dataUrl}
-                      className="aspect-video w-full object-cover"
-                      controls
-                      preload="metadata"
-                    />
-                  ) : (
-                    <img
-                      src={att.dataUrl}
-                      alt={att.name}
-                      className="aspect-square w-full object-cover"
-                    />
-                  )}
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
-      </div>
     </div>
   )
 }

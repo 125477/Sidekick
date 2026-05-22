@@ -19,6 +19,10 @@ import {
   usesDetachedToastWindow,
 } from '../utils/companionTts'
 import { subscribeAppSelfIntroDismissed } from '../state/appSelfIntroSync'
+import {
+  clearPendingEmotionForCompanion,
+  readPendingEmotionForCompanion,
+} from '../state/pendingEmotionStorage'
 
 export type UseScheduledCompanionPushArgs = {
   settings: SidekickSettings
@@ -89,15 +93,19 @@ export function useScheduledCompanionPush({
         if (!s.pushEnabled || !canPushNow(s)) return
         const fetchId = startCompanionCopyRequest()
         const avoidPush = recentCompanionLinesRef.current
+        const pendingEmotion = await readPendingEmotionForCompanion()
         const result = await fetchCompanionCopy(
           s,
           undefined,
-          undefined,
+          pendingEmotion ?? undefined,
           avoidPush.length > 0 ? avoidPush : undefined,
-          { trigger: 'scheduled' },
+          pendingEmotion
+            ? { trigger: 'emotion' }
+            : { trigger: 'scheduled' },
         )
         await persistBailianAgentSessionId(settingsRef, result.sessionId)
         if (!shouldApplyCompanionCopyResult(fetchId, result.source)) return
+        if (pendingEmotion) await clearPendingEmotionForCompanion()
         const next = await appendText({
           id: `text-${Date.now()}`,
           content: result.text,

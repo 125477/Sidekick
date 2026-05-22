@@ -13,7 +13,6 @@ import {
   IconToolbarLockClosed,
   IconToolbarLockOpen,
   IconToolbarMenu,
-  IconToolbarRefresh,
   IconToolbarSettings,
   IconToolbarSkin,
   IconToolbarSpeaker,
@@ -87,7 +86,7 @@ export function EmotionToastUnlockedToolbar({
   regenerating,
   copyDone,
   favorite,
-  maxChars,
+  maxChars: _maxChars,
   toastBarPinnedOpen,
   unlockedToolbarHot,
   toolbarMenuHoldOpen,
@@ -97,7 +96,7 @@ export function EmotionToastUnlockedToolbar({
   copyResetTimerRef,
   setUnlockedToolbarHot,
   setCopyDone,
-  regenInToolbar,
+  regenInToolbar: _regenInToolbar,
   showCopy,
   showReplay,
   showFavorite,
@@ -121,14 +120,15 @@ export function EmotionToastUnlockedToolbar({
   onOpenMenu,
   onSpriteInteractionLockedChange,
   onClose,
-  runRegenerate,
+  runRegenerate: _runRegenerate,
+  runSimilar: _runSimilar,
+  showSimilar: _showSimilar = false,
 }: EmotionToastUnlockedToolbarProps) {
   const chromeRevealed =
     introMode ||
     toolbarMenuHoldOpen ||
     unlockedToolbarHot ||
-    (!spriteInteractionLockedOnly && toastBarPinnedOpen) ||
-    (spriteInteractionLockedOnly && !detached && toastBarPinnedOpen)
+    (!detached && toastBarPinnedOpen)
 
   const lockedWidget = spriteInteractionLockedOnly && !detached
   const chromeRevealClass = (revealed: boolean) =>
@@ -231,6 +231,7 @@ export function EmotionToastUnlockedToolbar({
                 </EmotionToastToolbarIconButton>
               </div>
             ) : null}
+            {/* 换一句：工具栏暂不展示（仍可点击正文换句）
             {!spriteInteractionLockedOnly && regenInToolbar ? (
               <EmotionToastToolbarIconButton
                 title={
@@ -248,7 +249,8 @@ export function EmotionToastUnlockedToolbar({
                 <IconToolbarRefresh className="h-[15px] w-[15px] shrink-0" />
               </EmotionToastToolbarIconButton>
             ) : null}
-            {/* 类似这句：暂不展示
+            */}
+            {/* 类似这句：工具栏暂不展示
             {!spriteInteractionLockedOnly && showSimilar && runSimilar ? (
               <EmotionToastToolbarIconButton
                 title={

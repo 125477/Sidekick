@@ -60,7 +60,6 @@ export function useEmotionToastChrome({
   onRegenerate,
   keepRegenerateLoadingUntilUnmount = false,
   onClose,
-  linkedTextId,
   onCopy,
   messageRegeneratesOnClick = true,
   onReplayTts,
@@ -114,15 +113,12 @@ export function useEmotionToastChrome({
     return () => window.clearTimeout(id)
   }, [dwellSeconds, visible, onClose])
 
-  const regenInToolbar =
-    !introMode &&
-    Boolean(onRegenerate && messageRegeneratesOnClick === false)
+  const regenInToolbar = !introMode && Boolean(onRegenerate)
   const messageClickable =
     !introMode &&
     Boolean(onRegenerate && messageRegeneratesOnClick !== false)
   const showCopy = !introMode && Boolean(onCopy && message.trim())
-  const showFavorite =
-    !introMode && Boolean(linkedTextId && onToggleFavorite)
+  const showFavorite = !introMode && Boolean(onToggleFavorite)
   const showReplay = !introMode && Boolean(onReplayTts)
   const showEmotionFeedback = !introMode && Boolean(onOpenEmotion)
   const showSettings = !introMode && Boolean(onOpenSettings)
@@ -163,12 +159,14 @@ export function useEmotionToastChrome({
     }
   }, [visible, spriteInteractionLocked])
 
-  const toolbarChromeRevealed =
-    introMode ||
-    toolbarMenuHoldOpen ||
-    unlockedToolbarHot ||
-    (!showLockedOnlyToolbar && toastBarPinnedOpen) ||
-    (showLockedOnlyToolbar && !detached && spriteHoverReveal)
+  /** 独立气泡：锁定/未锁定均只靠悬停热态展开；挂件内仍保留 pinned / hover 展开。 */
+  const toolbarChromeRevealed = detached
+    ? introMode || toolbarMenuHoldOpen || unlockedToolbarHot
+    : introMode ||
+      toolbarMenuHoldOpen ||
+      unlockedToolbarHot ||
+      (!showLockedOnlyToolbar && toastBarPinnedOpen) ||
+      (showLockedOnlyToolbar && spriteHoverReveal)
 
   const placementSide: 'above' | 'below' =
     detached && bubblePlacement != null

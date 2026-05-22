@@ -126,7 +126,7 @@ export function DailyFortunePanel({ fillAvailable = false }: DailyFortunePanelPr
       `}</style>
 
       <p className={`text-sm text-slate-600 ${fillAvailable ? 'shrink-0' : 'mb-4'}`}>
-        娱乐向小仪式 · 同一自然日内以<strong className="font-medium text-slate-700">最后一次</strong>
+        娱乐性小仪式 · 同一自然日内以<strong className="font-medium text-slate-700">最后一次</strong>
         签文为准 · 今日{' '}
         <span className="font-medium text-slate-700">{localCalendarDate()}</span>
       </p>

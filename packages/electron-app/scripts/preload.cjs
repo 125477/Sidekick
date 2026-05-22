@@ -248,4 +248,22 @@ contextBridge.exposeInMainWorld('sidekickDesktop', {
     ipcRenderer.on(channel, listener)
     return () => ipcRenderer.removeListener(channel, listener)
   },
+  getAppUpdateStatus() {
+    return ipcRenderer.invoke('sidekick:app-update-get-status')
+  },
+  checkForAppUpdate() {
+    return ipcRenderer.invoke('sidekick:app-update-check')
+  },
+  downloadAppUpdate() {
+    return ipcRenderer.invoke('sidekick:app-update-download')
+  },
+  installAppUpdate() {
+    return ipcRenderer.invoke('sidekick:app-update-install')
+  },
+  onAppUpdateStatus(callback) {
+    const channel = 'sidekick:app-update-status'
+    const listener = (_event, payload) => callback(payload)
+    ipcRenderer.on(channel, listener)
+    return () => ipcRenderer.removeListener(channel, listener)
+  },
 })

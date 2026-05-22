@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import type { EmotionToastProps } from './emotionToastTypes'
 import type { EmotionToastChrome } from './useEmotionToastChrome'
 import { EmotionToastTail } from './EmotionToastTail'
@@ -17,6 +17,7 @@ import {
   toastMessageChromeClass,
   toastMessageInnerClass,
 } from './toastMessageLayout'
+import { usesCompanionToastShell } from '../emotion/moodHistory/quoteBubbleSettings'
 
 function EmotionToastSwitchingRow() {
   return (
@@ -70,9 +71,12 @@ export function EmotionToastCard({
   toastMode = 'normal',
   onIntroDismiss,
   onSimilar,
+  quoteBubbleVariant = 'companion-tail',
   chrome,
 }: EmotionToastCardProps) {
   const introMode = toastMode === 'intro'
+  const effectiveQuoteVariant = introMode ? 'companion-tail' : quoteBubbleVariant
+  const showToastShellChrome = usesCompanionToastShell(effectiveQuoteVariant)
   const messageCell = chrome.regenerating ? (
     <EmotionToastSwitchingRow />
   ) : (
@@ -83,6 +87,7 @@ export function EmotionToastCard({
       toastPassthroughLocked={chrome.toastPassthroughLocked}
       multiline={introMode}
       compactLayout={chrome.compactMessageLayout}
+      quoteBubbleVariant={effectiveQuoteVariant}
       {...(maxChars !== undefined ? { maxChars } : {})}
       onRegenerateClick={chrome.runRegenerate}
     />
@@ -123,6 +128,14 @@ export function EmotionToastCard({
     </div>
   )
 
+  const handleDetachedPointerLeave = (e: ReactPointerEvent) => {
+    const rel = e.relatedTarget
+    if (rel instanceof Node && chrome.toastHitRootRef.current?.contains(rel)) {
+      return
+    }
+    chrome.setUnlockedToolbarHot(false)
+  }
+
   return (
     <div
       className={`pointer-events-none ${detached ? '' : 'absolute left-1/2 -translate-x-1/2'} ${chrome.positionClass} ${zIndexClass}`}
@@ -135,23 +148,28 @@ export function EmotionToastCard({
         aria-busy={chrome.regenerating}
         className={`relative flex ${TOAST_CARD_MIN_CLASS} ${
           detached ? TOAST_CARD_MAX_CLASS_DETACHED : TOAST_CARD_MAX_CLASS
-        } sk-toast-shell w-max items-start gap-2.5 rounded-2xl border px-2.5 py-1 text-[13px] leading-relaxed [-webkit-app-region:no-drag] ${
-          chrome.toastPassthroughLocked
-            ? 'pointer-events-none'
-            : 'pointer-events-auto'
-        } ${detached ? 'sk-toast-shell--detached' : ''} ${chrome.motionClass}`}
+        } sk-toast-shell pointer-events-auto w-max items-start gap-2.5 rounded-2xl border px-2.5 py-1 text-[13px] leading-relaxed [-webkit-app-region:no-drag] ${
+          showToastShellChrome ? '' : 'sk-toast-shell--styled-quote'
+        } ${
+          detached ? 'sk-toast-shell--detached' : ''
+        } ${chrome.motionClass}`}
+        onPointerEnter={
+          detached
+            ? () => {
+                chrome.setUnlockedToolbarHot(true)
+                onPointerEnteredToastChrome?.()
+              }
+            : undefined
+        }
+        onPointerLeave={detached ? handleDetachedPointerLeave : undefined}
       >
-        <EmotionToastTail pointsDown={chrome.tailPointsDown} />
+        {showToastShellChrome ? (
+          <EmotionToastTail pointsDown={chrome.tailPointsDown} />
+        ) : null}
 
         <div className="emotion-toast-slot relative flex min-w-0 w-full max-w-full flex-col">
           {chrome.showToolbar ? (
-            <div
-              className="flex w-full min-w-0 flex-col"
-              onPointerEnter={() => {
-                chrome.setUnlockedToolbarHot(true)
-                onPointerEnteredToastChrome?.()
-              }}
-            >
+            <div className="flex w-full min-w-0 flex-col">
               <EmotionToastUnlockedToolbar
                 detached={detached}
                 motionEnabled={motionEnabled}
@@ -218,8 +236,6 @@ export function EmotionToastCard({
             !chrome.toolbarChromeRevealed
           }
           slopRef={chrome.lockedPassthroughSlopRef}
-          toastbarGroupRef={chrome.unlockedToastbarGroupRef}
-          setToolbarHot={chrome.setUnlockedToolbarHot}
         />
 
       </div>

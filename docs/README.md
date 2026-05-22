@@ -14,5 +14,6 @@
 | [adr/001-drag-star-trail-overlay.md](./adr/001-drag-star-trail-overlay.md) | 人 + AI | 拖动星星拖尾：小窗 overlay 方案 |
 | [../CHANGELOG.md](../CHANGELOG.md) | 人 + AI | 实现层面变更日志 |
 | [RELEASE.md](./RELEASE.md) | 维护者 | GitHub Releases 发版流程 |
+| [RELEASE_NOTES_v1.1.0.md](./RELEASE_NOTES_v1.1.0.md) | 维护者 | v1.1.0 Release 正文（复制到 GitHub） |
 
 根目录 [README.md](../README.md)：产品介绍、下载、开发安装、FAQ。

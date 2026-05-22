@@ -2,7 +2,6 @@
 import {
   appendEmotion,
   emotionCnLabelToKind,
-  type EmotionKind,
   type EmotionRecord,
 } from '@sidekick/core'
 import type { SidekickSettings } from '../../state/settingsState'
@@ -31,6 +30,7 @@ import {
   fetchMoodJournalPolish,
 } from '../../app/moodJournalAgent'
 import type { FetchCompanionCopyOptions } from '../../app/companionCopy'
+import { setPendingEmotionForCompanion } from '../../state/pendingEmotionStorage'
 import {
   formatJournalClosureMoment,
   formatStreakMoment,
@@ -60,10 +60,6 @@ type DailyMoodPanelProps = {
   settings: SidekickSettings
   emotionRecords: EmotionRecord[]
   setEmotionRecords: (records: EmotionRecord[]) => void
-  requestCompanionText: (
-    keyword?: string,
-    emotion?: EmotionKind,
-  ) => Promise<void>
   pushProactiveCompanion?: (
     fetchOptions: FetchCompanionCopyOptions,
   ) => Promise<string | null>
@@ -77,7 +73,6 @@ export function DailyMoodPanel({
   settings,
   emotionRecords,
   setEmotionRecords,
-  requestCompanionText,
   pushProactiveCompanion,
 }: DailyMoodPanelProps) {
   const [entries, setEntries] = useState<MoodJournalEntry[]>([])
@@ -89,6 +84,7 @@ export function DailyMoodPanel({
   const [mediaError, setMediaError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [summaryView, setSummaryView] = useState<SummarySubview>('form')
+  const [historyDetailOpen, setHistoryDetailOpen] = useState(false)
   const [guideQuestions, setGuideQuestions] = useState<string[] | null>(null)
   const [guideBusy, setGuideBusy] = useState(false)
   const [polishBusy, setPolishBusy] = useState(false)
@@ -305,7 +301,7 @@ export function DailyMoodPanel({
         <div className="flex min-h-0 flex-1 flex-col gap-[var(--sk-emotion-section-gap)]">
           <div className="sk-emotion-intro-stack">
             <p className="sk-emotion-lead">
-              点选此刻感受，会记入趋势并换一句更贴近你状态的陪伴话。
+              点选此刻感受会记入趋势；下一条定时陪伴会换一句更贴近你状态的话。
             </p>
             <EmotionQuickFeedback
             onSelect={async (label) => {
@@ -317,7 +313,7 @@ export function DailyMoodPanel({
                 createdAt: new Date().toISOString(),
               })
               setEmotionRecords(next.emotion.records)
-              void requestCompanionText(undefined, kind)
+              await setPendingEmotionForCompanion(kind)
             }}
             />
           </div>
@@ -343,20 +339,24 @@ export function DailyMoodPanel({
         </div>
       ) : summaryView === 'history' ? (
         <div className="sk-emotion-history-shell min-h-0 flex-1">
-          <div className="sk-emotion-history-head shrink-0">
-            <h3 className="sk-emotion-heading mb-0">历史记录</h3>
-            <button
-              type="button"
-              className="sk-emotion-link"
-              onClick={() => setSummaryView('form')}
-            >
-              返回填写
-            </button>
-          </div>
+          {!historyDetailOpen ? (
+            <div className="sk-emotion-history-head shrink-0">
+              <h3 className="sk-emotion-heading mb-0">历史记录</h3>
+              <button
+                type="button"
+                className="sk-emotion-link"
+                onClick={() => setSummaryView('form')}
+              >
+                返回填写
+              </button>
+            </div>
+          ) : null}
           <div className="min-h-0 flex-1 overflow-hidden">
             <MoodHistoryPanel
               entries={entries}
+              quoteBubbleMode={settings.quoteBubbleVariant}
               onDeleteEntry={handleDeleteEntry}
+              onDetailOpenChange={setHistoryDetailOpen}
             />
           </div>
         </div>

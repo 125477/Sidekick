@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import type { MoodHistoryQuoteBubbleVariant } from '../emotion/moodHistory/moodHistoryQuoteBubbleVariants'
 
 /** 卡片 `w-max` 随内容；独立窗 IPC 缩宽高，避免工具栏两侧留白。 */
 export type EmotionToastProps = {
@@ -38,4 +39,6 @@ export type EmotionToastProps = {
   /** App 自我介绍：长文案 + 知道了，隐藏轻反馈。 */
   toastMode?: 'normal' | 'intro'
   onIntroDismiss?: () => void
+  /** 设置 · 文案展示 · 气泡样式（非 companion-tail 时在气泡内套用对应样式） */
+  quoteBubbleVariant?: MoodHistoryQuoteBubbleVariant
 }

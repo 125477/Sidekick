@@ -83,10 +83,13 @@ export async function fetchCompanionCopy(
   const appId = bailianAppIdFromEnv()
   const trigger = resolveFetchTrigger(keyword, emotion, options?.trigger)
   const lightHints = getCompanionLightFeedbackHints()
+  const generationSeed =
+    Date.now() ^ Math.floor(Math.random() * 1_000_000_000)
   const common = {
     style: settings.textStyle,
     allowEmoji: settings.allowEmoji,
     maxChars: settings.textMaxChars,
+    seed: generationSeed,
     ...(keyword !== undefined ? { keyword } : {}),
     ...(emotion !== undefined ? { emotion } : {}),
     ...(avoidRecentOutputs?.length ? { avoidRecentOutputs } : {}),
@@ -121,7 +124,9 @@ export async function fetchCompanionCopy(
       const agentResult = await generateCompanionCopyViaAgent({
         apiKey,
         appId,
-        sessionId: settings.bailianAgentSessionId,
+        ...(trigger === 'regenerate'
+          ? {}
+          : { sessionId: settings.bailianAgentSessionId }),
         ...common,
         ...(dashscopeAgentIpc
           ? {

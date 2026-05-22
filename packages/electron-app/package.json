@@ -1,11 +1,12 @@
 {
-  "name": "@sidekick/electron-app",
+  "name": "sidekick-electron",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "main": "scripts/dev-main.mjs",
   "dependencies": {
-    "@sidekick/core": "workspace:*"
+    "@sidekick/core": "workspace:*",
+    "electron-updater": "^6.8.3"
   },
   "devDependencies": {
     "electron": "^38.5.1",
@@ -20,7 +21,7 @@
     "icons:transparent": "node ./scripts/transparentize-app-icon.mjs",
     "icons:mac-icns": "node ./scripts/build-mac-icns.mjs",
     "pack": "electron-builder",
-    "pack:mac": "electron-builder --mac dmg",
+    "pack:mac": "electron-builder --mac dmg zip && node ./scripts/sync-latest-mac-yml.mjs",
     "pack:win": "node ./scripts/prepare-nsis-makensis.mjs && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win nsis",
     "pack:all": "node ./scripts/prepare-nsis-makensis.mjs && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg --win nsis"
   },
@@ -41,7 +42,8 @@
     ],
     "dmg": {
       "title": "${productName} ${version}",
-      "icon": "resources/icon.icns"
+      "icon": "resources/icon.icns",
+      "artifactName": "Lingban-${version}-${arch}.${ext}"
     },
     "extraResources": [
       {
@@ -52,6 +54,7 @@
     "mac": {
       "category": "public.app-category.lifestyle",
       "icon": "resources/icon.icns",
+      "artifactName": "Lingban-${version}-${arch}-mac.${ext}",
       "target": [
         "dmg",
         "zip"
@@ -59,6 +62,7 @@
     },
     "win": {
       "executableName": "Sidekick",
+      "artifactName": "Lingban-Setup-${version}.${ext}",
       "asar": false,
       "signAndEditExecutable": false,
       "target": [
@@ -80,6 +84,14 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     },
-    "afterAllArtifactBuild": "./scripts/after-all-artifact-build.cjs"
+    "afterAllArtifactBuild": "./scripts/after-all-artifact-build.cjs",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "125477",
+        "repo": "Sidekick",
+        "releaseType": "release"
+      }
+    ]
   }
 }
