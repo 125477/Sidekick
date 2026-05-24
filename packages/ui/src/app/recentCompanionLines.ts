@@ -1,3 +1,5 @@
+import { sanitizeRecentCompanionLinesForPrompt } from '@sidekick/core'
+
 /** 与 `recentCompanionLinesRef`、`buildAvoidRecentBlock` 对齐的近期句上限。 */
 export const RECENT_COMPANION_LINES_MAX = 6
 
@@ -6,9 +8,10 @@ export function seedRecentCompanionLinesFromTextHistory(
   history: { content: string }[] | undefined,
 ): string[] {
   if (!history?.length) return []
-  return history
+  const raw = history
     .slice(0, RECENT_COMPANION_LINES_MAX)
     .map((t) => t.content.replace(/\s+/g, ' ').trim())
     .filter((c) => c.length > 0)
     .reverse()
+  return sanitizeRecentCompanionLinesForPrompt(raw)
 }

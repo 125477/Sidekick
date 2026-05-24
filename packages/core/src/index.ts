@@ -66,6 +66,18 @@ export * from './storage/localStore'
 export * from './utils/dailyFortuneLottery'
 export * from './prompts/avatarPrompt'
 export * from './prompts/textPrompt'
+export * from './prompts/companionArchetypeContrast'
+export * from './prompts/companionStructureValidation'
+export * from './prompts/companionOutputGate'
+export { COMPANION_DESKTOP_SCENE_CONTEXT } from './prompts/companionSceneContext'
+export {
+  COMPANION_ARCHETYPE_EXEMPLARS,
+  buildWritingAngleTaskHint,
+  pickAlternateCompanionArchetype,
+  pickArchetypeExemplarLine,
+} from './prompts/companionArchetypes'
+export * from './prompts/sanitizeRecentCompanionLines'
 export * from './prompts/moodJournalAgentPrompt'
 export * from './fallback/quotes'
+export * from './fallback/pickNonBannedCompanionLine'
 export * from './fallback/companionTriggerFallback'

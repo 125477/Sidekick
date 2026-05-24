@@ -21,6 +21,7 @@ import {
   loadLastYesterdayGreetingDayKey,
 } from '../state/yesterdayGreetingStorage'
 import { localDayKey } from '../state/moodJournalStorage'
+import { shouldDeferExtraProactiveCopy } from './companionSessionBoot'
 
 const INTEREST_DEEPEN_HOURS = [10, 15] as const
 
@@ -82,6 +83,7 @@ export function useCompanionRituals({
     void (async () => {
       if (!isWidgetMode || !settingsReady || onboardingDone !== true) return
       if (unlockBusyRef.current || blockScheduledPushRef.current) return
+      if (shouldDeferExtraProactiveCopy()) return
       if (!(await canFireUnlockRitual())) return
 
       const today = localDayKey()
@@ -109,6 +111,7 @@ export function useCompanionRituals({
     void (async () => {
       if (!isWidgetMode || !settingsReady || onboardingDone !== true) return
       if (focusEndBusyRef.current || blockScheduledPushRef.current) return
+      if (shouldDeferExtraProactiveCopy()) return
       if (!(await canFireFocusEndRitual())) return
 
       focusEndBusyRef.current = true
@@ -131,6 +134,7 @@ export function useCompanionRituals({
     void (async () => {
       if (!isWidgetMode || !settingsReady || onboardingDone !== true) return
       if (interestBusyRef.current || blockScheduledPushRef.current) return
+      if (shouldDeferExtraProactiveCopy()) return
       if (!(await canFireInterestDeepen())) return
 
       interestBusyRef.current = true
@@ -182,6 +186,7 @@ export function useCompanionRituals({
     if (!isWidgetMode || !settingsReady || onboardingDone !== true) return
 
     const tick = () => {
+      if (shouldDeferExtraProactiveCopy()) return
       const today = localDayKey()
       if (today !== dayKeyRef.current) {
         dayKeyRef.current = today

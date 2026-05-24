@@ -5,7 +5,7 @@
 
 ## 粘贴后检查
 
-- 百炼应用内声明 **18 个**自定义变量（见下文表格）；**勿**为 `style_guide` / `interest_guide` 填写默认长文（由客户端每轮注入，含 `COMPANION_ANTI_TEMPLATE_BLOCK` 防套句块）。
+- 百炼应用内声明 **19 个**自定义变量（见下文表格，含 `scene_context`）；**勿**为 `style_guide` / `interest_guide` / `scene_context` 填写默认长文（由客户端每轮注入）。
 - 系统提示词须含完整「防套句」章节（见 `BAILIAN_AGENT_PROMPT.md`）；仅改 `style_guide` 变量不够。
 - 语气细则真源：`packages/core/src/prompts/textPrompt.ts` 中 `STYLE_GUIDE` / `STYLE_ANTI_FUNCTIONAL`。
 
@@ -35,7 +35,8 @@ flowchart LR
 | 系统提示词（短模板 + `{{变量}}`） | 百炼控制台 ← `BAILIAN_AGENT_PROMPT.md` | `buildCompanionSystemPrompt()` |
 | 每轮动态变量 | `buildCompanionAgentUserPromptParams()` | 写入 system/user 片段 |
 | 短任务 `input.prompt` | `buildCompanionAgentUserPrompt()` | `buildCompanionUserPrompt*` |
-| 生成后套句/过短重试 | 无（控制台 + 客户端轻后处理） | `generateCompanionCopy` 多轮 retry |
+| 生成后套句/过短重试 | `refineCompanionCopyLine`（与 chat 共用） | 同左 |
+| 百炼 session | **不传** `session_id`（每轮独立，防格言腔记忆） | N/A |
 | 本地兜底句 | `getCompanionText` → `fallback/quotes.ts` | 同左 |
 | 情绪 → 语气 | `companionStyleForEmotion` → `text_style` | 同左 |
 
@@ -52,13 +53,24 @@ flowchart LR
 
 环境变量：`VITE_BAILIAN_APP_ID`（陪伴短句应用 ID）。
 
-## 控制台自定义变量（18 个）
+## 响应里的 `model_id` 不是 Sidekick 选的
+
+`apps/{id}/completion` 返回的 `usage.models[].model_id`（例如 `deepseek-v3.1`）来自**百炼应用里绑定的模型**，与 `VITE_DASHSCOPE_MODEL`（chat 回退）无关。
+
+**经验**：DeepSeek 做「治愈短句」时极易复读「偶尔…发呆…」套句，即使用户提示词已禁止。建议百炼应用改绑 **Qwen-Plus / Qwen-Turbo**；若仍用 DeepSeek，客户端在判定套句后会**自动改走千问 chat**（Network 里可能先有一条 agent completion，气泡展示的是后续 chat 结果）。
+
+客户端每轮仍会注入 `style_guide`、`writing_angle`（白名单句法）等变量；**控制台系统提示词未更新时，模型仍会按旧习惯写套句**。
+
+套句若仍出现：优先检查控制台是否粘贴最新 `BAILIAN_AGENT_PROMPT.md`，且 **19 个变量齐全**（尤其 `writing_angle` 与 `avoid_recent_block` 勿写死默认值）。代码每轮只选**一种** `writing_angle`，并注入「与上一句对照」块；换句时自动选与上一句**不同句法类型**的 archetype。`writing_angle` 与 `avoid_recent_block` 使用同一 archetype，不再互相矛盾。
+
+## 控制台自定义变量（19 个）
 
 在百炼应用「自定义变量」中声明，名称与代码返回值键名**完全一致**：
 
 | 变量名 | 含义 | 典型值 |
 |--------|------|--------|
 | `trigger` | 触发场景 | `scheduled` / `regenerate` / `similar` / `emotion` / `manual` / `yesterday-greeting` / `focus-end` / `unlock` / `journal-closure` / `streak-nudge` / `interest-deepen` |
+| `scene_context` | **桌面挂件场景**（代码注入，勿写死） | 灵伴桌面气泡、默认未在读书等 |
 | `text_style` | 语气类型标签 | `治愈` / `励志` / `搞笑` / `助眠` / `职场解压` / `抽象` |
 | `style_guide` | **当前语气全文**（由代码从 `STYLE_GUIDE` 注入） | 每轮一条，勿在控制台写死 |
 | `interests` | 兴趣标签列表 | `音乐、影视` 或 `无` |
@@ -70,8 +82,9 @@ flowchart LR
 | `yesterday_context` | 昨日情境 | 摘要或 `无昨日记录` |
 | `moment_context` | 本轮情境 | 收束 / streak 等或 `无` |
 | `similar_to_line` | 类似参考句 | 原文或 `无` |
-| `local_time_hint` | 本地时段 | 如「工作日傍晚」 |
-| `writing_angle` | 写法角度 | 多样性约束 |
+| `local_time_hint` | 本地时段 | 如「工作日傍晚」（仅语境，不写禁词） |
+| `writing_angle` | **气质参考（few-shot）** | 每轮 2 条随机示范句 +「勿照抄」；由代码注入，勿在控制台写死 |
+| `writing_angle_index` | 句法索引 | `0`–`7` |
 | `avoid_recent_block` | 防重复 | 近期句 + 起笔禁令或 `无` |
 | `min_chars` | 最少汉字 | 如 `10` |
 | `max_chars` | 最多汉字 | 如 `32` |

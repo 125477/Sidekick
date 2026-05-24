@@ -63,7 +63,8 @@ export async function refreshDetachedToastAfterAnchorPreferenceChange() {
   const toastH = state.toastWindow.getBounds().height || TOAST_WINDOW_HEIGHT
   const placement = computeToastPlacement(state.lastPreferredToastAnchor, toastH)
   if (!placement) return
-  const { message, textId, favorite, dwellSeconds } = state.lastToastSession
+  const { message, textId, favorite, dwellSeconds, autoTts } =
+    state.lastToastSession
   const effectiveAnchor = placement.effectiveAnchor
   state.lastToastSession = {
     message,
@@ -71,6 +72,7 @@ export async function refreshDetachedToastAfterAnchorPreferenceChange() {
     dwellSeconds,
     textId,
     favorite,
+    autoTts,
   }
   state.lastToastTailDown = effectiveAnchor === 'top'
 
@@ -117,6 +119,7 @@ export async function refreshDetachedToastAfterAnchorPreferenceChange() {
         message,
         ...(textId ? { textId } : {}),
         ...(typeof favorite === 'boolean' ? { favorite: favorite ? '1' : '0' } : {}),
+        autoTts: autoTts === true ? '1' : '0',
         anchor: effectiveAnchor,
         placement: placementPayload.placement,
         tailDown: effectiveAnchor === 'top' ? '1' : '0',

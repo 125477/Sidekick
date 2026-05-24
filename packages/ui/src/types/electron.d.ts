@@ -148,6 +148,8 @@ type SidekickDesktopApi = {
     favorite?: boolean
     /** App 自我介绍：长文案 + 知道了 */
     toastIntro?: boolean
+    /** 是否在气泡窗加载后自动 TTS（与设置「生成后自动播报」同步，由精灵窗传入）。 */
+    autoTts?: boolean
   }) => Promise<void>
   /**
    * 已展示独立气泡时，主进程优先用 IPC 同步版式；仅在页面未就绪时整页重载。无气泡则仅更新主进程偏好。
@@ -189,6 +191,15 @@ type SidekickDesktopApi = {
     callback: (payload: {
       anchor: SidekickToastAnchor
       placement: 'above' | 'below'
+    }) => void,
+  ) => () => void
+  /** 独立气泡：换句时主进程 IPC 同步文案（不重载页面）。 */
+  onDetachedToastContentSync?: (
+    callback: (payload: {
+      message: string
+      textId?: string
+      favorite?: boolean
+      autoTts?: boolean
     }) => void,
   ) => () => void
   resizeToastWindow?: (payload: {

@@ -736,25 +736,6 @@ export function SettingsPanel({
             <SettingsTabHeading>AI 设置</SettingsTabHeading>
             <SettingsSubsection title="文案生成">
               <label className="grid gap-1">
-                <span className="sk-label">
-                  文案 temperature：{settings.textTemperature.toFixed(1)}
-                </span>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.1}
-                  value={settings.textTemperature}
-                  onChange={(event) =>
-                    update('textTemperature', Number(event.target.value))
-                  }
-                  className="sk-range w-full"
-                />
-                <span className="sk-muted leading-relaxed">
-                  用于生成气泡里的陪伴短句：越高措辞越多样、偶发更跳脱；越低越稳，句子之间会更像、变化少。
-                </span>
-              </label>
-              <label className="grid gap-1">
                 <span className="sk-label">文案最大字数</span>
                 <input
                   type="number"

@@ -10,6 +10,8 @@ export type AppUrlState = {
   toastTextIdFromQuery: string | null
   toastFavoriteFromUrl: boolean
   toastIntroFromQuery: boolean
+  /** 独立气泡：是否自动播报（来自 showToastWindow URL，优先于本地 settings）。 */
+  toastAutoTtsFromQuery: boolean
   emotionTabFromQuery: 'moment' | 'summary' | null
   cornerNotificationTitle: string
   cornerNotificationMessage: string
@@ -27,6 +29,7 @@ export function readAppSearchParams(): AppUrlState {
       toastTextIdFromQuery: null,
       toastFavoriteFromUrl: false,
       toastIntroFromQuery: false,
+      toastAutoTtsFromQuery: false,
       emotionTabFromQuery: null,
       cornerNotificationTitle: '灵伴 · 今日心情',
       cornerNotificationMessage: '',
@@ -49,6 +52,7 @@ export function readAppSearchParams(): AppUrlState {
       : null,
     toastFavoriteFromUrl: isToastMode ? sp.get('favorite') === '1' : false,
     toastIntroFromQuery: isToastMode ? sp.get('toastIntro') === '1' : false,
+    toastAutoTtsFromQuery: isToastMode ? sp.get('autoTts') === '1' : false,
     emotionTabFromQuery:
       sp.get('emotionTab') === 'summary'
         ? 'summary'

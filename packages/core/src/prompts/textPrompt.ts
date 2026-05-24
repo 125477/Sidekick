@@ -9,12 +9,41 @@
  *
  * ## 定稿原则（勿反复横跳）
  * 1. **通顺完整** > 文艺；禁止半截句（如「包括被自己。」）。
- * 2. **治愈** 三类轮换：直白许可 | 单处轻隐喻+许可 | 短格言；须写满最短字数、通顺完整，勿连刷同一句式。
+ * 2. **治愈** 自由写一句，无固定句型；单重心；禁止套句与逗号后半升华。
  * 3. **只拦硬套**：「像…一样」、轻轻停驻、风起/茶凉/暮色爆款、励志对仗、办公词、指令/拯救/条件价值、「累了就歇」类口语套句。
  * 4. **允许** 一处克制意象（书页/故事里的停顿）；**禁止** 把治愈写成七字口号（如「累了就歇会儿。」）。
- * 5. 改规则时同步 `docs/BAILIAN_AGENT_PROMPT.md`、`COMPANION_ANTI_TEMPLATE_BLOCK` 与 `companionTextHasFormulaSkeleton`，避免提示与兜底打架。
+ * 5. 智能体路径：**气质参考 few-shot**（`companionStyleExemplars.ts`）+ 相似度去重；**不**向模型堆禁词表。
  */
 import type { EmotionKind } from '../schema/data'
+import { COMPANION_DESKTOP_SCENE_CONTEXT } from './companionSceneContext'
+import { buildContrastWithLastLine } from './companionArchetypeContrast'
+import {
+  buildStyleReferenceBlock,
+} from './companionStyleExemplars'
+import {
+  collectRecentBigramsForAvoid,
+  collectRecentOpeningPrefixes,
+} from './companionLineSimilarity'
+import {
+  pickCompanionArchetype,
+  type CompanionArchetype,
+} from './companionArchetypes'
+import { sanitizeRecentCompanionLinesForPrompt } from './sanitizeRecentCompanionLines'
+
+export { pickCompanionArchetype, type CompanionArchetype } from './companionArchetypes'
+export {
+  buildContrastWithLastLine,
+  collectBannedOpeningsFromRecent,
+} from './companionArchetypeContrast'
+export { buildStyleReferenceBlock, pickStyleFewShots } from './companionStyleExemplars'
+export {
+  buildCompanionDiversityRetrySuffix,
+  collectRecentBigramsForAvoid,
+  companionLineTooSimilarToAny,
+  companionLineReusesRecentBigrams,
+  companionTextHasSceneryMoodCliche,
+  longestContiguousHanOverlap,
+} from './companionLineSimilarity'
 
 export type CompanionCopyStyle =
   | '治愈'
@@ -92,8 +121,7 @@ export type BuildCompanionPromptInput = {
 }
 
 const STYLE_GUIDE: Record<CompanionCopyStyle, string> = {
-  治愈:
-    '治愈=承接感受与存在许可，通顺好读、写满最短字数。可轮换：①直白许可（例：「疲惫时，休息也是正经事。」）；②单处轻隐喻+许可（例：「书页里的停顿，也该被允许存在。」）；③短格言（例：「晚一点也没关系，路还在。」）。一句一重心，须有实质内容，禁止七字口号。禁止连刷「馈赠」「安放」「化作」「静静流淌」「驻足也是前行」等散文套句；禁止「累了就歇」「歇会儿」作整句骨架；禁止「像…一样」、轻轻停驻、风起/茶凉/暮色；禁止命令、拯救与条件价值；禁止办公设备描写。',
+  治愈: '治愈=承接感受、温柔许可；一句一重心，通顺完整。',
   励志:
     '可多用「我」或无人称格言；聚焦态度与微小可能，禁止鸡血口号与抽象成功学；禁止命令式打气（加油/撑住/你必须）与「只要你…就…」式条件价值；禁止写键盘、光标、加班赶场等办公套话，勿照抄常见鸡汤句。',
   搞笑:
@@ -129,7 +157,7 @@ const PLAIN_HEALING_STYLES = new Set<CompanionCopyStyle>(['治愈', '助眠'])
 
 /** 治愈类重试共用收尾（勿在各 build*Retry 里写互相矛盾的示例）。 */
 const HEALING_QUALITY_RETRY_TAIL =
-  '改通顺完整、写满最短字数的一句，换骨架：直白许可、单处轻隐喻+许可、或短格言三选一；禁止像…一样、轻轻停驻、「累了就歇」类口语套句、半截句与过短口号。'
+  '改通顺完整、写满最短字数的一句；**严格按 writing_angle 白名单句法重写**，禁止逗号后半句人生升华，禁止像…一样与「累了就歇」整句。'
 
 /** 陪伴句最短汉字数（不含标点）。 */
 const COMPANION_MIN_CHARS_ABSOLUTE = 10
@@ -182,23 +210,6 @@ export const COMPANION_STIFF_HEALING_MARKERS = [
   '不妨像',
 ] as const
 
-/**
- * 每次随机抽一种写法（结合 seed + 最近句哈希），避免连续落在「X时，像…」「馈赠/安放/化作」文艺模板。
- * 角度差异要够大，否则模型仍会收敛到同一治愈腔。
- */
-const DIVERSITY_ANGLES = [
-  '用格言式判断句：具体、通顺，写满最短字数，禁止「X时，像…」对仗，禁止「有些…，…」励志对仗，禁止馈赠/安放/化作。',
-  '用直白许可或判断（例：「疲惫时，休息也是正经事。」），禁止「累了就歇」骨架，禁止馈赠、安放、化作、静静流淌，勿照抄上一句。',
-  '单处轻隐喻+许可（如「书页里的停顿，也该被允许存在。」），仅一处意象，禁止像…一样、风起/茶凉/暮色、馈赠、化作。',
-  '从成长或耐心直说，禁止暮色、风起、茶凉、窗台、杯底余温、馈赠、安放等爆款词。',
-  '用极短问句或感叹，禁止「你…，我…」对称、禁止逗号后接「像…」，禁止馈赠/驻足/前行套句。',
-  '用「可以」「不妨」邀请休息，禁止「不妨让心先停一停」式套句，禁止馈赠/安放/化作。',
-  '用对比结构（「不是…而是…」「与其…不如…」），禁止文艺散文腔与馈赠式收束。',
-  '第二人称单分句，无逗号对仗，禁止起笔「风起/茶凉/暮色/时光静静」。',
-  '写口语白描、无隐喻（例：「今天先到这儿，也很好。」），禁止文学意象、馈赠、安放、化作、驻足。',
-  '写身体或具体感受（例：「肩膀松一点，就算进步。」），禁止时光/馈赠/安放/化作/前行类格言。',
-] as const
-
 /** 模型连刷的「散文式收束」套句（与 POETIC 校验配合）。 */
 export const COMPANION_LITERARY_CLOSURE_MARKERS = [
   '馈赠',
@@ -222,42 +233,14 @@ export const COMPANION_LITERARY_CLOSURE_MARKERS = [
   '变幻',
   '偶尔停下来',
   '偶尔停',
+  '偶尔发发呆',
+  '偶尔允许',
+  '无所事事',
   '看看云',
+  '世界并不会',
+  '并不会因此',
+  '也是一种必要',
 ] as const
-
-const RECENT_LEXICAL_WATCH: ReadonlyArray<{
-  words: readonly string[]
-  ban: string
-}> = [
-  {
-    words: ['馈赠', '温柔的馈赠'],
-    ban: '最近已多次出现「馈赠」，本句禁止再用。',
-  },
-  {
-    words: ['安放', '妥善安放', '心情已经安放', '思绪已'],
-    ban: '最近已多次出现「安放」，本句禁止再用「安放/妥善安放」骨架。',
-  },
-  {
-    words: ['化作', '化作明日', '化作养分', '化作晨光'],
-    ban: '最近已多次出现「化作」，本句禁止再用「化作…」收束。',
-  },
-  {
-    words: ['静静流淌', '时光静静'],
-    ban: '最近已出现「静静流淌/时光静静」，本句换起笔。',
-  },
-  {
-    words: ['驻足', '也是前行', '也是一种前行'],
-    ban: '最近已出现「驻足/前行」格言，本句换骨架。',
-  },
-  {
-    words: ['云朵', '变幻', '看看云', '偶尔停', '偶尔停下来'],
-    ban: '最近已出现「停一停看云/变幻」骨架，本句禁止再用，改直白或许可。',
-  },
-  {
-    words: ['温柔的修行', '生活的一种温柔', '也是一种温柔'],
-    ban: '最近已出现「也是…温柔/修行」收束，本句换骨架与收束词。',
-  },
-]
 
 const OVERUSED_ADVERBS = '轻轻、慢慢、悄悄、静静、缓缓、默默'
 
@@ -312,25 +295,13 @@ const MOTIVATIONAL_PARALLEL_BAN_LINE =
 /**
  * 通用防套句块（智能体 `style_guide` 注入 + chat system；与 `docs/BAILIAN_AGENT_PROMPT.md` 同步）。
  */
+/** 与 `docs/BAILIAN_AGENT_PROMPT.md` 同步：正向写作步骤，少堆禁词。 */
 export const COMPANION_ANTI_TEMPLATE_BLOCK = [
-  '【防套句·总则】每句必须是新叙事骨架，禁止把同一模板只换个别词（如云朵↔天空、修行↔温柔）。',
-  '本轮以 writing_angle 为唯一允许的句式方向；与其冲突时以 writing_angle 为准。',
-  '须服从 avoid_recent_block：与列出的任一句不得同骨架，不得连续相同汉字超过 4 个。',
-  '',
-  '【禁止的叙事骨架（任一类命中即套句，须整体换掉）】',
-  'A. 停顿观景+感悟收束：偶尔停/停一停/看看云风月叶，逗号后「也是/便是…温柔/修行/前行/馈赠/生活的一种…」。',
-  'B. 时光/馈赠/安放/化作：静静流淌、温柔的馈赠、心情安放、化作明日/养分/晨光。',
-  'C. 爆款文艺：X时+像…、像…一样、风起/茶凉/暮色+窗台、轻轻停驻/驻足也是前行。',
-  'D. 励志对仗：有些…，…；不是所有…但总有一些…。',
-  'E. 对称陪伴：你…，我…。',
-  'F. 口令许可整句：累了就歇、歇会儿、不用怕耽误。',
-  'G. 办公数码：光标键盘屏幕追剧观影等。',
-  'H. 命令拯救条件：你应该、撑住加油、只要你…就…。',
-  'I. 半截尾巴：包括被自己。',
-  '',
-  '【鼓励且须轮换的写法（勿连刷同一类）】',
-  '① 直白判断或许可（例：疲惫时，休息也是正经事）；② 单处轻隐喻+许可（仅一处意象）；③ 短格言；④ 对比句；⑤ 极短问句；⑥ 身体/口语白描。',
-  '治愈禁止默认回到 A 类；须写满最短字数、通顺完整，禁止七字口号。',
+  '【怎么写】自由写一句；无固定句型、无指定起笔。对照 avoid_recent_block 避免与最近句同套路。',
+  '【禁止】不是聊天/作文/读书打卡；勿套「偶尔…也是…」「听一首/听首…让心情…」「这会儿放空/放松」；勿猜用户正在做的事；勿命令用户去听/去看/去读。',
+  '【换句】与最近句起笔/重心/收束至少两项不同；连续汉字重叠≤4；禁止只换副词。',
+  '【桌面场景】灵伴=角落气泡；默认用户未在读书；勿编造桌上物品、窗外风景、邮件/茶/家务等。',
+  '【兴趣】若有 interests：只把意象/语感织入句中，禁止建议用户去做该活动。',
 ].join('\n')
 
 /** 模型高频「有些…，…」励志平行句（与 recent 去重、生成后校验共用）。 */
@@ -588,9 +559,7 @@ export function buildBleakWithoutComfortRetryUserSuffix(): string {
 export function companionTextHasLiteraryClosureTemplate(text: string): boolean {
   const t = text.trim()
   if (!t) return false
-  if (COMPANION_LITERARY_CLOSURE_MARKERS.some((m) => t.includes(m))) {
-    return true
-  }
+  /** 只判收束句式结构，不靠禁词表 includes。 */
   if (/也是一?种.{0,8}(前行|馈赠|礼物|温柔|修行|生活)/.test(t)) {
     return true
   }
@@ -606,18 +575,46 @@ export function companionTextHasLiteraryClosureTemplate(text: string): boolean {
   return false
 }
 
-/** 通用公式化骨架（景物铺垫 + 感悟收束等），与具体禁词列表互补。 */
-export function companionTextHasFormulaSkeleton(text: string): boolean {
+/**
+ * 逗号后半句人生升华（套句根结构，优先于关键词黑名单）。
+ */
+export function companionTextHasCommaPhilosophyClosure(text: string): boolean {
   const t = text.trim()
-  if (!t) return false
-  if (companionTextHasLiteraryClosureTemplate(t)) {
+  const commaIdx = t.search(/[，,]/)
+  if (commaIdx < 0) return false
+  const head = t.slice(0, commaIdx).trim()
+  const tail = t.slice(commaIdx + 1).trim()
+  if (!tail) return false
+  if (/^(也是|便是|并不|并不会|其实|毕竟|原来)/.test(tail)) return true
+  if (/(也是|便是).{0,10}(必要|修行|温柔|前行|馈赠|礼物|正事|生活)/.test(tail)) {
+    return true
+  }
+  if (/(世界|人生|生活|命运|岁月|时光).{0,12}(并不|不会|仍|依然|照样)/.test(tail)) {
     return true
   }
   if (
-    /偶尔.{0,8}停/.test(t) &&
-    /(看看|望望|瞧瞧|注视)/.test(t) &&
-    /(云|风|叶|天|变幻)/.test(t)
+    /^偶尔/.test(head) ||
+    /(发呆|无所事事|放空|停一?停|看看云|望望天)/.test(head)
   ) {
+    return true
+  }
+  if (/^[^，,]{1,14}(时|刻|候)[，,]/.test(t) && /(也是|便是|并不)/.test(tail)) {
+    return true
+  }
+  return false
+}
+
+/** 通用公式化骨架（句法结构，非禁词表）。 */
+export function companionTextHasFormulaSkeleton(text: string): boolean {
+  const t = text.trim()
+  if (!t) return false
+  if (companionTextHasCommaPhilosophyClosure(t)) return true
+  if (companionTextHasLiteraryClosureTemplate(t)) return true
+  if (/^偶尔/.test(t) && /[，,]/.test(t)) return true
+  if (/也是一种.{0,6}(必要|修行|温柔|前行|馈赠|礼物|生活)/.test(t)) {
+    return true
+  }
+  if (/世界.{0,8}并不.{0,8}(停|转|倒|垮|因此)/.test(t)) {
     return true
   }
   if (
@@ -626,21 +623,13 @@ export function companionTextHasFormulaSkeleton(text: string): boolean {
   ) {
     return true
   }
-  if (/不妨让.{0,8}(心|自己|思绪)/.test(t)) {
-    return true
-  }
-  if (/时光.{0,8}(静静|缓缓|慢慢)/.test(t)) {
-    return true
-  }
+  if (/不妨让.{0,8}(心|自己|思绪)/.test(t)) return true
+  if (/时光.{0,8}(静静|缓缓|慢慢)/.test(t)) return true
   if (/^[^，,。！？]{1,12}时[，,]/.test(t) && /(像|仿佛|好似)/.test(t)) {
     return true
   }
-  if (/^有些[^，,]{1,20}[，,]/.test(t)) {
-    return true
-  }
-  if (/不是所有[^，,]{1,24}但总有一些/.test(t)) {
-    return true
-  }
+  if (/^有些[^，,]{1,20}[，,]/.test(t)) return true
+  if (/不是所有[^，,]{1,24}但总有一些/.test(t)) return true
   return false
 }
 
@@ -778,22 +767,22 @@ function buildLocalTimeHintLine(now: Date): string {
   else if (h < 22) band = '傍晚'
   else band = '夜间'
   const weekend = now.getDay() === 0 || now.getDay() === 6
-  return `【当前时段参考】本地约为${weekend ? '周末' : '工作日'}${band}。只可轻点时段氛围（如午后倦意），禁止写具体几点几分或「刚过X分钟」。`
+  return `${weekend ? '周末' : '工作日'}${band}`
 }
 
 const INTEREST_TAG_GUIDE: Record<string, string> = {
   影视:
-    '「影视」：只化用经典台词的**情绪与节奏**（可略改写，勿标注片名演员）；禁止出现「电影」「剧集」「影院」「屏幕」等词，禁止写追剧/观影动作。',
+    '「影视」：只可化用台词的情绪节奏或留白感（勿写片名/演员/追剧/屏幕）；禁止「去看电影」式建议；禁止「听一首…让心情…」骨架。',
   书籍:
-    '「书籍」：化用名著/诗里**一句**短引神韵（勿标注书名作者）；禁止眼前翻书、捧读；允许抽象「书页/故事」一处隐喻，勿叠景物。',
+    '「书籍」：只可化用诗性短句或抽象「故事/留白」一处语感（勿写书名/翻书/捧读）；禁止读书动作与「听一首式」骨架。',
   音乐:
-    '「音乐」：可化用歌词意象或节奏感（勿写歌名歌手），禁止「戴上耳机听歌」等旁观描写。',
+    '「音乐」：只可把留白/轻重/停顿等抽象语感织入句中（一句一处）；禁止出现「旋律/悠扬/飘荡/歌声/听歌/听一首」；禁止「让心情/让思绪…」式升华；禁止命令用户去听音乐。',
   运动:
-    '「运动」：可点到身体舒展、呼吸、短暂停一下，禁止假设用户正在球场或健身房。',
+    '「运动」：只可点到舒展、呼吸等身体感；禁止假设用户正在球场或健身房；禁止活动建议口号。',
   游戏:
-    '「游戏」：可化用轻松胜负/暂停意象，禁止假设用户正在打游戏。',
+    '「游戏」：只可化用轻松胜负/暂停的抽象语感；禁止假设用户正在打游戏。',
   旅行:
-    '「旅行」：可用路途、窗外风景的**一句**联想，禁止假设用户正在旅途。',
+    '「旅行」：只可化用路途/远方的抽象联想一词；禁止假设用户正在旅途；禁止窗外风景堆砌。',
 }
 
 const QUOTE_FORWARD_INTERESTS = new Set(['影视', '书籍'])
@@ -886,7 +875,7 @@ export function buildCompanionSystemPrompt(input: BuildCompanionPromptInput): st
     ...lightFeedbackLines,
     `目标语气类型：${input.style}。`,
     `语气要求：${STYLE_GUIDE[input.style]}`,
-    `长度要求：不少于 ${minChars}、不超过 ${input.maxChars} 个汉字（不含标点）；须通顺完整，最好有一个逗号把两层意思写开，禁止只有「累了就歇会儿」式过短套句。`,
+    `长度要求：不少于 ${minChars}、不超过 ${input.maxChars} 个汉字（不含标点）；须通顺完整、单重心；禁止「累了就歇会儿」式过短套句；禁止「前半+逗号+后半人生升华」套句。`,
     emojiRule,
     DESKTOP_CLICHE_BAN_LINE,
     POETIC_TEMPLATE_BAN_LINE,
@@ -946,179 +935,35 @@ export function buildCompanionTriggerContextLines(input: {
   return lines
 }
 
-function hashStringForAngle(s: string): number {
-  let h = 0
-  for (let i = 0; i < s.length; i++) {
-    h = (Math.imul(33, h) + s.charCodeAt(i)) | 0
-  }
-  return Math.abs(h)
-}
+/** @deprecated 使用 sanitizeRecentCompanionLines.ts 导出 */
+export { COMPANION_AVOID_RECENT_MAX } from './sanitizeRecentCompanionLines'
 
-function hashRecentForAngle(recent: string[]): number {
-  return recent.reduce((acc, line) => acc + hashStringForAngle(line), 0)
-}
-
-function pickDiversityAngle(seed: number, recent: string[] = []): string {
-  const cleaned = recent.map(compactLineForPrompt).filter(Boolean)
-  const idx =
-    Math.abs(seed + hashRecentForAngle(cleaned) * 17 + cleaned.length * 13) %
-    DIVERSITY_ANGLES.length
-  return DIVERSITY_ANGLES[idx] ?? DIVERSITY_ANGLES[0]
-}
-
-function buildRecentLexicalBanLines(recent: string[]): string[] {
-  const joined = recent.join(' ')
-  if (!joined) return []
-  return RECENT_LEXICAL_WATCH.filter(({ words }) =>
-    words.some((w) => joined.includes(w)),
-  ).map(({ ban }) => ban)
-}
-
-function buildOpeningConstraint(recent: string[], seed: number): string {
-  const lines = recent.map(compactLineForPrompt).filter(Boolean)
-  const last = lines[lines.length - 1]
-  const angle = pickDiversityAngle(seed, lines)
-  const rules = [`【本次写法】${angle}`, ...buildRecentLexicalBanLines(lines)]
-
-  if (last) {
-    const firstChar = last[0]
-    if (firstChar) {
-      rules.push(`本句第一字不得为「${firstChar}」（上一句以它起头）。`)
-    }
-    if (last.startsWith('你')) {
-      rules.push('禁止再次以「你」字开篇。')
-    }
-    if (/你.{0,10}[，,].{0,10}我/.test(last)) {
-      rules.push('上一句为「你…我…」对称句式，本句不得再写你我对照陪伴。')
-    }
-    if (/轻轻|慢慢|悄悄|静静/.test(last)) {
-      rules.push(
-        `上一句已用「${OVERUSED_ADVERBS}」类叠词，本句这些词一律不要再出现。`,
-      )
-    }
-    const clichesInRecent = COMPANION_DESKTOP_CLICHE_WORDS.filter((w) =>
-      last.includes(w),
-    )
-    if (clichesInRecent.length > 0) {
-      rules.push(
-        `上一句已出现办公套话（${clichesInRecent.join('、')}），本句这些词一律不得再出现。`,
-      )
-    }
-    const poeticInRecent = COMPANION_POETIC_TEMPLATE_MARKERS.filter((m) =>
-      last.includes(m),
-    )
-    if (
-      poeticInRecent.length > 0 ||
-      companionTextHasPoeticTemplate(last) ||
-      companionTextHasLiteraryClosureTemplate(last)
-    ) {
-      rules.push(
-        `上一句是文艺/散文套句（${poeticInRecent.length > 0 ? poeticInRecent.join('、') : '馈赠/安放/化作/时+像'}），本句须换完全不同的句式，禁止再起「X时，像…」与馈赠式收束。`,
-      )
-    }
-    const closureInRecent = COMPANION_LITERARY_CLOSURE_MARKERS.filter((m) =>
-      lines.some((line) => line.includes(m)),
-    )
-    if (closureInRecent.length > 0) {
-      rules.push(
-        `最近句已出现「${closureInRecent.slice(0, 4).join('、')}」等，本句禁止再出现这些词。`,
-      )
-    }
-    if (companionTextHasMotivationalParallelTemplate(last)) {
-      rules.push(
-        '上一句是「有些…，…」或「不是所有…但总有一些…」励志套句，本句须换完全不同的句式与起笔。',
-      )
-    }
-    if (companionTextHasBleakWithoutComfort(last)) {
-      rules.push(
-        '上一句是宿命感叹、缺少托住感；本句须写接纳、许可或温柔指望，禁止「再…也…不…」式无力格言。',
-      )
-    }
-    if (companionTextHasFunctionalTone(last, '治愈')) {
-      rules.push(
-        '上一句像指令、拯救口号或条件价值；本句改为存在许可（可以、允许、就好），禁止你应该、撑住、只要你…就…。',
-      )
-    }
-    if (companionTextHasStiffHealingCliche(last)) {
-      rules.push(
-        '上一句像硬套文艺（如像…一样轻轻停驻）；本句改通顺治愈句，可单处轻隐喻+许可，禁止像…一样。',
-      )
-    }
-    if (companionTextHasOralPermissionCliche(last)) {
-      rules.push(
-        '上一句是口语许可套句（如累了就歇/歇会儿/不用怕耽误）；本句换骨架，可写单处意象+许可（如书页里的停顿），禁止再写「累了就歇」类短句。',
-      )
-    }
-    if (/累了|歇会儿|歇歇|不用怕耽误/.test(last)) {
-      rules.push(
-        '上一句是「累了/歇」类套句；本句禁止再起「累了就…歇」骨架，改隐喻+许可或短格言，并写满最短字数。',
-      )
-    }
-    if (companionTextHasFormulaSkeleton(last)) {
-      rules.push(
-        '上一句是公式化骨架（停顿看云+也是温柔/修行、馈赠式收束等），本句须换到 writing_angle 指定的完全不同句式。',
-      )
-    }
-    const bannedOpeners = [
-      '风起',
-      '茶凉',
-      '暮色',
-      '雨落',
-      '雪落',
-      '窗',
-      '有些',
-      '偶尔',
-      '云',
-    ]
-    for (const o of bannedOpeners) {
-      if (last.startsWith(o)) {
-        rules.push(`禁止以「${o}」起头。`)
-        break
-      }
-    }
-  }
-
-  const poeticInAllRecent = [
-    ...new Set(
-      lines.flatMap((line) =>
-        COMPANION_POETIC_TEMPLATE_MARKERS.filter((m) => line.includes(m)),
-      ),
-    ),
-  ]
-  if (poeticInAllRecent.length > 0) {
-    rules.push(
-      `最近几句已反复出现：${poeticInAllRecent.join('、')}；本句这些意象与「时，像…」骨架一律不要再出现。`,
-    )
-  }
-
-  const motivationalInAllRecent = lines.filter((line) =>
-    companionTextHasMotivationalParallelTemplate(line),
-  )
-  if (motivationalInAllRecent.length > 0) {
-    rules.push(
-      '最近几句已出现「有些…，…」或「不是所有…但总有一些…」励志套句；本句禁止再用该骨架，改直白许可或判断句。',
-    )
-  }
-
-  return `${rules.join('\n')}\n`
-}
-
-/** 与 UI `RECENT_COMPANION_LINES_MAX` 对齐。 */
-export const COMPANION_AVOID_RECENT_MAX = 6
-
-function buildAvoidRecentBlock(lines: string[] | undefined, seed: number): string {
-  const cleaned = (lines ?? [])
+function buildAvoidRecentBlock(lines: string[] | undefined): string {
+  const cleaned = sanitizeRecentCompanionLinesForPrompt(lines)
     .map(compactLineForPrompt)
     .filter(Boolean)
-    .slice(-COMPANION_AVOID_RECENT_MAX)
-  if (cleaned.length === 0) return `${buildOpeningConstraint([], seed)}\n`
+  if (cleaned.length === 0) {
+    return '无'
+  }
   const quoted = cleaned.map((s) => `「${s}」`).join('、')
+  const bigrams = collectRecentBigramsForAvoid(cleaned)
+  const openings = collectRecentOpeningPrefixes(cleaned)
+  const lexicalLine =
+    bigrams.length > 0
+      ? `【勿再用词】${bigrams.join('、')}（来自最近句，本句不得再出现这些二字词）`
+      : ''
+  const openingLine =
+    openings.length > 0
+      ? `【勿再用起笔】${openings.map((s) => `「${s}」`).join('、')}（本句起笔/前半句须明显不同，禁止只改后半）`
+      : ''
   return [
-    `【禁止微改编述】以下为最近已向用户展示过的陪伴句（从旧到新）：${quoted}`,
-    '新句必须同时满足：1）不得与任一句采用同一叙事骨架（禁止停顿看云+也是温柔/修行、馈赠安放化作、X时像…、有些对仗等只换词）；2）若最近以景物感悟或励志对仗为主，本句改直白许可/判断/身体感受/口语白描；3）与最近一句不得共享超过 4 个连续汉字；4）禁止仅替换个别形容词（云朵↔天空、修行↔温柔）。',
-    buildOpeningConstraint(cleaned, seed + 17),
-    '',
-  ].join('\n')
+    `【最近句】${quoted}（从旧到新）`,
+    lexicalLine,
+    openingLine,
+    buildContrastWithLastLine(cleaned),
+  ]
+    .filter(Boolean)
+    .join('\n')
 }
 
 export type CompanionUserPromptContext = {
@@ -1136,11 +981,15 @@ export function buildCompanionUserPrompt(
   const kw = trimmed && !isMeta ? trimmed : undefined
   const seed =
     Date.now() ^ Math.floor(Math.random() * 1_000_000_000)
-  const avoidBlock = buildAvoidRecentBlock(context?.avoidRecentOutputs, seed)
+  const archetype = pickCompanionArchetype(
+    seed,
+    context?.avoidRecentOutputs ?? [],
+  )
+  const avoidBlock = buildAvoidRecentBlock(context?.avoidRecentOutputs)
 
   const metaDiversity =
     isMeta && trimmed
-      ? `【重要】用户操作是「${trimmed}」：这不是文案主题。请写一句全新的陪伴短句，在**开头、句式、意象**上与上一句明显不同；禁止「风起时/茶凉时/暮色漫过/像未说完的句子」「有些…，…」励志对仗，禁止只改一两个字。\n`
+      ? `【换句】用户操作「${trimmed}」：写一句全新短句，对照 avoid_recent_block，起笔/重心/收束至少两项不同；无固定句型模板。\n`
       : ''
 
   const prefix = `${avoidBlock}${avoidBlock && metaDiversity ? '\n' : ''}${metaDiversity}`
@@ -1154,7 +1003,7 @@ export function buildCompanionUserPrompt(
   if (kw) {
     return `${prefix}请围绕这个关键词生成文案：${kw}。（${seed}）`
   }
-  return `${prefix}请给我一句陪伴短句：通顺完整、写满字数，接纳与许可；可直白、可一处轻隐喻、可短格言，换与上一句不同骨架。禁止像…一样、轻轻停驻、「累了就歇」类套句、过短口号、半截句、办公词与拯救口号。（${seed}）`
+  return `${prefix}请给我一句陪伴短句：通顺完整、写满字数；**只按【本轮唯一句法·白名单】写**，禁止逗号后半句人生升华。禁止像…一样、轻轻停驻、「累了就歇」、过短口号、半截句、办公词与拯救口号。（${seed}）`
 }
 
 export function parseCompanionInterestTags(interests: string[] | undefined): {
@@ -1214,6 +1063,8 @@ export type BuildCompanionAgentContextInput = {
   avoidRecentOutputs?: string[]
   now?: Date
   seed?: number
+  /** 与本轮 writing_angle 一致；不传则按 seed 选取。 */
+  archetype?: CompanionArchetype
 }
 
 function formatInterestsForAgent(tags: string[]): string {
@@ -1221,10 +1072,9 @@ function formatInterestsForAgent(tags: string[]): string {
 }
 
 function buildStyleGuideForAgent(style: CompanionCopyStyle): string {
-  return `${STYLE_GUIDE[style]}\n${STYLE_ANTI_FUNCTIONAL[style]}\n${COMPANION_ANTI_TEMPLATE_BLOCK}`
+  return STYLE_GUIDE[style]
 }
 
-/** 仅注入与 interests 匹配的兴趣写作说明（无重复桌面场景条）。 */
 function buildInterestGuideForAgent(
   tags: string[],
   style: CompanionCopyStyle,
@@ -1232,18 +1082,25 @@ function buildInterestGuideForAgent(
 ): string {
   if (tags.length === 0 && !note) return '无'
   const parts: string[] = []
-  for (const tag of tags) {
-    const line = INTEREST_TAG_GUIDE[tag]
-    if (line) parts.push(line)
-  }
-  if (tags.some((t) => QUOTE_FORWARD_INTERESTS.has(t))) {
+  if (tags.length > 0) {
     parts.push(
-      `影视/书籍：宜像文学作品摘出的格言，再按「${style}」收束；禁止仅装饰性比喻。`,
+      `用户自选兴趣：${tags.join('、')}。本条宜让对方感到「懂我的喜好」：用兴趣相关意象自然织入一句（一句一处，勿罗列标签名、勿活动建议）。`,
     )
-  } else if (tags.length > 0) {
-    parts.push('兴趣仅轻点意象，与情绪或语气冲突时忽略。')
+    parts.push(
+      ...tags
+        .map((tag) => INTEREST_TAG_GUIDE[tag])
+        .filter((line): line is string => Boolean(line)),
+    )
+    if (tags.some((t) => QUOTE_FORWARD_INTERESTS.has(t))) {
+      parts.push(
+        `【影视/书籍】优先像文学作品里摘出的一句格言，再按「${style}」语气收束；不必加书名号或片名。`,
+      )
+    }
+    parts.push(
+      '若与本轮情境（moment_context / yesterday_context）或当前情绪冲突，以情境与情绪优先，兴趣仅作轻点缀。',
+    )
   }
-  if (note) parts.push(`用户补充：${note}（轻量参考，勿喧宾夺主）`)
+  if (note) parts.push(`用户补充（可优先化用）：${note}`)
   return parts.join('\n')
 }
 
@@ -1286,12 +1143,18 @@ export function buildCompanionAgentUserPromptParams(
     input.yesterdayContextText?.trim() || '无昨日记录'
   const moment = input.momentContextText?.trim() || '无'
   const similarLine = input.similarToLine?.trim() || '无'
-  const avoidBlock = buildAvoidRecentBlock(input.avoidRecentOutputs, seed)
   const trigger = resolveCompanionCopyTrigger(input.trigger, input.keyword)
+  const avoidBlock = buildAvoidRecentBlock(input.avoidRecentOutputs)
   const minChars = companionMinCharsForStyle(input.maxChars, effectiveStyle)
+  const styleReference = buildStyleReferenceBlock(
+    effectiveStyle,
+    seed,
+    sanitizeRecentCompanionLinesForPrompt(input.avoidRecentOutputs),
+  )
 
   return {
     trigger,
+    scene_context: COMPANION_DESKTOP_SCENE_CONTEXT,
     text_style: effectiveStyle,
     style_guide: buildStyleGuideForAgent(effectiveStyle),
     interests: formatInterestsForAgent(tags),
@@ -1306,18 +1169,9 @@ export function buildCompanionAgentUserPromptParams(
     moment_context: moment,
     similar_to_line: similarLine,
     local_time_hint: buildLocalTimeHintLine(input.now ?? new Date()),
-    writing_angle: pickDiversityAngle(seed, input.avoidRecentOutputs ?? []),
-    writing_angle_index: String(
-      Math.abs(
-        seed +
-          hashRecentForAngle(
-            (input.avoidRecentOutputs ?? []).map(compactLineForPrompt).filter(Boolean),
-          ) *
-            17 +
-          (input.avoidRecentOutputs?.length ?? 0) * 13,
-      ) % DIVERSITY_ANGLES.length,
-    ),
-    avoid_recent_block: avoidBlock.trim().length > 0 ? avoidBlock.trim() : '无',
+    writing_angle: styleReference,
+    writing_angle_index: String(Math.abs(seed) % 997),
+    avoid_recent_block: avoidBlock,
     min_chars: String(minChars),
     max_chars: String(input.maxChars),
     allow_emoji: input.allowEmoji ? '是' : '否',
@@ -1336,26 +1190,37 @@ export function buildCompanionAgentUserPrompt(
   const zhOnly =
     '仅输出一条简体中文短句，禁止出现任何英文字母或英文单词；勿写中英夹杂。'
 
+  const { tags: interestTags } = parseCompanionInterestTags(
+    input.companionInterests,
+  )
+  const interestTaskHint =
+    interestTags.length > 0
+      ? '若 interests 非无，须读 interest_guide 与 interest_note，自然体现用户兴趣（一句一处意象）。'
+      : ''
+
+  const taskCore = [
+    '写一句桌面陪伴短句。读 writing_angle 里的气质参考，读 avoid_recent_block 避免复读；写全新措辞。',
+    interestTaskHint,
+    zhOnly,
+  ]
+    .filter(Boolean)
+    .join('')
+
+  const finishTask = (extra: string) => `${taskCore}\n${extra}`
+
   if (trigger === 'regenerate') {
-    return [
-      '请换一句全新的陪伴短句：母题、起笔、句法、收束词均须与 avoid_recent_block 中任一句明显不同。',
-      '禁止同骨架换词（如云朵↔天空、修行↔温柔、馈赠↔礼物）；禁止停顿看云+也是温柔/修行类公式句。',
-      '严格按 writing_angle 指定的句式写，勿回到默认散文腔。禁止照抄提示词示范句。',
-      zhOnly,
-    ].join('')
+    return finishTask('用户点「换一句」：须与 avoid_recent_block 明显不同。')
   }
   if (trigger === 'similar') {
-    return [
-      '用户对当前气泡句点了「类似这句」；请根据 similar_to_line 与轻反馈偏好，',
-      '写一句语气与骨架相近、措辞明显换新的陪伴短句；禁止照抄参考句。',
-      zhOnly,
-    ].join('')
-  }
-  if (trigger === 'scheduled') {
-    return `请生成一句定时陪伴短句。${zhOnly}`
+    return finishTask(
+      '用户点「类似这句」：语气贴近 similar_to_line，措辞明显换新，禁止照抄。',
+    )
   }
   if (trigger === 'emotion') {
-    return `用户刚完成情绪反馈，请给一句严格贴合当前情绪的陪伴短句。${zhOnly}`
+    return finishTask('用户刚完成情绪反馈：写一句贴合当前情绪的陪伴短句。')
+  }
+  if (trigger === 'scheduled') {
+    return finishTask('定时推送：写一句桌面陪伴短句。')
   }
   if (trigger === 'yesterday-greeting') {
     return [
@@ -1400,8 +1265,8 @@ export function buildCompanionAgentUserPrompt(
     ].join('')
   }
   if (kw) {
-    return `请围绕关键词生成一句陪伴短句：${kw}。${zhOnly}`
+    return finishTask(`围绕关键词写一句陪伴短句：${kw}。`)
   }
-  return `请给一句陪伴短句：通顺完整、写满字数，换与上一句不同骨架。${zhOnly}`
+  return finishTask('写一句桌面陪伴短句。')
 }
 

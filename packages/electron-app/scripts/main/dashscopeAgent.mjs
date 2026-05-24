@@ -56,7 +56,6 @@ export async function dashscopeAgentComplete(payload) {
         ? { user_prompt_params: payload.userPromptParams }
         : {}),
     },
-    parameters: {},
   }
 
   const res = await fetch(agentUrl(appId), {
@@ -86,4 +85,13 @@ export async function dashscopeAgentComplete(payload) {
       : null
 
   return { text, sessionId }
+}
+
+/** 主进程：并发 IPC 串行化，避免不同 prompt 共用同一次 HTTP 响应。 */
+let agentHttpChain = Promise.resolve()
+
+export async function dashscopeAgentCompleteSingleFlight(payload) {
+  const run = agentHttpChain.then(() => dashscopeAgentComplete(payload))
+  agentHttpChain = run.catch(() => {})
+  return run
 }

@@ -13,11 +13,9 @@ import {
   shouldApplyCompanionCopyResult,
   startCompanionCopyRequest,
 } from './companionCopySession'
-import {
-  speakCompanionLine,
-  usesDetachedToastWindow,
-} from '../utils/companionTts'
+import { usesDetachedToastWindow } from '../utils/companionTts'
 import { reportSpriteAnchorToMain } from '../utils/reportSpriteAnchor'
+import { buildShowToastWindowPayload } from '../utils/toastWindowPayload'
 
 const BLOCK_SCHEDULED_MS = 4 * 60 * 1000
 
@@ -72,7 +70,11 @@ export async function pushProactiveCompanionCopy(
       undefined,
       undefined,
       avoid.length > 0 ? avoid : undefined,
-      input.fetchOptions,
+      {
+        ...input.fetchOptions,
+        fetchKind: 'interactive',
+        maxQualityRetries: 0,
+      },
     )
     await persistBailianAgentSessionId(input.settingsRef, result.sessionId)
     if (!shouldApplyCompanionCopyResult(fetchId, result.source)) return null
@@ -101,12 +103,14 @@ export async function pushProactiveCompanionCopy(
       flush: true,
       avatarSizePercent: s.avatarSize,
     })
-    await window.sidekickDesktop!.showToastWindow({
-      message: text,
-      anchor: s.toastAnchor,
-      dwellSeconds: dwell,
-      ...(newId ? { textId: newId, favorite: false } : {}),
-    })
+    await window.sidekickDesktop!.showToastWindow(
+      buildShowToastWindowPayload(s, {
+        message: text,
+        anchor: s.toastAnchor,
+        dwellSeconds: dwell,
+        ...(newId ? { textId: newId, favorite: false } : {}),
+      }),
+    )
   } else {
     await input.showToastMessage(text, {
       dwellSeconds: dwell,
@@ -115,13 +119,6 @@ export async function pushProactiveCompanionCopy(
     if (newId && input.setToastMeta) {
       input.setToastMeta({ id: newId, favorite: false })
     }
-    const tts = input.settingsRef.current
-    void speakCompanionLine(text, {
-      enabled: tts.companionTtsEnabled,
-      model: tts.companionTtsModel,
-      voice: tts.companionTtsVoice,
-      speechRate: tts.companionTtsSpeechRate,
-    })
   }
 
   input.recentCompanionLinesRef.current = [

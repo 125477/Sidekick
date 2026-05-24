@@ -2,8 +2,10 @@ import { FALLBACK_QUOTES } from '../fallback/quotes'
 import {
   companionTextHasBleakWithoutComfort,
   companionTextHasEllipticalTail,
+  companionTextHasFormulaSkeleton,
   companionTextHasFunctionalTone,
   companionTextHasMotivationalParallelTemplate,
+  companionTextHasOralPermissionCliche,
   companionTextHasPoeticTemplate,
   companionTextHasStiffHealingCliche,
 } from '../prompts/textPrompt'
@@ -21,11 +23,13 @@ function pickFallbackQuote(maxChars?: number): string {
   const base = withinLen.length > 0 ? withinLen : FALLBACK_QUOTES
   const withoutBanned = base.filter(
     (q) =>
+      !companionTextHasFormulaSkeleton(q) &&
       !companionTextHasPoeticTemplate(q) &&
       !companionTextHasMotivationalParallelTemplate(q) &&
       !companionTextHasBleakWithoutComfort(q) &&
       !companionTextHasFunctionalTone(q, '治愈') &&
       !companionTextHasStiffHealingCliche(q) &&
+      !companionTextHasOralPermissionCliche(q) &&
       !companionTextHasEllipticalTail(q),
   )
   const pool = withoutBanned.length > 0 ? withoutBanned : base

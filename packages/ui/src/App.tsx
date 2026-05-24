@@ -173,6 +173,7 @@ function App() {
     toastTextIdFromQuery,
     toastFavoriteFromUrl,
     toastIntroFromQuery,
+    toastAutoTtsFromQuery,
     emotionTabFromQuery,
     cornerNotificationTitle,
     cornerNotificationMessage,
@@ -182,6 +183,14 @@ function App() {
     anchor: 'top' | 'bottom'
     placement: 'above' | 'below'
   } | null>(null)
+  /** 独立气泡：IPC 同步文案，覆盖 URL query（避免 loadURL 竞态）。 */
+  const [detachedToastLiveMessage, setDetachedToastLiveMessage] = useState('')
+  const [detachedToastLiveTextId, setDetachedToastLiveTextId] = useState<
+    string | null
+  >(null)
+  const [detachedToastLiveFavorite, setDetachedToastLiveFavorite] = useState<
+    boolean | null
+  >(null)
   const toastDetachAnchor = detachPlacementFromMain?.anchor ?? toastAnchorFromQuery
   const toastDetachBubblePlacement =
     detachPlacementFromMain?.placement ?? toastBubblePlacement
@@ -202,7 +211,7 @@ function App() {
     isWidgetMode ||
     isToastMode ||
     mode === 'app'
-  const runsScheduledPush = isWidgetMode || mode === 'app'
+  const runsScheduledPush = isWidgetMode
   const [toastDetachFavorite, setToastDetachFavorite] =
     useState(toastFavoriteFromUrl)
   const spriteAvatarSize = settings.avatarSize
@@ -486,6 +495,31 @@ function App() {
     />
   )
 
+  useEffect(() => {
+    if (!isToastMode) return
+    const unsub = window.sidekickDesktop?.onDetachedToastContentSync?.(
+      (payload) => {
+        setDetachedToastLiveMessage(payload.message)
+        if (payload.textId !== undefined) {
+          setDetachedToastLiveTextId(payload.textId ?? null)
+        }
+        if (payload.favorite !== undefined) {
+          setDetachedToastLiveFavorite(payload.favorite)
+        }
+      },
+    )
+    return () => {
+      unsub?.()
+    }
+  }, [isToastMode])
+
+  const detachedToastDisplayMessage =
+    detachedToastLiveMessage.trim() || toastMessageFromQuery
+  const detachedToastDisplayTextId =
+    detachedToastLiveTextId ?? toastTextIdFromQuery
+  const detachedToastDisplayFavorite =
+    detachedToastLiveFavorite ?? toastFavoriteFromUrl
+
   if (isMoodHistoryBubbleGalleryMode) {
     return <MoodHistoryQuoteBubbleGallery />
   }
@@ -506,11 +540,15 @@ function App() {
         toastDetachTailPointsDown={toastDetachTailPointsDown}
         toastDetachAnchor={toastDetachAnchor}
         toastDetachBubblePlacement={toastDetachBubblePlacement}
-        toastMessageFromQuery={toastMessageFromQuery}
+        toastMessageFromQuery={detachedToastDisplayMessage}
         toastIntroFromQuery={toastIntroFromQuery}
+        toastAutoTtsFromQuery={toastAutoTtsFromQuery}
         settings={settings}
-        toastTextIdFromQuery={toastTextIdFromQuery}
-        toastDetachFavorite={toastDetachFavorite}
+        settingsReady={settingsReady}
+        toastTextIdFromQuery={detachedToastDisplayTextId}
+        toastDetachFavorite={
+          detachedToastLiveFavorite ?? toastDetachFavorite
+        }
         setToastDetachFavorite={setToastDetachFavorite}
         openEmotionFromToast={openEmotionFromToast}
         openSettingsFromToast={openSettingsFromToast}

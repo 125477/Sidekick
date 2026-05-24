@@ -84,6 +84,26 @@ contextBridge.exposeInMainWorld('sidekickDesktop', {
     ipcRenderer.on(channel, listener)
     return () => ipcRenderer.removeListener(channel, listener)
   },
+  /** 独立气泡窗：主进程推送新文案，避免换句时整页 loadURL 竞态。 */
+  onDetachedToastContentSync(callback) {
+    const channel = 'sidekick:detached-toast-content'
+    const listener = (_event, payload) => {
+      if (!payload || typeof payload !== 'object') return
+      const message = typeof payload.message === 'string' ? payload.message.trim() : ''
+      if (!message) return
+      callback({
+        message,
+        textId:
+          typeof payload.textId === 'string' && payload.textId.trim()
+            ? payload.textId.trim()
+            : undefined,
+        favorite: typeof payload.favorite === 'boolean' ? payload.favorite : undefined,
+        autoTts: payload.autoTts === true,
+      })
+    }
+    ipcRenderer.on(channel, listener)
+    return () => ipcRenderer.removeListener(channel, listener)
+  },
   resizeToastWindow(payload) {
     return ipcRenderer.invoke('sidekick:resize-toast', payload)
   },

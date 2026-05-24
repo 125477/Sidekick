@@ -14,7 +14,8 @@ export type DashScopeTextRequest = {
   model: string | undefined
   systemPrompt: string
   userPrompt: string
-  temperature: number | undefined
+  /** 不传则 API 使用平台默认采样参数。 */
+  temperature?: number
   /** Full POST URL (e.g. Vite dev `/dashscope/...` proxy). Defaults to DashScope compatible-mode Beijing. */
   chatCompletionsUrl?: string
 }
@@ -250,7 +251,9 @@ export async function requestDashScopeChatCompletion(
     },
     body: JSON.stringify({
       model,
-      temperature: input.temperature ?? 0.7,
+      ...(input.temperature !== undefined && Number.isFinite(input.temperature)
+        ? { temperature: input.temperature }
+        : {}),
       messages: [
         { role: 'system', content: input.systemPrompt },
         { role: 'user', content: input.userPrompt },

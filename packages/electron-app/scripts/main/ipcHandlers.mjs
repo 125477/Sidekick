@@ -4,7 +4,7 @@ import {
   registerAutoUpdaterLifecycle,
 } from './autoUpdater.mjs'
 import { dashscopeTtsFetch } from '../dashscopeTtsFetch.mjs'
-import { dashscopeAgentComplete } from './dashscopeAgent.mjs'
+import { dashscopeAgentCompleteSingleFlight } from './dashscopeAgent.mjs'
 import { dashscopeChatCompleteWithFallback } from './dashscopeChat.mjs'
 import { clamp } from './geometry.mjs'
 import {
@@ -370,12 +370,20 @@ export function registerSidekickIpcHandlers() {
     })
     applyToastWindowBounds()
   })
+  let lastToastRegenerateAt = 0
+  let lastToastSimilarAt = 0
+  const TOAST_COPY_ACTION_DEBOUNCE_MS = 2500
   ipcMain.on('sidekick:toast-regenerate-request', () => {
+    const now = Date.now()
+    if (now - lastToastRegenerateAt < TOAST_COPY_ACTION_DEBOUNCE_MS) return
+    lastToastRegenerateAt = now
     if (!state.spriteWindow || state.spriteWindow.isDestroyed()) return
     state.spriteWindow.webContents.send('sidekick:regenerate-copy')
   })
   ipcMain.on('sidekick:toast-similar-request', () => {
-    if (!state.spriteWindow || state.spriteWindow.isDestroyed()) return
+    const now = Date.now()
+    if (now - lastToastSimilarAt < TOAST_COPY_ACTION_DEBOUNCE_MS) return
+    lastToastSimilarAt = now
     state.spriteWindow.webContents.send('sidekick:similar-copy')
   })
   ipcMain.handle('sidekick:get-work-area', () => {
@@ -399,7 +407,7 @@ export function registerSidekickIpcHandlers() {
   })
 
   ipcMain.handle('sidekick:dashscope-agent', async (_event, payload) => {
-    return dashscopeAgentComplete(payload)
+    return dashscopeAgentCompleteSingleFlight(payload)
   })
 
   ipcMain.handle('sidekick:dashscope-tts', async (_event, payload) => {

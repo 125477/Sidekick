@@ -64,8 +64,6 @@ export type SidekickSettings = {
   clickToFetchEnabled: boolean
   avatarSize: number
   avatarOpacity: number
-  /** 生成陪伴短句（千问等）时的采样温度；越高输出越多样，越低越稳。 */
-  textTemperature: number
   /** 预留：文生图 / 形象生成等接入后可作图像侧 temperature；当前仅持久化，生成链路未读取。 */
   imageTemperature: number
   textStyle: CompanionCopyStyle
@@ -192,7 +190,6 @@ export const defaultSettings: SidekickSettings = {
   clickToFetchEnabled: true,
   avatarSize: 80,
   avatarOpacity: 90,
-  textTemperature: 0.85,
   imageTemperature: 0.5,
   textStyle: '治愈',
   allowEmoji: false,

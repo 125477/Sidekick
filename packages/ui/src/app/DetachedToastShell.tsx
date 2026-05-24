@@ -5,6 +5,7 @@ import {
   replayCompanionSpeech,
   speakCompanionLine,
 } from '../utils/companionTts'
+import { buildShowToastWindowPayload } from '../utils/toastWindowPayload'
 import { toggleToastFavorite } from './toastFavoriteToggle'
 import { resolveCompanionQuoteBubbleVariant } from '../components/emotion/moodHistory/quoteBubbleSettings'
 import type { SidekickSettings } from '../state/settingsState'
@@ -20,7 +21,10 @@ type DetachedToastShellProps = {
   toastDetachBubblePlacement: 'above' | 'below'
   toastMessageFromQuery: string
   toastIntroFromQuery: boolean
+  /** 由精灵窗打开气泡时写入 URL（`autoTts=1`），优先于气泡窗内 settings。 */
+  toastAutoTtsFromQuery: boolean
   settings: SidekickSettings
+  settingsReady: boolean
   toastTextIdFromQuery: string | null
   toastDetachFavorite: boolean
   setToastDetachFavorite: (v: boolean) => void
@@ -45,7 +49,9 @@ export function DetachedToastShell({
   toastDetachBubblePlacement,
   toastMessageFromQuery,
   toastIntroFromQuery,
+  toastAutoTtsFromQuery,
   settings,
+  settingsReady,
   toastTextIdFromQuery,
   toastDetachFavorite,
   setToastDetachFavorite,
@@ -65,7 +71,7 @@ export function DetachedToastShell({
   const lastAutoTtsRef = useRef('')
 
   useEffect(() => {
-    if (introMode || !settings.companionTtsEnabled) return
+    if (!settingsReady || introMode || !toastAutoTtsFromQuery) return
     const msg = toastMessageFromQuery.trim()
     if (!msg || msg === lastAutoTtsRef.current) return
     lastAutoTtsRef.current = msg
@@ -76,9 +82,10 @@ export function DetachedToastShell({
       speechRate: settings.companionTtsSpeechRate,
     })
   }, [
+    settingsReady,
     introMode,
+    toastAutoTtsFromQuery,
     toastMessageFromQuery,
-    settings.companionTtsEnabled,
     settings.companionTtsModel,
     settings.companionTtsVoice,
     settings.companionTtsSpeechRate,
@@ -144,13 +151,19 @@ export function DetachedToastShell({
                     result.id !== toastTextIdFromQuery &&
                     window.sidekickDesktop?.showToastWindow
                   ) {
-                    await window.sidekickDesktop.showToastWindow({
-                      message: toastMessageFromQuery,
-                      textId: result.id,
-                      favorite: result.favorite,
-                      anchor: toastDetachAnchor,
-                      dwellSeconds: 0,
-                    })
+                    await window.sidekickDesktop.showToastWindow(
+                      buildShowToastWindowPayload(
+                        settings,
+                        {
+                          message: toastMessageFromQuery,
+                          textId: result.id,
+                          favorite: result.favorite,
+                          anchor: toastDetachAnchor,
+                          dwellSeconds: 0,
+                        },
+                        { autoTts: false },
+                      ),
+                    )
                   }
                 })()
               }}

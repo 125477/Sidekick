@@ -4,33 +4,15 @@ import {
 } from '../clients/dashscopeTextClient'
 import type { EmotionKind } from '../schema/data'
 import {
-  buildBleakWithoutComfortRetryUserSuffix,
   buildCompanionSystemPrompt,
   buildCompanionUserPromptWithInterests,
-  buildDesktopClicheRetryUserSuffix,
-  buildMotivationalParallelRetryUserSuffix,
-  buildFunctionalToneRetryUserSuffix,
-  buildPoeticTemplateRetryUserSuffix,
-  buildEllipticalTailRetryUserSuffix,
-  buildOralPermissionRetryUserSuffix,
-  buildStiffHealingRetryUserSuffix,
-  buildTooShortRetryUserSuffix,
-  companionTextHasEllipticalTail,
-  companionTextTooShort,
-  companionTextHasOralPermissionCliche,
-  companionTextHasStiffHealingCliche,
-  companionTextNeedsPlainHealingCheck,
-  companionStyleForEmotion,
-  companionTextHasBleakWithoutComfort,
-  companionTextHasDesktopCliche,
-  companionTextHasFunctionalTone,
-  companionTextHasMotivationalParallelTemplate,
-  companionTextHasPoeticTemplate,
   buildCompanionTriggerContextLines,
+  companionStyleForEmotion,
   parseCompanionInterestTags,
   type CompanionCopyStyle,
   type CompanionCopyTrigger,
 } from '../prompts/textPrompt'
+import { refineCompanionCopyLine } from './companionCopyQualityPasses'
 import { getCompanionText, type CompanionTextResult } from './getCompanionText'
 
 export type GenerateCompanionCopyInput = {
@@ -40,7 +22,6 @@ export type GenerateCompanionCopyInput = {
   keyword: string | undefined
   allowEmoji: boolean
   maxChars: number
-  temperature: number | undefined
   /** 与情绪反馈联动时使用 */
   emotion?: EmotionKind
   /** 最近已向用户展示的陪伴句，写入 user prompt 以抑制「只改一两字」式复述 */
@@ -59,6 +40,8 @@ export type GenerateCompanionCopyInput = {
   yesterdayContextText?: string | null
   momentContextText?: string | null
   similarToLine?: string | null
+  /** 套句校验额外重试上限；`0` 表示仅首句、不重试（换一句等场景）。 */
+  maxQualityRetries?: number
 }
 
 function stripEmojisFromText(text: string): string {
@@ -134,18 +117,12 @@ export async function generateCompanionCopy(
       ? `${triggerLines.join('\n')}\n${userPromptBase}`
       : userPromptBase
 
-  const recentCount = input.avoidRecentOutputs?.length ?? 0
-  const baseTemperature = input.temperature ?? 0.7
-  const effectiveTemperature =
-    recentCount > 0 ? Math.min(1.05, baseTemperature + 0.12) : baseTemperature
-
   const requestModelLine = async (userPromptLine: string): Promise<string> => {
     const req: DashScopeTextRequest = {
       apiKey: input.apiKey,
       model: input.model,
       systemPrompt,
       userPrompt: userPromptLine,
-      temperature: effectiveTemperature,
       ...(input.chatCompletionsUrl !== undefined
         ? { chatCompletionsUrl: input.chatCompletionsUrl }
         : {}),
@@ -163,80 +140,28 @@ export async function generateCompanionCopy(
     return finalizeCompanionText(raw, input.maxChars, input.allowEmoji)
   }
 
+  const qualityCtx = { maxChars: input.maxChars, style: effectiveStyle }
+  const refineOpts =
+    typeof input.maxQualityRetries === 'number'
+      ? { maxExtraRetries: input.maxQualityRetries }
+      : undefined
   const result = await getCompanionText(async () => {
     let line = await requestModelLine(userPrompt)
-    if (companionTextTooShort(line, input.maxChars, effectiveStyle)) {
-      line = await requestModelLine(
-        `${userPrompt}\n${buildTooShortRetryUserSuffix(input.maxChars, effectiveStyle)}`,
-      )
-    }
-    if (companionTextHasPoeticTemplate(line)) {
-      line = await requestModelLine(
-        `${userPrompt}\n${buildPoeticTemplateRetryUserSuffix()}`,
-      )
-    }
-    if (companionTextHasDesktopCliche(line)) {
-      line = await requestModelLine(
-        `${userPrompt}\n${buildDesktopClicheRetryUserSuffix()}`,
-      )
-    }
-    if (companionTextHasMotivationalParallelTemplate(line)) {
-      line = await requestModelLine(
-        `${userPrompt}\n${buildMotivationalParallelRetryUserSuffix()}`,
-      )
-    }
-    if (companionTextHasBleakWithoutComfort(line)) {
-      line = await requestModelLine(
-        `${userPrompt}\n${buildBleakWithoutComfortRetryUserSuffix()}`,
-      )
-    }
-    if (companionTextHasFunctionalTone(line, effectiveStyle)) {
-      line = await requestModelLine(
-        `${userPrompt}\n${buildFunctionalToneRetryUserSuffix(effectiveStyle)}`,
-      )
-    }
+    line = finalizeCompanionText(line, input.maxChars, input.allowEmoji)
+
     if (
-      companionTextNeedsPlainHealingCheck(effectiveStyle) &&
-      companionTextHasStiffHealingCliche(line)
+      typeof input.maxQualityRetries === 'number' &&
+      input.maxQualityRetries === 0
     ) {
-      line = await requestModelLine(
-        `${userPrompt}\n${buildStiffHealingRetryUserSuffix()}`,
-      )
+      return line
     }
-    if (
-      companionTextNeedsPlainHealingCheck(effectiveStyle) &&
-      companionTextHasOralPermissionCliche(line)
-    ) {
-      line = await requestModelLine(
-        `${userPrompt}\n${buildOralPermissionRetryUserSuffix()}`,
-      )
-    }
-    if (companionTextHasEllipticalTail(line)) {
-      line = await requestModelLine(
-        `${userPrompt}\n${buildEllipticalTailRetryUserSuffix()}`,
-      )
-    }
-    if (companionTextTooShort(line, input.maxChars, effectiveStyle)) {
-      line = await requestModelLine(
-        `${userPrompt}\n${buildTooShortRetryUserSuffix(input.maxChars, effectiveStyle)}`,
-      )
-    }
-    if (
-      companionTextHasPoeticTemplate(line) ||
-      companionTextHasDesktopCliche(line) ||
-      companionTextHasMotivationalParallelTemplate(line) ||
-      companionTextHasBleakWithoutComfort(line) ||
-      companionTextHasFunctionalTone(line, effectiveStyle) ||
-      (companionTextNeedsPlainHealingCheck(effectiveStyle) &&
-        companionTextHasStiffHealingCliche(line)) ||
-      (companionTextNeedsPlainHealingCheck(effectiveStyle) &&
-        companionTextHasOralPermissionCliche(line)) ||
-      companionTextHasEllipticalTail(line) ||
-      companionTextTooShort(line, input.maxChars, effectiveStyle)
-    ) {
-      throw new Error('companion copy still matches banned template')
-    }
-    return line
+
+    return refineCompanionCopyLine(
+      line,
+      qualityCtx,
+      (suffix) => requestModelLine(`${userPrompt}\n${suffix}`),
+      refineOpts,
+    )
   }, { maxChars: input.maxChars })
 
   return {

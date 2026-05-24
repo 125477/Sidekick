@@ -17,6 +17,8 @@ import {
   loadLastYesterdayGreetingDayKey,
   saveLastYesterdayGreetingDayKey,
 } from '../state/yesterdayGreetingStorage'
+import { shouldSkipYesterdayGreetingAfterBootstrap } from './companionFetchCoordinator'
+import { shouldDeferExtraProactiveCopy } from './companionSessionBoot'
 
 const BLOCK_SCHEDULED_MS = 4 * 60 * 1000
 
@@ -67,6 +69,8 @@ export function useYesterdayEmotionGreeting({
     void (async () => {
       if (!isWidgetMode || !settingsReady) return
       if (blockScheduledPushRef.current || greetingBusyRef.current) return
+      if (shouldDeferExtraProactiveCopy()) return
+      if (shouldSkipYesterdayGreetingAfterBootstrap()) return
       const s = settingsRef.current
       if (!s.pushEnabled || !canPushNow(s)) return
 
@@ -89,12 +93,15 @@ export function useYesterdayEmotionGreeting({
             undefined,
             undefined,
             {
+              fetchKind: 'startup',
+              maxQualityRetries: 0,
               trigger: 'yesterday-greeting',
               yesterdayContextText: yesterdayText,
             },
           )
           await persistBailianAgentSessionId(settingsRef, result.sessionId)
-          text = result.text
+          text = result.text.trim()
+          if (!text) return
         } catch {
           text = buildYesterdayGreetingText(ctx)
         }

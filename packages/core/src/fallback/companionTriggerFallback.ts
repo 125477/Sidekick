@@ -1,6 +1,11 @@
 import type { CompanionCopyTrigger } from '../prompts/textPrompt'
 
 const FALLBACK: Partial<Record<CompanionCopyTrigger, string[]>> = {
+  regenerate: [
+    '肩酸了就把背靠实一会儿，这一下算照顾到自己。',
+    '可以先把脑子放空两分钟，再决定要不要继续。',
+    '今天不必对自己那么凶，先到这儿也很好。',
+  ],
   similar: [
     '还是这种轻轻的语气，换一句陪在你身边。',
     '顺着刚才的心意，再送你一句不一样的温柔。',

@@ -53,7 +53,20 @@ function extractAgentError(payload: AgentCompletionResponse, status: number): st
  * 调用百炼智能体应用 completion（非 chat/completions）。
  * @see https://help.aliyun.com/zh/model-studio/new-agent-application-api-reference
  */
+let agentHttpChain: Promise<unknown> = Promise.resolve()
+
 export async function requestDashScopeAgentCompletion(
+  input: DashScopeAgentRequest,
+  opts?: { requestBasePath?: string },
+): Promise<DashScopeAgentResult> {
+  const run = agentHttpChain.then(() =>
+    requestDashScopeAgentCompletionOnce(input, opts),
+  )
+  agentHttpChain = run.catch(() => {})
+  return run
+}
+
+async function requestDashScopeAgentCompletionOnce(
   input: DashScopeAgentRequest,
   opts?: { requestBasePath?: string },
 ): Promise<DashScopeAgentResult> {
@@ -74,7 +87,6 @@ export async function requestDashScopeAgentCompletion(
         ? { user_prompt_params: input.userPromptParams }
         : {}),
     },
-    parameters: {},
   }
 
   const res = await fetch(agentCompletionUrl(appId, opts?.requestBasePath), {

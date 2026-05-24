@@ -204,7 +204,9 @@ async function completeOnce({
     },
     body: JSON.stringify({
       model,
-      temperature,
+      ...(typeof temperature === 'number' && Number.isFinite(temperature)
+        ? { temperature }
+        : {}),
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
@@ -252,7 +254,7 @@ export async function dashscopeChatCompleteWithFallback(payload) {
   const temperature =
     typeof payload?.temperature === 'number' && Number.isFinite(payload.temperature)
       ? payload.temperature
-      : 0.7
+      : undefined
   const chatCompletionsUrl = payload?.chatCompletionsUrl
 
   const fetched = await listDashScopeChatModels(apiKey, chatCompletionsUrl)

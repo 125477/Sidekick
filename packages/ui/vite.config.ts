@@ -8,7 +8,11 @@ import { dashscopeAudioProxyPlugin } from './scripts/viteDashscopeAudioProxy'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // https://vite.dev/config/
+/** monorepo 根目录 `.env` / `.env.local`（与仓库根 README 约定一致）。 */
+const repoRoot = path.resolve(__dirname, '../..')
+
 export default defineConfig({
+  envDir: repoRoot,
   /** 静态资源根目录（仅媒体文件；TS 模块在 `src/assets/`）。 */
   publicDir: path.resolve(__dirname, 'src/static'),
   /** 与 Electron `file://` 打包加载一致（`extraResources` 下的静态 `index.html`）。 */

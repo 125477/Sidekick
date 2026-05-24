@@ -3,19 +3,13 @@ import type { EmotionKind } from '../schema/data'
 import {
   buildCompanionAgentUserPrompt,
   buildCompanionAgentUserPromptParams,
-  buildPoeticTemplateRetryUserSuffix,
-  buildStiffHealingRetryUserSuffix,
-  buildTooShortRetryUserSuffix,
   companionMinCharsForStyle,
   companionStyleForEmotion,
-  companionTextHasPoeticTemplate,
-  companionTextHasStiffHealingCliche,
-  companionTextNeedsPlainHealingCheck,
-  companionTextTooShort,
   type BuildCompanionAgentContextInput,
   type CompanionCopyStyle,
   type CompanionCopyTrigger,
 } from '../prompts/textPrompt'
+import { refineCompanionCopyLine } from './companionCopyQualityPasses'
 import { getCompanionText, type CompanionTextResult } from './getCompanionText'
 
 export type GenerateCompanionViaAgentInput = {
@@ -34,8 +28,8 @@ export type GenerateCompanionViaAgentInput = {
   yesterdayContextText?: string | null
   momentContextText?: string | null
   similarToLine?: string | null
-  /** 每轮生成唯一种子，驱动 writing_angle 与防重复块 */
   seed?: number
+  maxQualityRetries?: number
   invokeAgent?: (payload: {
     appId: string
     prompt: string
@@ -77,7 +71,6 @@ function companionTextHasLatinLetters(text: string): boolean {
   return /[A-Za-z]/.test(text)
 }
 
-/** 模型偶发中英夹杂时，保留首个英文片段之前的通顺中文。 */
 function keepChineseCompanionSegment(text: string): string {
   const idx = text.search(/[A-Za-z]/)
   if (idx < 0) return text.trim()
@@ -87,7 +80,6 @@ function keepChineseCompanionSegment(text: string): string {
     .trim()
 }
 
-/** 取模型返回的首行、去掉常见包裹符号。 */
 function normalizeAgentLine(raw: string): string {
   const first = raw
     .split(/\r?\n/)
@@ -109,13 +101,10 @@ async function invokeCompanionAgentOnce(
   const prompt = extraUserSuffix
     ? `${buildCompanionAgentUserPrompt(ctx)}\n${extraUserSuffix}`
     : buildCompanionAgentUserPrompt(ctx)
-  let capturedSessionId: string | null = input.sessionId ?? null
-
   const raw = input.invokeAgent
     ? await input.invokeAgent({
         appId: input.appId,
         prompt,
-        ...(input.sessionId ? { sessionId: input.sessionId } : {}),
         userPromptParams,
       })
     : await requestDashScopeAgentCompletion(
@@ -123,7 +112,6 @@ async function invokeCompanionAgentOnce(
           apiKey: input.apiKey,
           appId: input.appId,
           prompt,
-          ...(input.sessionId != null ? { sessionId: input.sessionId } : {}),
           userPromptParams,
         },
         input.requestBasePath !== undefined
@@ -131,7 +119,6 @@ async function invokeCompanionAgentOnce(
           : undefined,
       )
 
-  capturedSessionId = raw.sessionId ?? capturedSessionId
   let line = normalizeAgentLine(raw.text)
   if (companionTextHasLatinLetters(line)) {
     const zhOnly = keepChineseCompanionSegment(line)
@@ -143,7 +130,16 @@ async function invokeCompanionAgentOnce(
     }
   }
   if (!line) throw new Error('empty agent line')
-  return { line, sessionId: capturedSessionId }
+  return { line, sessionId: null }
+}
+
+/** 单次百炼 HTTP；气泡必须与该次 Network `output.text` 一致。 */
+async function generateLineOnce(
+  input: GenerateCompanionViaAgentInput,
+  ctx: BuildCompanionAgentContextInput,
+): Promise<string> {
+  const { line } = await invokeCompanionAgentOnce(input, ctx)
+  return finalizeCompanionText(line, input.maxChars, input.allowEmoji)
 }
 
 export async function generateCompanionCopyViaAgent(
@@ -162,6 +158,7 @@ export async function generateCompanionCopyViaAgent(
     allowEmoji: input.allowEmoji,
     maxChars: input.maxChars,
     seed: baseSeed,
+    now: new Date(),
     ...(input.keyword !== undefined ? { keyword: input.keyword } : {}),
     ...(input.emotion !== undefined ? { emotion: input.emotion } : {}),
     ...(input.companionInterests?.length
@@ -184,59 +181,43 @@ export async function generateCompanionCopyViaAgent(
       : {}),
   }
 
-  let capturedSessionId: string | null = input.sessionId ?? null
+  const qualityCtx = { maxChars: input.maxChars, style: effectiveStyle }
+  const singleShot =
+    typeof input.maxQualityRetries === 'number' && input.maxQualityRetries === 0
+
   const result = await getCompanionText(async () => {
-    let { line, sessionId } = await invokeCompanionAgentOnce(
-      input,
-      ctx,
-    )
-    capturedSessionId = sessionId ?? capturedSessionId
+    if (singleShot) {
+      return generateLineOnce(input, ctx)
+    }
+
+    let retrySeedOffset = 1
+    let { line } = await invokeCompanionAgentOnce(input, ctx)
     line = finalizeCompanionText(line, input.maxChars, input.allowEmoji)
 
-    if (companionTextTooShort(line, input.maxChars, effectiveStyle)) {
-      const retry = await invokeCompanionAgentOnce(
-        input,
-        { ...ctx, seed: baseSeed + 1 },
-        buildTooShortRetryUserSuffix(input.maxChars, effectiveStyle),
-      )
-      line = finalizeCompanionText(retry.line, input.maxChars, input.allowEmoji)
-      capturedSessionId = retry.sessionId ?? capturedSessionId
-    }
-    if (companionTextHasPoeticTemplate(line)) {
-      const retry = await invokeCompanionAgentOnce(
-        input,
-        { ...ctx, seed: baseSeed + 2 },
-        buildPoeticTemplateRetryUserSuffix(),
-      )
-      line = finalizeCompanionText(retry.line, input.maxChars, input.allowEmoji)
-      capturedSessionId = retry.sessionId ?? capturedSessionId
-    }
-    if (
-      companionTextNeedsPlainHealingCheck(effectiveStyle) &&
-      companionTextHasStiffHealingCliche(line)
-    ) {
-      const retry = await invokeCompanionAgentOnce(
-        input,
-        { ...ctx, seed: baseSeed + 3 },
-        buildStiffHealingRetryUserSuffix(),
-      )
-      line = finalizeCompanionText(retry.line, input.maxChars, input.allowEmoji)
-      capturedSessionId = retry.sessionId ?? capturedSessionId
-    }
-    if (
-      companionTextHasPoeticTemplate(line) ||
-      companionTextTooShort(line, input.maxChars, effectiveStyle) ||
-      (companionTextNeedsPlainHealingCheck(effectiveStyle) &&
-        companionTextHasStiffHealingCliche(line))
-    ) {
-      throw new Error('companion agent line still matches banned template')
-    }
+    const refineOpts =
+      typeof input.maxQualityRetries === 'number'
+        ? { maxExtraRetries: input.maxQualityRetries }
+        : undefined
+    line = await refineCompanionCopyLine(
+      line,
+      qualityCtx,
+      async (suffix) => {
+        const retry = await invokeCompanionAgentOnce(
+          input,
+          { ...ctx, seed: baseSeed + retrySeedOffset },
+          suffix,
+        )
+        retrySeedOffset += 1
+        return finalizeCompanionText(retry.line, input.maxChars, input.allowEmoji)
+      },
+      refineOpts,
+    )
     return line
   }, { maxChars: input.maxChars })
 
   return {
     ...result,
     text: finalizeCompanionText(result.text, input.maxChars, input.allowEmoji),
-    sessionId: capturedSessionId,
+    sessionId: null,
   }
 }

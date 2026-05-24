@@ -19,7 +19,7 @@ import {
   applyToastWindowBounds,
 } from './detachedToast.mjs'
 import { preloadPath } from './paths.mjs'
-import { buildRoute } from './route.mjs'
+import { buildRoute, toastWebContentsUrlIsDetachedToastMode } from './route.mjs'
 import { state } from './state.mjs'
 import {
   closeWidgetSpriteMenuWindow,
@@ -231,7 +231,31 @@ export function openOnboardingWindow() {
   })
 }
 
-export async function showToastWindow(payload) {
+/** 独立气泡：串行更新，避免并发 loadURL 导致气泡文案与最后一次 API 不一致。 */
+let toastShowQueue = Promise.resolve()
+
+function scheduleToastAutoHide(dwellSeconds) {
+  if (state.toastTimerId) {
+    clearTimeout(state.toastTimerId)
+    state.toastTimerId = null
+  }
+  if (dwellSeconds > 0) {
+    state.toastTimerId = setTimeout(() => {
+      if (state.toastWindow && !state.toastWindow.isDestroyed()) {
+        stopToastPassthroughHitTest()
+        state.toastWindow.hide()
+      }
+      state.toastTimerId = null
+    }, dwellSeconds * 1000)
+  }
+}
+
+export function showToastWindow(payload) {
+  toastShowQueue = toastShowQueue.then(() => applyToastWindowPayload(payload))
+  return toastShowQueue
+}
+
+async function applyToastWindowPayload(payload) {
   if (!state.spriteWindow || state.spriteWindow.isDestroyed()) return
   const message = String(payload?.message ?? '').trim()
   if (!message) return
@@ -289,12 +313,38 @@ export async function showToastWindow(payload) {
     height: toastH,
   })
 
+  state.lastToastSession = {
+    message,
+    effectiveAnchor,
+    dwellSeconds,
+    textId,
+    favorite,
+    autoTts: payload?.autoTts === true,
+  }
+
+  const wc = state.toastWindow.webContents
+  const canSyncContent =
+    !toastIntro && toastWebContentsUrlIsDetachedToastMode(wc)
+
+  if (canSyncContent) {
+    wc.send('sidekick:detached-toast-content', {
+      message,
+      ...(textId ? { textId } : {}),
+      ...(typeof favorite === 'boolean' ? { favorite } : {}),
+      autoTts: payload?.autoTts === true,
+    })
+    state.toastWindow.showInactive()
+    scheduleToastAutoHide(dwellSeconds)
+    return
+  }
+
   await state.toastWindow.loadURL(
     buildRoute(state.baseUrl, 'toast', {
       message,
       ...(textId ? { textId } : {}),
       ...(typeof favorite === 'boolean' ? { favorite: favorite ? '1' : '0' } : {}),
       ...(toastIntro ? { toastIntro: '1' } : {}),
+      autoTts: payload?.autoTts === true ? '1' : '0',
       anchor: effectiveAnchor,
       placement: effectiveAnchor === 'top' ? 'above' : 'below',
       tailDown: effectiveAnchor === 'top' ? '1' : '0',
@@ -310,21 +360,10 @@ export async function showToastWindow(payload) {
     dwellSeconds,
     textId,
     favorite,
+    autoTts: payload?.autoTts === true,
   }
 
-  if (state.toastTimerId) {
-    clearTimeout(state.toastTimerId)
-    state.toastTimerId = null
-  }
-  if (dwellSeconds > 0) {
-    state.toastTimerId = setTimeout(() => {
-      if (state.toastWindow && !state.toastWindow.isDestroyed()) {
-        stopToastPassthroughHitTest()
-        state.toastWindow.hide()
-      }
-      state.toastTimerId = null
-    }, dwellSeconds * 1000)
-  }
+  scheduleToastAutoHide(dwellSeconds)
 }
 
 export function hideToastWindow() {
