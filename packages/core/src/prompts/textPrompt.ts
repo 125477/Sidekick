@@ -24,10 +24,7 @@ import {
   collectRecentBigramsForAvoid,
   collectRecentOpeningPrefixes,
 } from './companionLineSimilarity'
-import {
-  pickCompanionArchetype,
-  type CompanionArchetype,
-} from './companionArchetypes'
+import type { CompanionArchetype } from './companionArchetypes'
 import { sanitizeRecentCompanionLinesForPrompt } from './sanitizeRecentCompanionLines'
 
 export { pickCompanionArchetype, type CompanionArchetype } from './companionArchetypes'
@@ -981,10 +978,6 @@ export function buildCompanionUserPrompt(
   const kw = trimmed && !isMeta ? trimmed : undefined
   const seed =
     Date.now() ^ Math.floor(Math.random() * 1_000_000_000)
-  const archetype = pickCompanionArchetype(
-    seed,
-    context?.avoidRecentOutputs ?? [],
-  )
   const avoidBlock = buildAvoidRecentBlock(context?.avoidRecentOutputs)
 
   const metaDiversity =

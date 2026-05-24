@@ -4,7 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./rag": "./src/rag/index.ts"
   },
   "scripts": {
     "prebuild": "node ../ui/scripts/sync-lottie-builtin-presets.mjs && node ../ui/scripts/sync-gif-builtin-presets.mjs",
@@ -14,6 +15,14 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "localforage": "^1.10.0"
+    "@langchain/core": "^0.3.26",
+    "@langchain/openai": "^0.3.17",
+    "@langchain/textsplitters": "^0.1.0",
+    "localforage": "^1.10.0",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.10"
   }
 }

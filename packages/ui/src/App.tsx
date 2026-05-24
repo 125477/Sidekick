@@ -517,8 +517,6 @@ function App() {
     detachedToastLiveMessage.trim() || toastMessageFromQuery
   const detachedToastDisplayTextId =
     detachedToastLiveTextId ?? toastTextIdFromQuery
-  const detachedToastDisplayFavorite =
-    detachedToastLiveFavorite ?? toastFavoriteFromUrl
 
   if (isMoodHistoryBubbleGalleryMode) {
     return <MoodHistoryQuoteBubbleGallery />

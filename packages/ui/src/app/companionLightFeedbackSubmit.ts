@@ -38,7 +38,7 @@ async function completeLightFeedbackWithDashScope(
       model: req.model,
       systemPrompt: req.systemPrompt,
       userPrompt: req.userPrompt,
-      temperature: req.temperature,
+      ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
       ...(modelFallbackEnv !== undefined ? { modelFallbackEnv } : {}),
       ...(req.chatCompletionsUrl
         ? { chatCompletionsUrl: req.chatCompletionsUrl }

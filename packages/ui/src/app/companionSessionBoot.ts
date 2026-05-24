@@ -5,7 +5,6 @@ const SESSION_START_MS = Date.now()
 export const STARTUP_GRACE_MS = 120_000
 
 let startupCopyClaimed = false
-let startupCopyFinished = false
 
 /** 定时推送 bootstrap 专用：全进程只放行一次。 */
 export function tryClaimStartupCompanionCopy(): boolean {
@@ -15,7 +14,7 @@ export function tryClaimStartupCompanionCopy(): boolean {
 }
 
 export function markStartupCompanionCopyFinished(): void {
-  startupCopyFinished = true
+  /* 启动首句已完成；保留钩子供 fetch 协调链路调用。 */
 }
 
 export function isInStartupGraceWindow(): boolean {

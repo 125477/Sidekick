@@ -32,3 +32,5 @@ __pycache__/
 # 本地 pip --target 临时依赖（非项目正式依赖，勿提交）
 .tmp-pillow/
 
+packages/core/data/
+

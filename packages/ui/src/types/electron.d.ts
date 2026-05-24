@@ -22,6 +22,8 @@ type SidekickSpriteMenuAnchor = {
 }
 type SidekickToastAnchor = 'top' | 'bottom'
 
+export type { SidekickToastAnchor }
+
 type SidekickSpriteAnchor = {
   centerX: number
   topY: number
@@ -60,7 +62,7 @@ type DashScopeChatPayload = {
   model: string | undefined
   systemPrompt: string
   userPrompt: string
-  temperature: number | undefined
+  temperature?: number
   chatCompletionsUrl?: string
   /** 逗号分隔的额外 model 候选（VITE_DASHSCOPE_MODEL_FALLBACK）。 */
   modelFallbackEnv?: string
