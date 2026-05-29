@@ -36,6 +36,9 @@ export function resolveInitialBaseUrl() {
  *   spriteMenuWarmInFlight: Promise<boolean> | null
  *   lastSpriteMenuInvoker: 'sprite' | 'toast' | null
  *   toastTimerId: ReturnType<typeof setTimeout> | null
+ *   toastAutoHideAtMs: number | null
+ *   toastDisplayDwellSeconds: number
+ *   toastAlwaysVisiblePref: boolean
  *   passthroughPollId: ReturnType<typeof setInterval> | null
  *   toastPassthroughClientRect: { left: number; top: number; width: number; height: number } | null
  *   widgetPassthroughClientRect: { left: number; top: number; width: number; height: number } | null
@@ -88,6 +91,9 @@ export const state = {
   spriteMenuWarmInFlight: null,
   lastSpriteMenuInvoker: null,
   toastTimerId: null,
+  toastAutoHideAtMs: null,
+  toastDisplayDwellSeconds: 0,
+  toastAlwaysVisiblePref: false,
   passthroughPollId: null,
   toastPassthroughClientRect: null,
   widgetPassthroughClientRect: null,

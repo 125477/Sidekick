@@ -18,6 +18,11 @@ import {
 import {
   applyToastWindowBounds,
 } from './detachedToast.mjs'
+import {
+  resolveToastDwellSeconds,
+  scheduleToastAutoHide,
+  clearToastAutoHideSchedule,
+} from './toastAutoHide.mjs'
 import { preloadPath } from './paths.mjs'
 import { buildRoute, toastWebContentsUrlIsDetachedToastMode } from './route.mjs'
 import { state } from './state.mjs'
@@ -234,23 +239,29 @@ export function openOnboardingWindow() {
 /** 独立气泡：串行更新，避免并发 loadURL 导致气泡文案与最后一次 API 不一致。 */
 let toastShowQueue = Promise.resolve()
 
-function scheduleToastAutoHide(dwellSeconds) {
-  if (state.toastTimerId) {
-    clearTimeout(state.toastTimerId)
-    state.toastTimerId = null
-  }
-  if (dwellSeconds > 0) {
-    state.toastTimerId = setTimeout(() => {
-      if (state.toastWindow && !state.toastWindow.isDestroyed()) {
-        stopToastPassthroughHitTest()
-        state.toastWindow.hide()
-      }
-      state.toastTimerId = null
-    }, dwellSeconds * 1000)
-  }
+function logToastShow(payload, message, dwellSeconds) {
+  console.warn('[sidekick:toast] show', {
+    message: message.slice(0, 120),
+    copyTrigger: payload?.copyMeta?.trigger ?? '(unknown)',
+    copySource: payload?.copyMeta?.source ?? '(unknown)',
+    dwellSeconds,
+    locked: state.lastSpriteInteractionLocked,
+  })
 }
 
 export function showToastWindow(payload) {
+  const message = String(payload?.message ?? '').trim()
+  if (!message) return Promise.resolve()
+  const toastIntro = payload?.toastIntro === true
+  /** 气泡已挂载：软更新不走队列，避免被首次 loadURL 卡住导致换句不上屏。 */
+  if (
+    !toastIntro &&
+    state.toastWindow &&
+    !state.toastWindow.isDestroyed() &&
+    toastWebContentsUrlIsDetachedToastMode(state.toastWindow.webContents)
+  ) {
+    return applyToastWindowPayload(payload)
+  }
   toastShowQueue = toastShowQueue.then(() => applyToastWindowPayload(payload))
   return toastShowQueue
 }
@@ -267,8 +278,7 @@ async function applyToastWindowPayload(payload) {
     typeof payload?.favorite === 'boolean' ? payload.favorite : undefined
   const toastIntro = payload?.toastIntro === true
   state.lastPreferredToastAnchor = payload?.anchor === 'bottom' ? 'bottom' : 'top'
-  const dwellSeconds = Number(payload?.dwellSeconds ?? 180)
-  state.lastToastSession = null
+  const dwellSeconds = resolveToastDwellSeconds(payload)
   stopToastPassthroughHitTest()
 
   if (!state.toastWindow || state.toastWindow.isDestroyed()) {
@@ -313,31 +323,59 @@ async function applyToastWindowPayload(payload) {
     height: toastH,
   })
 
-  state.lastToastSession = {
-    message,
-    effectiveAnchor,
-    dwellSeconds,
-    textId,
-    favorite,
-    autoTts: payload?.autoTts === true,
-  }
-
   const wc = state.toastWindow.webContents
   const canSyncContent =
     !toastIntro && toastWebContentsUrlIsDetachedToastMode(wc)
 
+  /** 独立气泡已挂载：一律 IPC 软更新（换句也如此）；整页 loadURL 会卡数秒且 loading 难结束。 */
   if (canSyncContent) {
-    wc.send('sidekick:detached-toast-content', {
+    const session = state.lastToastSession
+    const textIdChanged =
+      Boolean(textId?.trim()) && textId !== session?.textId
+    const favoriteChanged =
+      typeof favorite === 'boolean' && favorite !== session?.favorite
+    const forceReload = payload?.forceToastContentReload === true
+    if (
+      session &&
+      session.message?.trim() === message &&
+      !textIdChanged &&
+      !favoriteChanged &&
+      !forceReload
+    ) {
+      console.warn('[sidekick:toast] showToastWindow skip (unchanged message)', {
+        message: message.slice(0, 80),
+      })
+      return
+    }
+
+    const messageChanged = !session || session.message?.trim() !== message
+    const resetDwell = forceReload || messageChanged || textIdChanged
+
+    const contentRevision = Date.now()
+    const syncPayload = {
       message,
+      contentRevision,
       ...(textId ? { textId } : {}),
       ...(typeof favorite === 'boolean' ? { favorite } : {}),
       autoTts: payload?.autoTts === true,
-    })
+    }
+    logToastShow(payload, message, dwellSeconds)
+    wc.send('sidekick:detached-toast-content', syncPayload)
+    state.lastToastSession = {
+      message,
+      effectiveAnchor,
+      dwellSeconds,
+      textId,
+      favorite,
+      autoTts: payload?.autoTts === true,
+    }
     state.toastWindow.showInactive()
-    scheduleToastAutoHide(dwellSeconds)
+    wc.send('sidekick:sprite-interaction-locked', state.lastSpriteInteractionLocked)
+    scheduleToastAutoHide(dwellSeconds, { resetDwell })
     return
   }
 
+  logToastShow(payload, message, dwellSeconds)
   await state.toastWindow.loadURL(
     buildRoute(state.baseUrl, 'toast', {
       message,
@@ -351,8 +389,11 @@ async function applyToastWindowPayload(payload) {
       t: String(Date.now()),
     }),
   )
-  await awaitWebContentsNavigationSettled(state.toastWindow.webContents)
+  await awaitWebContentsNavigationSettled(state.toastWindow.webContents, {
+    timeoutMs: 12_000,
+  })
   state.toastWindow.showInactive()
+  wc.send('sidekick:sprite-interaction-locked', state.lastSpriteInteractionLocked)
 
   state.lastToastSession = {
     message,
@@ -363,15 +404,12 @@ async function applyToastWindowPayload(payload) {
     autoTts: payload?.autoTts === true,
   }
 
-  scheduleToastAutoHide(dwellSeconds)
+  scheduleToastAutoHide(dwellSeconds, { resetDwell: true })
 }
 
 export function hideToastWindow() {
   stopToastPassthroughHitTest()
-  if (state.toastTimerId) {
-    clearTimeout(state.toastTimerId)
-    state.toastTimerId = null
-  }
+  clearToastAutoHideSchedule()
   state.detachToastAnchorRefreshQueued = false
   state.lastToastSession = null
   if (state.toastWindow && !state.toastWindow.isDestroyed()) {

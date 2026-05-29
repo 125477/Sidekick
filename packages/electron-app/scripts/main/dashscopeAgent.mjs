@@ -72,6 +72,13 @@ export async function dashscopeAgentComplete(payload) {
   if (!res.ok) {
     throw new Error(extractError(data, res.status))
   }
+  const topCode =
+    typeof data.code === 'string' && data.code.trim()
+      ? data.code.trim().toLowerCase()
+      : ''
+  if (topCode && topCode !== 'success' && topCode !== 'ok') {
+    throw new Error(extractError(data, res.status))
+  }
 
   const text = data.output?.text?.trim() ?? ''
   if (!text) {

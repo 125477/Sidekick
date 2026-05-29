@@ -1,9 +1,17 @@
 import {
   companionAgentLineRejected,
+  companionAgentLineStructurallyRejected,
+  companionInterestTagsRequireQuote,
+  companionLineDuplicateOfReplaceTarget,
+  companionRegenerateLineFailsInterestQuoteMode,
   companionStyleForEmotion,
   generateCompanionCopy,
   generateCompanionCopyViaAgent,
   isWithinQuietHours,
+  logCompanionRegenerate,
+  logCompanionCopy,
+  parseCompanionInterestTags,
+  pickCompanionRegenerateLineDistinct,
   pickCompanionTriggerFallback,
   sanitizeRecentCompanionLinesForPrompt,
   type CompanionCopyTrigger,
@@ -33,10 +41,18 @@ export type FetchCompanionCopyOptions = {
   maxQualityRetries?: number
   /** 驱动 writing_angle 与多样性；换句建议传入 Date.now()。 */
   seed?: number
+  /** 换一句时屏幕上正在展示的原句（仅用于判重复，不扩写 avoid 误杀）。 */
+  replaceTargetLine?: string
+  /** 仅启动首句写入 45s merge 窗口（定时 interval 勿设）。 */
+  markStartupMerge?: boolean
+  /** 定时 interval 等 recurring 请求跳过 merge 窗口。 */
+  skipStartupMerge?: boolean
 }
 
 export type FetchCompanionCopyResult = CompanionTextResult & {
   sessionId?: string | null
+  /** 并发换句被 gate 跳过：勿上屏、勿 notify 假文案。 */
+  skipped?: boolean
 }
 
 function bailianAppIdFromEnv(): string | undefined {
@@ -73,6 +89,16 @@ function shouldUseBailianAgent(settings: SidekickSettings): boolean {
   return Boolean(bailianAppIdFromEnv())
 }
 
+function shouldUseBailianAgentForRequest(
+  settings: SidekickSettings,
+  trigger: CompanionCopyTrigger,
+): boolean {
+  if (!shouldUseBailianAgent(settings)) return false
+  // 换句/类似：只走 chat/completions 并在同接口轮换 model，避免 completion + completions 双请求
+  if (trigger === 'regenerate' || trigger === 'similar') return false
+  return true
+}
+
 /** 陪伴短句改为每轮无 session 调用，不再持久化百炼 session（避免多轮记忆锁死格言腔）。 */
 export async function persistBailianAgentSessionId(
   settingsRef: { current: SidekickSettings },
@@ -88,21 +114,22 @@ export async function persistBailianAgentSessionId(
   broadcastSettingsSync()
 }
 
-/** 用户点「换一句」等：不做套句校验连环重试（否则一次点击会打多次 completion）。 */
+/** 换句：百炼 Agent 最多 2 次（首句 + 同骨架重试）；chat 回退同策略。 */
+const INTERACTIVE_REGENERATE_MAX_QUALITY_RETRIES = 0
+const INTERACTIVE_OTHER_MAX_QUALITY_RETRIES = 1
+
 function resolveMaxQualityRetries(
   trigger: CompanionCopyTrigger,
   fetchKind: CompanionFetchKind,
   explicit?: number,
 ): number | undefined {
   if (typeof explicit === 'number') return explicit
-  if (fetchKind === 'startup' || trigger === 'scheduled') return 0
-  if (
-    trigger === 'regenerate' ||
-    trigger === 'similar' ||
-    trigger === 'manual' ||
-    trigger === 'emotion'
-  ) {
-    return 0
+  if (fetchKind === 'startup' || trigger === 'scheduled') return 1
+  if (trigger === 'regenerate' || trigger === 'similar') {
+    return INTERACTIVE_REGENERATE_MAX_QUALITY_RETRIES
+  }
+  if (trigger === 'manual' || trigger === 'emotion') {
+    return INTERACTIVE_OTHER_MAX_QUALITY_RETRIES
   }
   return undefined
 }
@@ -114,18 +141,14 @@ function trimFallbackLine(text: string, maxChars: number): string {
     : `${normalized.slice(0, Math.max(1, maxChars - 1))}…`
 }
 
-/** 换一句/类似这句等：不再改走 chat（易与 Network 里 agent 预览不一致，且同样套句）。 */
+/** interactive 非换句场景禁止 Agent 失败后再打 chat；定时推送须走 chat。 */
 function shouldSkipChatFallbackForTrigger(
   trigger: CompanionCopyTrigger,
   fetchKind: CompanionFetchKind,
 ): boolean {
-  if (fetchKind === 'interactive') return true
-  return (
-    trigger === 'regenerate' ||
-    trigger === 'similar' ||
-    trigger === 'manual' ||
-    trigger === 'emotion'
-  )
+  if (trigger === 'regenerate' || trigger === 'similar') return false
+  if (trigger === 'scheduled') return false
+  return fetchKind === 'interactive'
 }
 
 function resolveFetchKind(
@@ -146,9 +169,7 @@ function resolveFetchKind(
 
 /** 同一渲染进程内：交互换句并发调用串行化（不同 prompt 不共用同一次 HTTP 结果）。 */
 let interactiveFetchInFlight: Promise<FetchCompanionCopyResult> | null = null
-let lastRegenerateStartedMs = 0
 let interactiveAgentChain: Promise<unknown> = Promise.resolve()
-const REGENERATE_MIN_INTERVAL_MS = 2500
 
 function invokeAgentSingleFlight(
   ipc: (payload: {
@@ -178,18 +199,28 @@ export async function fetchCompanionCopy(
 ): Promise<FetchCompanionCopyResult> {
   const trigger = resolveFetchTrigger(keyword, emotion, options?.trigger)
   const fetchKind = resolveFetchKind(trigger, options?.fetchKind)
-
-  if (fetchKind === 'interactive' && trigger === 'regenerate') {
-    const now = Date.now()
-    if (now - lastRegenerateStartedMs < REGENERATE_MIN_INTERVAL_MS) {
-      return { text: '', source: 'fallback' }
-    }
-    lastRegenerateStartedMs = now
-  }
+  const isRegenerateLike =
+    trigger === 'regenerate' || trigger === 'similar'
 
   const execute = async (): Promise<FetchCompanionCopyResult> => {
-    const gate = beginCompanionFetch(fetchKind)
+    const gate = beginCompanionFetch(fetchKind, {
+      bypassInteractiveDebounce: isRegenerateLike,
+      skipStartupMerge: options?.skipStartupMerge === true,
+    })
     if (!gate.proceed) {
+      if (isRegenerateLike) {
+        logCompanionRegenerate('fetchCompanionCopy gate skipped (in flight)', {
+          fetchKind,
+          trigger,
+          replaceTargetLine: options?.replaceTargetLine,
+        })
+        return {
+          text: '',
+          source: 'fallback',
+          skipped: true,
+        }
+      }
+      logCompanionCopy('fetch skipped (gate busy)', { trigger, fetchKind })
       return { text: '', source: 'fallback' }
     }
     try {
@@ -200,7 +231,7 @@ export async function fetchCompanionCopy(
         avoidRecentOutputs,
         { ...options, trigger, fetchKind },
       )
-      if (fetchKind === 'startup' && result.text.trim()) {
+      if (options?.markStartupMerge && fetchKind === 'startup' && result.text.trim()) {
         markCompanionStartupFetchSucceeded()
         markStartupCompanionCopyFinished()
       }
@@ -210,7 +241,7 @@ export async function fetchCompanionCopy(
     }
   }
 
-  if (fetchKind === 'interactive') {
+  if (fetchKind === 'interactive' && !isRegenerateLike) {
     if (interactiveFetchInFlight) {
       return interactiveFetchInFlight
     }
@@ -239,6 +270,7 @@ async function fetchCompanionCopyInner(
   const generationSeed =
     options?.seed ??
     (Date.now() ^ Math.floor(Math.random() * 1_000_000_000))
+
   const common = {
     style: settings.textStyle,
     allowEmoji: settings.allowEmoji,
@@ -272,7 +304,7 @@ async function fetchCompanionCopyInner(
       ? window.sidekickDesktop?.dashscopeChat
       : undefined
 
-  if (shouldUseBailianAgent(settings) && appId) {
+  if (shouldUseBailianAgentForRequest(settings, trigger) && appId) {
     try {
       const requestBasePath = dashscopeRequestBase()
       // 每轮独立 completion，不传 session_id，避免百炼多轮记忆锁死同一「格言腔」
@@ -286,6 +318,9 @@ async function fetchCompanionCopyInner(
         appId,
         ...common,
         ...(maxQualityRetries !== undefined ? { maxQualityRetries } : {}),
+        ...(options?.replaceTargetLine != null
+          ? { replaceTargetLine: options.replaceTargetLine }
+          : {}),
         ...(dashscopeAgentIpc
           ? {
               invokeAgent: (payload) =>
@@ -314,27 +349,66 @@ async function fetchCompanionCopyInner(
           emotion != null
             ? companionStyleForEmotion(emotion)
             : settings.textStyle
+        const gateCtx = {
+          style,
+          maxChars: settings.textMaxChars,
+          avoidRecent: sanitizedAvoid,
+          now: new Date(),
+        }
+        const replaceTarget = options?.replaceTargetLine?.trim()
+        const duplicateOnly =
+          fetchKind === 'interactive' &&
+          companionLineDuplicateOfReplaceTarget(agentText, replaceTarget)
+        const structureRejected =
+          companionAgentLineStructurallyRejected(agentText, gateCtx)
+        const { tags: interestTags } = parseCompanionInterestTags(
+          settings.companionInterests,
+        )
+        const interestQuoteRejected =
+          companionInterestTagsRequireQuote(interestTags) &&
+          companionRegenerateLineFailsInterestQuoteMode(agentText)
+
+        if (fetchKind === 'interactive') {
+          if (duplicateOnly && typeof console !== 'undefined') {
+            console.warn(
+              '[sidekick] 百炼句仍与当前气泡重复（已 Agent 重试），展示最后一次 API 返回：',
+              agentText,
+            )
+          } else if (structureRejected && typeof console !== 'undefined') {
+            console.warn(
+              '[sidekick] 百炼句结构质检未过，仍展示最后一次 API 返回：',
+              agentText,
+            )
+          }
+          return {
+            text: agentText,
+            source: agentResult.source,
+            sessionId: agentResult.sessionId,
+          }
+        }
         if (
-          companionAgentLineRejected(agentText, {
-            style,
-            maxChars: settings.textMaxChars,
-            avoidRecent: sanitizedAvoid,
-            now: new Date(),
-          }) &&
-          typeof console !== 'undefined'
+          !structureRejected &&
+          !interestQuoteRejected &&
+          !companionAgentLineRejected(agentText, gateCtx)
         ) {
+          return {
+            text: agentText,
+            source: agentResult.source,
+            sessionId: agentResult.sessionId,
+          }
+        }
+        if (typeof console !== 'undefined' && console.warn) {
           console.warn(
-            '[sidekick] 百炼返回套句/与最近句过近（仍展示该次 API 原文，未自动重试）：',
-            agentText,
+            '[sidekick] 百炼首句质检未过，回退 chat/completions',
+            structureRejected
+              ? '结构套句'
+              : interestQuoteRejected
+                ? '未写兴趣金句'
+                : '与最近句过近',
+            agentText.slice(0, 48),
           )
         }
-        return {
-          text: agentText,
-          source: agentResult.source,
-          sessionId: agentResult.sessionId,
-        }
-      }
-      if (typeof console !== 'undefined' && console.warn) {
+      } else if (typeof console !== 'undefined' && console.warn) {
         console.warn('[sidekick] 百炼智能体返回空文案')
       }
     } catch (err) {
@@ -363,20 +437,49 @@ async function fetchCompanionCopyInner(
   }
 
   if (shouldSkipChatFallbackForTrigger(trigger, fetchKind)) {
+    const fallbackText = trimFallbackLine(
+      pickCompanionTriggerFallback(trigger, {
+        maxChars: settings.textMaxChars,
+        seed: generationSeed,
+        ...(sanitizedAvoid.length ? { avoidRecent: sanitizedAvoid } : {}),
+      }),
+      settings.textMaxChars,
+    )
+    logCompanionCopy('fetch done (pool fallback)', {
+      trigger,
+      fetchKind,
+      reason: 'skip-chat-interactive',
+      text: fallbackText.slice(0, 120),
+    })
     return {
-      text: trimFallbackLine(
-        pickCompanionTriggerFallback(trigger),
-        settings.textMaxChars,
-      ),
+      text: fallbackText,
       source: 'fallback',
     }
   }
 
+  /** 换句/类似：优先 Electron IPC（同 completions 接口轮换 model）；无 IPC 时走渲染进程直连。 */
+  const chatViaRenderer =
+    (trigger === 'regenerate' || trigger === 'similar') &&
+    !dashscopeChatIpc &&
+    Boolean(apiKey?.trim())
+
+  if (trigger === 'regenerate' || trigger === 'similar') {
+    logCompanionRegenerate('fetchCompanionCopy route', {
+      trigger,
+      chatViaRenderer,
+      hasDashscopeChatIpc: Boolean(dashscopeChatIpc),
+      hasBailianAgent: shouldUseBailianAgentForRequest(settings, trigger),
+      replaceTargetLine: options?.replaceTargetLine,
+      seed: generationSeed,
+      avoidCount: sanitizedAvoid.length,
+    })
+  }
+
   let chatCompletionsUrl: string | undefined
-  if (!dashscopeChatIpc && import.meta.env.DEV && typeof window !== 'undefined') {
-    const { protocol } = window.location
-    if (protocol === 'http:' || protocol === 'https:') {
-      chatCompletionsUrl = `${window.location.origin}/dashscope/compatible-mode/v1/chat/completions`
+  if (chatViaRenderer || !dashscopeChatIpc) {
+    const base = dashscopeRequestBase()
+    if (base) {
+      chatCompletionsUrl = `${base}/compatible-mode/v1/chat/completions`
     }
   }
 
@@ -400,17 +503,59 @@ async function fetchCompanionCopyInner(
     ...(chatMaxQualityRetries !== undefined
       ? { maxQualityRetries: chatMaxQualityRetries }
       : {}),
-    ...(dashscopeChatIpc
+    ...(options?.replaceTargetLine != null
+      ? { replaceTargetLine: options.replaceTargetLine }
+      : {}),
+    ...(dashscopeChatIpc && !chatViaRenderer
       ? {
           invokeDashScope: (req: DashScopeTextRequest) =>
             dashscopeChatIpc({
               ...req,
+              copyTrigger: trigger,
               ...(modelFallbackEnv !== undefined ? { modelFallbackEnv } : {}),
             }),
         }
       : {}),
     ...(chatCompletionsUrl !== undefined ? { chatCompletionsUrl } : {}),
   })
+
+  const chatText = chatResult.text.trim()
+  if (chatText) {
+    return chatResult
+  }
+
+  if (fetchKind === 'interactive') {
+    const poolPick =
+      trigger === 'regenerate' || trigger === 'similar'
+        ? pickCompanionRegenerateLineDistinct({
+            maxChars: settings.textMaxChars,
+            style: settings.textStyle,
+            seed: generationSeed,
+            ...(sanitizedAvoid.length ? { avoidRecent: sanitizedAvoid } : {}),
+            ...(options?.replaceTargetLine != null
+              ? { mustDifferFrom: options.replaceTargetLine }
+              : {}),
+          })
+        : pickCompanionTriggerFallback(trigger, {
+            maxChars: settings.textMaxChars,
+            seed: generationSeed,
+            ...(sanitizedAvoid.length ? { avoidRecent: sanitizedAvoid } : {}),
+            ...(options?.replaceTargetLine != null
+              ? { replaceTarget: options.replaceTargetLine }
+              : {}),
+          })
+    const fallbackText = trimFallbackLine(poolPick, settings.textMaxChars)
+    logCompanionCopy('fetch done (pool fallback)', {
+      trigger,
+      fetchKind,
+      reason: 'chat-empty-or-rejected',
+      text: fallbackText.slice(0, 120),
+    })
+    return {
+      text: fallbackText,
+      source: 'fallback',
+    }
+  }
 
   return chatResult
 }

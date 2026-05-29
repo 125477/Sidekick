@@ -30,6 +30,7 @@ export type PushProactiveCompanionInput = {
       textId?: string
       favorite?: boolean
       toastMode?: 'normal' | 'intro'
+      copyMeta?: { trigger: string; source: 'model' | 'fallback' }
     },
   ) => Promise<void>
   setToastMeta?: (meta: { id: string; favorite: boolean } | null) => void
@@ -72,19 +73,21 @@ export async function pushProactiveCompanionCopy(
       avoid.length > 0 ? avoid : undefined,
       {
         ...input.fetchOptions,
-        fetchKind: 'interactive',
-        maxQualityRetries: 0,
+        fetchKind: input.fetchOptions.fetchKind ?? 'startup',
+        maxQualityRetries: input.fetchOptions.maxQualityRetries ?? 0,
       },
     )
     await persistBailianAgentSessionId(input.settingsRef, result.sessionId)
     if (!shouldApplyCompanionCopyResult(fetchId, result.source)) return null
-    text = result.text
+    text = result.text.trim()
     source = result.source
     sessionId = result.sessionId
   } catch {
-    text = pickCompanionTriggerFallback(trigger)
+    text = pickCompanionTriggerFallback(trigger).trim()
     source = 'fallback'
   }
+
+  if (!text) return null
 
   const next = await appendText({
     id: `text-${Date.now()}`,
@@ -95,6 +98,7 @@ export async function pushProactiveCompanionCopy(
   })
   const newId = next.texts.history[0]?.id
   const dwell = s.toastAlwaysVisible ? 0 : s.dwellMinutes * 60
+  const copyMeta = { trigger, source }
   const detachedToast =
     input.isWidgetMode && usesDetachedToastWindow() && input.widgetMeasureRef
 
@@ -108,12 +112,14 @@ export async function pushProactiveCompanionCopy(
         message: text,
         anchor: s.toastAnchor,
         dwellSeconds: dwell,
+        copyMeta,
         ...(newId ? { textId: newId, favorite: false } : {}),
       }),
     )
   } else {
     await input.showToastMessage(text, {
       dwellSeconds: dwell,
+      copyMeta,
       ...(newId ? { textId: newId, favorite: false } : {}),
     })
     if (newId && input.setToastMeta) {

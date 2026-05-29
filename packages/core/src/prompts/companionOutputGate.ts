@@ -4,7 +4,11 @@
  */
 
 import { companionLineTooSimilarToAny } from './companionLineSimilarity'
-import { companionTextViolatesBannedStructure } from './companionStructureValidation'
+import {
+  companionTextIsAgentMetaClarification,
+  companionTextHasProductMarketingCliche,
+  companionTextViolatesBannedStructure,
+} from './companionStructureValidation'
 import type { CompanionCopyStyle } from './textPrompt'
 
 export type CompanionOutputGateContext = {
@@ -14,25 +18,62 @@ export type CompanionOutputGateContext = {
   now?: Date
 }
 
-export function companionAgentLineRejected(
+/** 只拦套句骨架/索要参数；不拦「与历史句二字词相近」（交互换句误杀率高）。 */
+export function companionAgentLineStructurallyRejected(
   line: string,
   ctx: CompanionOutputGateContext,
 ): boolean {
   const t = line.replace(/\s+/g, ' ').trim()
   if (!t) return true
-  if (
-    companionTextViolatesBannedStructure(
-      t,
-      ctx.style,
-      ctx.maxChars,
-      ctx.now,
-    )
-  ) {
-    return true
-  }
-  const recent = ctx.avoidRecent ?? []
-  if (recent.length > 0 && companionLineTooSimilarToAny(t, recent)) {
+  if (companionTextIsAgentMetaClarification(t)) return true
+  return companionTextViolatesBannedStructure(
+    t,
+    ctx.style,
+    ctx.maxChars,
+    ctx.now,
+  )
+}
+
+/** 不宜作为【待改写】的屏上句（产品占位/自我介绍，非陪伴短句）。 */
+export function companionLineIsNonRewriteTarget(line: string | undefined): boolean {
+  const t = line?.replace(/\s+/g, ' ').trim() ?? ''
+  if (!t) return true
+  if (/更多功能|V1\.1|解锁/.test(t)) return true
+  if (/我是「灵伴」|智能陪伴伙伴/.test(t)) return true
+  if (companionTextHasProductMarketingCliche(t)) return true
+  return false
+}
+
+/** 换一句：仅当与屏幕上这句几乎相同才拒（不误杀「先喘口气」类正常模型句）。 */
+export function companionLineDuplicateOfReplaceTarget(
+  candidate: string,
+  replaceTarget: string | undefined,
+): boolean {
+  const t = candidate.replace(/\s+/g, ' ').trim()
+  const target = replaceTarget?.replace(/\s+/g, ' ').trim() ?? ''
+  if (!t || !target) return false
+  if (t === target) return true
+  return companionLineTooSimilarToAny(t, [target], {
+    maxContiguousOverlap: 10,
+    sameFirstChar: false,
+  })
+}
+
+export function companionAgentLineRejected(
+  line: string,
+  ctx: CompanionOutputGateContext,
+): boolean {
+  if (companionAgentLineStructurallyRejected(line, ctx)) {
     return true
   }
   return false
+}
+
+/** 去掉模型输出的外层直角/弯引号，气泡直接展示正文。 */
+export function stripCompanionLineCornerQuotes(text: string): string {
+  return text
+    .replace(/^\s*[「『"'‘“]+/, '')
+    .replace(/[」』"'’”]+\s*$/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
 }

@@ -40,6 +40,12 @@ contextBridge.exposeInMainWorld('sidekickDesktop', {
   showToastWindow(payload) {
     return ipcRenderer.invoke('sidekick:show-toast', payload)
   },
+  syncToastDisplaySettings(payload) {
+    return ipcRenderer.invoke('sidekick:sync-toast-display-settings', payload)
+  },
+  logCompanionCopyEvent(payload) {
+    ipcRenderer.send('sidekick:companion-copy-log', payload ?? {})
+  },
   setToastAnchorPreference(payload) {
     return ipcRenderer.invoke('sidekick:set-toast-anchor-preference', payload)
   },
@@ -87,22 +93,40 @@ contextBridge.exposeInMainWorld('sidekickDesktop', {
   /** 独立气泡窗：主进程推送新文案，避免换句时整页 loadURL 竞态。 */
   onDetachedToastContentSync(callback) {
     const channel = 'sidekick:detached-toast-content'
-    const listener = (_event, payload) => {
-      if (!payload || typeof payload !== 'object') return
+    const parsePayload = (payload) => {
+      if (!payload || typeof payload !== 'object') return null
       const message = typeof payload.message === 'string' ? payload.message.trim() : ''
-      if (!message) return
-      callback({
+      if (!message) return null
+      return {
         message,
+        contentRevision:
+          typeof payload.contentRevision === 'number' &&
+          Number.isFinite(payload.contentRevision)
+            ? payload.contentRevision
+            : undefined,
         textId:
           typeof payload.textId === 'string' && payload.textId.trim()
             ? payload.textId.trim()
             : undefined,
         favorite: typeof payload.favorite === 'boolean' ? payload.favorite : undefined,
         autoTts: payload.autoTts === true,
+      }
+    }
+    if (!globalThis.__sidekickDetachedToastContentListenerInstalled) {
+      globalThis.__sidekickDetachedToastContentListenerInstalled = true
+      ipcRenderer.on(channel, (_event, payload) => {
+        const parsed = parsePayload(payload)
+        if (!parsed) return
+        const cb = globalThis.__sidekickDetachedToastContentCallback
+        if (typeof cb === 'function') cb(parsed)
       })
     }
-    ipcRenderer.on(channel, listener)
-    return () => ipcRenderer.removeListener(channel, listener)
+    globalThis.__sidekickDetachedToastContentCallback = callback
+    return () => {
+      if (globalThis.__sidekickDetachedToastContentCallback === callback) {
+        globalThis.__sidekickDetachedToastContentCallback = null
+      }
+    }
   },
   resizeToastWindow(payload) {
     return ipcRenderer.invoke('sidekick:resize-toast', payload)
@@ -199,9 +223,13 @@ contextBridge.exposeInMainWorld('sidekickDesktop', {
   getWorkArea() {
     return ipcRenderer.invoke('sidekick:get-work-area')
   },
-  requestRegenerateCopy() {
-    ipcRenderer.send('sidekick:toast-regenerate-request')
-    return Promise.resolve()
+  requestRegenerateCopy(line) {
+    return ipcRenderer.invoke('sidekick:toast-regenerate-request', {
+      line: typeof line === 'string' ? line : '',
+    })
+  },
+  notifyRegenerateCopyDone(payload) {
+    ipcRenderer.send('sidekick:regenerate-copy-done', payload ?? {})
   },
   requestSimilarCopy() {
     ipcRenderer.send('sidekick:toast-similar-request')
@@ -209,7 +237,7 @@ contextBridge.exposeInMainWorld('sidekickDesktop', {
   },
   onRegenerateCopyRequested(callback) {
     const channel = 'sidekick:regenerate-copy'
-    const listener = () => callback()
+    const listener = (_event, payload) => callback(payload ?? {})
     ipcRenderer.on(channel, listener)
     return () => ipcRenderer.removeListener(channel, listener)
   },

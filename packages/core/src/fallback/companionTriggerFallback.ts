@@ -1,11 +1,7 @@
 import type { CompanionCopyTrigger } from '../prompts/textPrompt'
+import { pickCompanionRegenerateLine } from './companionRegeneratePool'
 
 const FALLBACK: Partial<Record<CompanionCopyTrigger, string[]>> = {
-  regenerate: [
-    '肩酸了就把背靠实一会儿，这一下算照顾到自己。',
-    '可以先把脑子放空两分钟，再决定要不要继续。',
-    '今天不必对自己那么凶，先到这儿也很好。',
-  ],
   similar: [
     '还是这种轻轻的语气，换一句陪在你身边。',
     '顺着刚才的心意，再送你一句不一样的温柔。',
@@ -34,8 +30,31 @@ const FALLBACK: Partial<Record<CompanionCopyTrigger, string[]>> = {
 
 export function pickCompanionTriggerFallback(
   trigger: CompanionCopyTrigger,
+  opts?: {
+    maxChars?: number
+    avoidRecent?: string[]
+    replaceTarget?: string
+    seed?: number
+  },
 ): string {
+  if (trigger === 'regenerate' || trigger === 'similar') {
+    return pickCompanionRegenerateLine({
+      maxChars: opts?.maxChars ?? 32,
+      ...(opts?.avoidRecent?.length ? { avoidRecent: opts.avoidRecent } : {}),
+      ...(opts?.replaceTarget !== undefined
+        ? { replaceTarget: opts.replaceTarget }
+        : {}),
+      ...(opts?.seed !== undefined ? { seed: opts.seed } : {}),
+    })
+  }
   const list = FALLBACK[trigger]
-  if (!list?.length) return '此刻，你值得被温柔地看见。'
-  return list[Math.floor(Math.random() * list.length)]!
+  if (list?.length) {
+    return list[Math.floor(Math.random() * list.length)]!
+  }
+  /** 定时推送 / 首句等：走句库轮换，避免 API 失败时反复同一句。 */
+  return pickCompanionRegenerateLine({
+    maxChars: opts?.maxChars ?? 32,
+    ...(opts?.avoidRecent?.length ? { avoidRecent: opts.avoidRecent } : {}),
+    ...(opts?.seed !== undefined ? { seed: opts.seed } : {}),
+  })
 }

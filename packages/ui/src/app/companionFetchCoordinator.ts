@@ -13,18 +13,28 @@ const INTERACTIVE_DEBOUNCE_MS = 1500
 
 export type CompanionFetchKind = 'startup' | 'interactive'
 
+export type BeginCompanionFetchOpts = {
+  bypassInteractiveDebounce?: boolean
+  /** 定时 interval 等 recurring startup 请求：不占 45s merge 窗口。 */
+  skipStartupMerge?: boolean
+}
+
 export function isInteractiveCompanionFetchActive(): boolean {
   return interactiveExclusive || inFlight
 }
 
 export function beginCompanionFetch(
   kind: CompanionFetchKind,
+  opts?: BeginCompanionFetchOpts,
 ): { proceed: boolean; release: () => void } {
   const now = Date.now()
   if (kind === 'interactive') {
+    if (interactiveExclusive) {
+      return { proceed: false, release: () => {} }
+    }
     if (
-      inFlight ||
-      now - lastInteractiveStartMs < INTERACTIVE_DEBOUNCE_MS
+      !opts?.bypassInteractiveDebounce &&
+      (inFlight || now - lastInteractiveStartMs < INTERACTIVE_DEBOUNCE_MS)
     ) {
       return { proceed: false, release: () => {} }
     }
@@ -44,6 +54,7 @@ export function beginCompanionFetch(
     return { proceed: false, release: () => {} }
   }
   if (
+    !opts?.skipStartupMerge &&
     lastStartupSucceededAt > 0 &&
     now - lastStartupSucceededAt < STARTUP_MERGE_MS
   ) {

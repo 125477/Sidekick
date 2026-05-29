@@ -1,6 +1,6 @@
 import type { MutableRefObject, Dispatch, SetStateAction } from 'react'
 import { useEffect, useRef } from 'react'
-import { appendText } from '@sidekick/core'
+import { appendText, logCompanionCopy } from '@sidekick/core'
 import {
   fetchCompanionCopy,
   canPushNow,
@@ -24,7 +24,7 @@ import {
   clearPendingEmotionForCompanion,
   readPendingEmotionForCompanion,
 } from '../state/pendingEmotionStorage'
-import { resetStartupFetchCoordinatorIfIdle, isInteractiveCompanionFetchActive } from './companionFetchCoordinator'
+import { isInteractiveCompanionFetchActive } from './companionFetchCoordinator'
 
 export type UseScheduledCompanionPushArgs = {
   settings: SidekickSettings
@@ -64,6 +64,7 @@ export function useScheduledCompanionPush({
 }: UseScheduledCompanionPushArgs) {
   const pushTextInFlightRef = useRef(false)
   const startupPushSucceededRef = useRef(false)
+  const bootstrapGenerationRef = useRef(0)
   const pendingStartupResultRef = useRef<{
     result: FetchCompanionCopyResult
     fetchId: number
@@ -106,11 +107,12 @@ export function useScheduledCompanionPush({
     if (!runsScheduledPush) return
     if (!settings.pushEnabled) return
 
-    resetStartupFetchCoordinatorIfIdle()
+    const bootstrapGeneration = ++bootstrapGenerationRef.current
 
-    const displayStartupResult = async (
+    const displayPushResult = async (
       result: FetchCompanionCopyResult,
       fetchId: number,
+      opts?: { markBootstrapDone?: boolean; copyTrigger?: string },
     ): Promise<boolean> => {
       if (!shouldApplyCompanionCopyResult(fetchId, result.source)) {
         return false
@@ -137,6 +139,10 @@ export function useScheduledCompanionPush({
             message: result.text,
             anchor,
             dwellSeconds: dwell,
+            copyMeta: {
+              trigger: opts?.copyTrigger ?? 'scheduled',
+              source: result.source,
+            },
             ...(newId ? { textId: newId, favorite: false } : {}),
           }),
         )
@@ -160,16 +166,18 @@ export function useScheduledCompanionPush({
         ...recentCompanionLinesRef.current,
         result.text,
       ].slice(-RECENT_COMPANION_LINES_MAX)
-      markStartupCompanionCopyFinished()
-      startupPushSucceededRef.current = true
-      companionBootstrapDoneRef.current = true
-      pendingStartupResultRef.current = null
+      if (opts?.markBootstrapDone) {
+        markStartupCompanionCopyFinished()
+        startupPushSucceededRef.current = true
+        companionBootstrapDoneRef.current = true
+        pendingStartupResultRef.current = null
+      }
       setSpriteState('notify')
       window.setTimeout(() => setSpriteState('idle'), 520)
       return true
     }
 
-    const runStartupPush = async (opts?: {
+    const runBootstrapPush = async (opts?: {
       displayOnly?: boolean
     }): Promise<boolean> => {
       if (startupPushSucceededRef.current) return true
@@ -178,7 +186,9 @@ export function useScheduledCompanionPush({
       if (opts?.displayOnly) {
         const pending = pendingStartupResultRef.current
         if (!pending?.result.text.trim()) return false
-        return displayStartupResult(pending.result, pending.fetchId)
+        return displayPushResult(pending.result, pending.fetchId, {
+          markBootstrapDone: true,
+        })
       }
 
       pushTextInFlightRef.current = true
@@ -196,7 +206,7 @@ export function useScheduledCompanionPush({
           avoidPush.length > 0 ? avoidPush : undefined,
           {
             fetchKind: 'startup',
-            maxQualityRetries: 0,
+            markStartupMerge: true,
             ...(pendingEmotion
               ? { trigger: 'emotion' as const }
               : { trigger: 'scheduled' as const }),
@@ -211,17 +221,60 @@ export function useScheduledCompanionPush({
           pendingStartupResultRef.current = { result, fetchId }
           return true
         }
-        return displayStartupResult(result, fetchId)
+        return displayPushResult(result, fetchId, {
+          markBootstrapDone: true,
+          copyTrigger: 'startup',
+        })
+      } finally {
+        pushTextInFlightRef.current = false
+      }
+    }
+
+    /** 间隔定时推送：与锁定无关；每次 tick 拉新句并刷新气泡。 */
+    const runScheduledIntervalPush = async (): Promise<boolean> => {
+      if (pushTextInFlightRef.current) return false
+      pushTextInFlightRef.current = true
+      try {
+        const s = settingsRef.current
+        if (!s.pushEnabled || !canPushNow(s)) {
+          logCompanionCopy('scheduled-push skip', {
+            pushEnabled: s.pushEnabled,
+            canPushNow: canPushNow(s),
+          })
+          return false
+        }
+        if (blockScheduledPushRef.current) {
+          logCompanionCopy('scheduled-push skip (intro block)')
+          return false
+        }
+
+        const fetchId = startCompanionCopyRequest()
+        const avoidPush = recentCompanionLinesRef.current
+        const result = await fetchCompanionCopy(
+          s,
+          undefined,
+          undefined,
+          avoidPush.length > 0 ? avoidPush : undefined,
+          {
+            fetchKind: 'startup',
+            trigger: 'scheduled',
+            skipStartupMerge: true,
+          },
+        )
+        await persistBailianAgentSessionId(settingsRef, result.sessionId)
+        if (!shouldApplyCompanionCopyResult(fetchId, result.source)) return false
+        if (!result.text.trim()) return false
+        return displayPushResult(result, fetchId, { copyTrigger: 'scheduled' })
       } finally {
         pushTextInFlightRef.current = false
       }
     }
 
     const showPushText = () => {
-      void runStartupPush()
+      void runScheduledIntervalPush()
     }
 
-    runStartupPushRef.current = runStartupPush
+    runStartupPushRef.current = runBootstrapPush
 
     const raw = Number(settings.pushIntervalMinutes)
     const intervalMinutes =
@@ -233,13 +286,13 @@ export function useScheduledCompanionPush({
       if (startupPushSucceededRef.current) return
 
       const introAlreadyShown = await loadAppSelfIntroShown()
-      if (cancelled) return
+      if (cancelled || bootstrapGeneration !== bootstrapGenerationRef.current) return
 
       if (!introAlreadyShown) {
         blockScheduledPushRef.current = true
       }
 
-      await runStartupPush()
+      await runBootstrapPush()
     })()
 
     const intervalId = window.setInterval(showPushText, intervalMs)
@@ -252,12 +305,6 @@ export function useScheduledCompanionPush({
     runsScheduledPush,
     settings.pushEnabled,
     settings.pushIntervalMinutes,
-    settings.pushStart,
-    settings.pushEnd,
-    settings.quietHoursEnabled,
-    settings.quietStart,
-    settings.quietEnd,
-    settings.focusSessionUntilEpochMs,
     dispatch,
     isWidgetMode,
     onboardingDone,

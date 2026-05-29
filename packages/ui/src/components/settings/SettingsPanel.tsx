@@ -31,6 +31,9 @@ const COPY_STYLE_OPTIONS: CompanionCopyStyle[] = [
   '助眠',
   '职场解压',
   '抽象',
+  '鸡汤',
+  '沙雕',
+  '高冷',
 ]
 
 type SettingsPanelProps = {

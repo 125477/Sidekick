@@ -6,7 +6,7 @@
  * - 三类混排：直白许可 / 轻隐喻+许可 / 短判断
  * - 不收录：像…一样、轻轻停驻、励志对仗、办公词、口语套句高频骨架
  *
- * 抽取时会经 `getCompanionText` 内与生成相同的 banned 过滤。
+ * 仅作 API 完全失败时的最后随机兜底；定时首句 / 推送优先用 `companionRegeneratePool`。
  */
 export const FALLBACK_QUOTES: string[] = [
   // 轻隐喻 + 许可（桌面场景，不写读书）

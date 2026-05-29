@@ -3,16 +3,35 @@ import {
   type DashScopeTextRequest,
 } from '../clients/dashscopeTextClient'
 import type { EmotionKind } from '../schema/data'
+import { stripCompanionLineCornerQuotes } from '../prompts/companionOutputGate'
+import {
+  companionRegenerateLineFailsInterestQuoteMode,
+  companionInterestTagsRequireQuote,
+  pickCompanionInterestRegenerateLine,
+} from '../fallback/companionInterestRegenerateLines'
+import { companionRegenerateModelLineUnacceptable } from '../prompts/companionRegenerateGate'
+import { companionLineEqualsArchetypeExemplar } from '../prompts/companionArchetypes'
+import {
+  buildRegenerateRetrySuffix,
+  pickRegenerateStructuredFallback,
+  shouldRetryRegenerateAgainstTarget,
+} from './regenerateCompanionLine'
 import {
   buildCompanionSystemPrompt,
   buildCompanionUserPromptWithInterests,
   buildCompanionTriggerContextLines,
+  buildRegenerateChatSystemPrompt,
+  buildRegenerateChatUserPrompt,
   companionStyleForEmotion,
   parseCompanionInterestTags,
   type CompanionCopyStyle,
   type CompanionCopyTrigger,
 } from '../prompts/textPrompt'
-import { refineCompanionCopyLine } from './companionCopyQualityPasses'
+import {
+  logCompanionRegenerate,
+  maskDashScopeApiKey,
+} from '../debug/logCompanionRegenerate'
+import { companionCopyStillBanned, refineCompanionCopyLine } from './companionCopyQualityPasses'
 import { getCompanionText, type CompanionTextResult } from './getCompanionText'
 
 export type GenerateCompanionCopyInput = {
@@ -22,25 +41,19 @@ export type GenerateCompanionCopyInput = {
   keyword: string | undefined
   allowEmoji: boolean
   maxChars: number
-  /** 与情绪反馈联动时使用 */
   emotion?: EmotionKind
-  /** 最近已向用户展示的陪伴句，写入 user prompt 以抑制「只改一两字」式复述 */
   avoidRecentOutputs?: string[]
-  /** Electron main etc.: avoids renderer CORS blocking DashScope. */
   invokeDashScope?: (input: DashScopeTextRequest) => Promise<string>
-  /** 逗号分隔的额外 model 候选（如 VITE_DASHSCOPE_MODEL_FALLBACK）。 */
   modelFallbackEnv?: string
-  /** Browser dev: same-origin proxy path (see Vite config). */
   chatCompletionsUrl?: string
-  /** 设置中的兴趣标签；非空时写入通义千问（DashScope）请求的 system 提示，见 `buildCompanionSystemPrompt`。 */
   companionInterests?: string[]
-  /** 轻反馈经模型归纳后的提示行，见 `buildCompanionSystemPrompt`。 */
   companionLightFeedbackHints?: string[]
   trigger?: CompanionCopyTrigger
   yesterdayContextText?: string | null
   momentContextText?: string | null
   similarToLine?: string | null
-  /** 套句校验额外重试上限；`0` 表示仅首句、不重试（换一句等场景）。 */
+  replaceTargetLine?: string
+  seed?: number
   maxQualityRetries?: number
 }
 
@@ -52,20 +65,37 @@ function stripEmojisFromText(text: string): string {
     .trim()
 }
 
-function trimToMaxChars(text: string, maxChars: number): string {
-  const normalized = text.replace(/\s+/g, ' ').trim()
-  return normalized.length <= maxChars
-    ? normalized
-    : `${normalized.slice(0, Math.max(1, maxChars - 1))}…`
-}
-
 function finalizeCompanionText(
   text: string,
   maxChars: number,
   allowEmoji: boolean,
 ): string {
   const raw = allowEmoji ? text : stripEmojisFromText(text)
-  return trimToMaxChars(raw, maxChars)
+  const normalized = stripCompanionLineCornerQuotes(
+    raw.replace(/\s+/g, ' ').trim(),
+  )
+  return normalized.length <= maxChars
+    ? normalized
+    : `${normalized.slice(0, Math.max(1, maxChars - 1))}…`
+}
+
+function isRegenerateChatTrigger(
+  trigger: CompanionCopyTrigger | undefined,
+): trigger is 'regenerate' | 'similar' {
+  return trigger === 'regenerate' || trigger === 'similar'
+}
+
+/** 换句：略高 temperature + seed 抖动，避免同 prompt 骨架连刷同一句。 */
+function regenerateChatTemperature(seed?: number): number {
+  const jitter =
+    seed != null
+      ? (Math.abs(seed) % 15) / 100
+      : Math.floor(Math.random() * 8) / 100
+  return Math.min(0.97, 0.88 + jitter)
+}
+
+function normalizeCompanionLine(text: string): string {
+  return text.replace(/\s+/g, ' ').trim()
 }
 
 export async function generateCompanionCopy(
@@ -75,98 +105,395 @@ export async function generateCompanionCopy(
     input.emotion != null
       ? companionStyleForEmotion(input.emotion)
       : input.style
+  const isRegenerateChat = isRegenerateChatTrigger(input.trigger)
 
-  const systemPrompt = buildCompanionSystemPrompt({
-    style: effectiveStyle,
-    keyword: input.keyword,
-    allowEmoji: input.allowEmoji,
+  const qualityCtx = {
     maxChars: input.maxChars,
+    style: effectiveStyle,
     now: new Date(),
-    ...(input.emotion !== undefined ? { emotion: input.emotion } : {}),
-    ...(input.avoidRecentOutputs?.length ? { recentOutputsGuard: true } : {}),
-    ...(input.companionInterests?.length
-      ? { companionInterests: input.companionInterests }
-      : {}),
-    ...(input.companionLightFeedbackHints?.length
-      ? { companionLightFeedbackHints: input.companionLightFeedbackHints }
-      : {}),
-  })
-  const { tags: interestTags } = parseCompanionInterestTags(
-    input.companionInterests,
-  )
-  const triggerLines = buildCompanionTriggerContextLines({
-    ...(input.trigger !== undefined ? { trigger: input.trigger } : {}),
-    ...(input.momentContextText != null
-      ? { momentContextText: input.momentContextText }
-      : {}),
-    ...(input.similarToLine != null ? { similarToLine: input.similarToLine } : {}),
-    ...(input.yesterdayContextText != null
-      ? { yesterdayContextText: input.yesterdayContextText }
-      : {}),
-  })
-  const userPromptBase = buildCompanionUserPromptWithInterests(
-    input.keyword,
-    input.emotion,
-    input.avoidRecentOutputs && input.avoidRecentOutputs.length > 0
-      ? { avoidRecentOutputs: input.avoidRecentOutputs }
-      : undefined,
-    interestTags,
-  )
-  const userPrompt =
-    triggerLines.length > 0
-      ? `${triggerLines.join('\n')}\n${userPromptBase}`
-      : userPromptBase
+  }
 
-  const requestModelLine = async (userPromptLine: string): Promise<string> => {
+  const systemPrompt = isRegenerateChat
+    ? buildRegenerateChatSystemPrompt({
+        maxChars: input.maxChars,
+        allowEmoji: input.allowEmoji,
+        style: effectiveStyle,
+        now: new Date(),
+        trigger: input.trigger as 'regenerate' | 'similar',
+        ...(input.seed !== undefined ? { seed: input.seed } : {}),
+        ...(input.companionInterests?.length
+          ? { companionInterests: input.companionInterests }
+          : {}),
+      })
+    : buildCompanionSystemPrompt({
+        style: effectiveStyle,
+        keyword: input.keyword,
+        allowEmoji: input.allowEmoji,
+        maxChars: input.maxChars,
+        now: new Date(),
+        ...(input.emotion !== undefined ? { emotion: input.emotion } : {}),
+        ...(input.avoidRecentOutputs?.length ? { recentOutputsGuard: true } : {}),
+        ...(input.companionInterests?.length
+          ? { companionInterests: input.companionInterests }
+          : {}),
+        ...(input.companionLightFeedbackHints?.length
+          ? { companionLightFeedbackHints: input.companionLightFeedbackHints }
+          : {}),
+      })
+
+  let userPrompt: string
+  if (isRegenerateChat) {
+    userPrompt = buildRegenerateChatUserPrompt({
+      maxChars: input.maxChars,
+      trigger: input.trigger as 'regenerate' | 'similar',
+      style: effectiveStyle,
+      ...(input.companionInterests?.length
+        ? { companionInterests: input.companionInterests }
+        : {}),
+      ...(input.companionLightFeedbackHints?.length
+        ? { companionLightFeedbackHints: input.companionLightFeedbackHints }
+        : {}),
+      ...(input.emotion !== undefined ? { emotion: input.emotion } : {}),
+      ...(input.avoidRecentOutputs?.length
+        ? { avoidRecentOutputs: input.avoidRecentOutputs }
+        : {}),
+      ...(input.replaceTargetLine != null
+        ? { replaceTargetLine: input.replaceTargetLine }
+        : {}),
+      ...(input.similarToLine != null
+        ? { similarToLine: input.similarToLine }
+        : {}),
+      ...(input.seed !== undefined ? { seed: input.seed } : {}),
+    })
+  } else {
+    const { tags: interestTags } = parseCompanionInterestTags(
+      input.companionInterests,
+    )
+    const triggerLines = buildCompanionTriggerContextLines({
+      ...(input.trigger !== undefined ? { trigger: input.trigger } : {}),
+      ...(input.momentContextText != null
+        ? { momentContextText: input.momentContextText }
+        : {}),
+      ...(input.similarToLine != null ? { similarToLine: input.similarToLine } : {}),
+      ...(input.yesterdayContextText != null
+        ? { yesterdayContextText: input.yesterdayContextText }
+        : {}),
+    })
+    const userPromptBase = buildCompanionUserPromptWithInterests(
+      input.keyword,
+      input.emotion,
+      input.avoidRecentOutputs && input.avoidRecentOutputs.length > 0
+        ? { avoidRecentOutputs: input.avoidRecentOutputs }
+        : undefined,
+      interestTags,
+      input.trigger,
+    )
+    userPrompt =
+      triggerLines.length > 0
+        ? `${triggerLines.join('\n')}\n${userPromptBase}`
+        : userPromptBase
+  }
+
+  const requestModelLine = async (
+    userPromptLine: string,
+    temperature?: number,
+  ): Promise<string> => {
+    const regenTemperature = isRegenerateChat
+      ? (temperature ?? regenerateChatTemperature(input.seed))
+      : undefined
     const req: DashScopeTextRequest = {
       apiKey: input.apiKey,
       model: input.model,
       systemPrompt,
       userPrompt: userPromptLine,
+      ...(isRegenerateChat
+        ? {
+            quickModelFallbackOnly: true,
+            regenerateChatNoExpand: true,
+            ...(regenTemperature !== undefined
+              ? { temperature: regenTemperature }
+              : {}),
+          }
+        : {}),
       ...(input.chatCompletionsUrl !== undefined
         ? { chatCompletionsUrl: input.chatCompletionsUrl }
         : {}),
+      ...(input.trigger ? { copyTrigger: input.trigger } : {}),
     }
-    const raw = input.invokeDashScope
-      ? await input.invokeDashScope(req)
-      : (
-          await requestDashScopeTextWithFallback(
-            req,
-            input.modelFallbackEnv
-              ? { envFallbackList: input.modelFallbackEnv }
-              : {},
-          )
-        ).content
+    const apiStarted = Date.now()
+    if (isRegenerateChat) {
+      logCompanionRegenerate('dashscope/chat/completions → request', {
+        via: input.invokeDashScope ? 'electron-ipc' : 'renderer-fetch',
+        url:
+          req.chatCompletionsUrl ??
+          'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
+        model: req.model ?? 'qwen-turbo',
+        temperature: regenTemperature,
+        apiKey: maskDashScopeApiKey(input.apiKey),
+        seed: input.seed,
+        replaceTarget: input.replaceTargetLine?.slice(0, 96),
+        userPromptTail: userPromptLine.slice(-280),
+      })
+    }
+    let raw: string
+    let modelUsed: string | undefined
+    try {
+      if (input.invokeDashScope) {
+        raw = await input.invokeDashScope(req)
+      } else {
+        const res = await requestDashScopeTextWithFallback(req, {
+          fetchRemoteModelList: false,
+          ...(input.modelFallbackEnv
+            ? { envFallbackList: input.modelFallbackEnv }
+            : {}),
+        })
+        raw = res.content
+        modelUsed = res.model
+      }
+    } catch (err) {
+      if (isRegenerateChat) {
+        logCompanionRegenerate('dashscope/chat/completions ← error', {
+          ms: Date.now() - apiStarted,
+          message: err instanceof Error ? err.message : String(err),
+        })
+      }
+      throw err
+    }
+    if (isRegenerateChat) {
+      logCompanionRegenerate('dashscope/chat/completions ← response', {
+        ms: Date.now() - apiStarted,
+        model: modelUsed ?? req.model,
+        content: raw,
+      })
+    }
     return finalizeCompanionText(raw, input.maxChars, input.allowEmoji)
   }
 
-  const qualityCtx = { maxChars: input.maxChars, style: effectiveStyle }
-  const refineOpts =
-    typeof input.maxQualityRetries === 'number'
+  const maxExtra =
+    typeof input.maxQualityRetries === 'number' ? input.maxQualityRetries : 0
+  const refineOpts = isRegenerateChat
+    ? { maxExtraRetries: maxExtra, strictFinish: true }
+    : typeof input.maxQualityRetries === 'number'
       ? { maxExtraRetries: input.maxQualityRetries }
       : undefined
-  const result = await getCompanionText(async () => {
-    let line = await requestModelLine(userPrompt)
-    line = finalizeCompanionText(line, input.maxChars, input.allowEmoji)
 
+  const requestAndRefine = async (): Promise<string> => {
+    let line = await requestModelLine(userPrompt)
+    if (maxExtra > 0) {
+      try {
+        line = await refineCompanionCopyLine(
+          line,
+          qualityCtx,
+          (suffix) => requestModelLine(`${userPrompt}\n${suffix}`),
+          refineOpts,
+        )
+      } catch {
+        /* 保留最后一版模型产出，质检不过也不丢 API 句 */
+      }
+    }
+    const { tags: interestTags } = parseCompanionInterestTags(input.companionInterests)
     if (
-      typeof input.maxQualityRetries === 'number' &&
-      input.maxQualityRetries === 0
+      companionInterestTagsRequireQuote(interestTags) &&
+      companionRegenerateLineFailsInterestQuoteMode(line)
     ) {
-      return line
+      try {
+        line = await requestModelLine(
+          `${userPrompt}\n【硬约束·重写】用户选了兴趣标签，须写一句可念出的歌词/影视台词/书本金句；禁止散文套句（在这/片刻/灵魂/安宁/栖息/宁静/静谧）。`,
+        )
+      } catch {
+        /* keep line */
+      }
+      if (companionRegenerateLineFailsInterestQuoteMode(line)) {
+        line = pickCompanionInterestRegenerateLine({
+          interestTags,
+          maxChars: input.maxChars,
+          style: effectiveStyle,
+          ...(input.seed !== undefined ? { seed: input.seed } : {}),
+          ...(input.avoidRecentOutputs?.length
+            ? { avoidRecent: input.avoidRecentOutputs }
+            : {}),
+        })
+      }
+    }
+    const normalized = line.replace(/\s+/g, ' ').trim()
+    if (!normalized) {
+      throw new Error('empty companion copy')
+    }
+    if (companionCopyStillBanned(line, qualityCtx)) {
+      if (typeof console !== 'undefined' && console.warn) {
+        console.warn('[sidekick] 陪伴句质检未过，仍上屏模型产出', line)
+      }
+    }
+    return line
+  }
+
+  const pickRegeneratePoolLine = () =>
+    pickRegenerateStructuredFallback({
+      trigger: input.trigger ?? 'regenerate',
+      maxChars: input.maxChars,
+      style: effectiveStyle,
+      ...(input.seed !== undefined ? { seed: input.seed } : {}),
+      ...(input.avoidRecentOutputs?.length
+        ? { avoidRecent: input.avoidRecentOutputs }
+        : {}),
+      ...(input.replaceTargetLine != null
+        ? { replaceTarget: input.replaceTargetLine }
+        : {}),
+      ...(input.companionInterests?.length
+        ? {
+            companionInterests: input.companionInterests,
+            hasInterests: true,
+          }
+        : {}),
+    })
+
+  async function resolveRegenerateModelLine(): Promise<CompanionTextResult> {
+    const replaceTarget = normalizeCompanionLine(input.replaceTargetLine ?? '')
+    const avoidRecent = (input.avoidRecentOutputs ?? [])
+      .map(normalizeCompanionLine)
+      .filter(Boolean)
+    const regenStarted = Date.now()
+    const gateCtx = {
+      maxChars: input.maxChars,
+      style: effectiveStyle,
+      now: new Date(),
     }
 
-    return refineCompanionCopyLine(
-      line,
-      qualityCtx,
-      (suffix) => requestModelLine(`${userPrompt}\n${suffix}`),
-      refineOpts,
+    logCompanionRegenerate('resolveRegenerateModelLine start', {
+      replaceTarget,
+      avoidRecent,
+      seed: input.seed,
+      interestTags: parseCompanionInterestTags(input.companionInterests).tags,
+    })
+
+    const pickFallback = (reason: string) => {
+      const line = pickRegeneratePoolLine()
+      logCompanionRegenerate('resolveRegenerateModelLine → fallback', {
+        text: line,
+        replaceTarget,
+        reason,
+      })
+      return {
+        text: finalizeCompanionText(line, input.maxChars, input.allowEmoji),
+        source: 'fallback' as const,
+      }
+    }
+
+    let modelLine = ''
+    try {
+      modelLine = await requestModelLine(
+        userPrompt,
+        regenerateChatTemperature(input.seed),
+      )
+    } catch (err) {
+      if (typeof console !== 'undefined' && console.warn) {
+        console.warn(
+          `[sidekick] 换句模型请求失败 (${Date.now() - regenStarted}ms)，使用结构化兜底`,
+          err instanceof Error ? err.message : err,
+        )
+      }
+      return pickFallback('api-error')
+    }
+
+    const firstLine = modelLine
+
+    if (companionLineEqualsArchetypeExemplar(modelLine)) {
+      try {
+        modelLine = await requestModelLine(
+          `${userPrompt}\n【硬约束】禁止照抄结构示范或最近句原文；须全新措辞；已选兴趣则须织入音乐/影视/书籍语感。`,
+          regenerateChatTemperature(
+            input.seed != null ? input.seed + 1_048_583 : undefined,
+          ),
+        )
+      } catch {
+        /* 保留首句 */
+      }
+    }
+
+    if (shouldRetryRegenerateAgainstTarget(modelLine, replaceTarget)) {
+      try {
+        modelLine = await requestModelLine(
+          `${userPrompt}\n${buildRegenerateRetrySuffix({
+            replaceTarget,
+            avoidRecent,
+          })}`,
+          regenerateChatTemperature(
+            input.seed != null ? input.seed + 1_048_583 : undefined,
+          ),
+        )
+      } catch {
+        /* 保留首句 */
+      }
+    }
+
+    if (
+      shouldRetryRegenerateAgainstTarget(modelLine, replaceTarget) &&
+      !shouldRetryRegenerateAgainstTarget(firstLine, replaceTarget)
+    ) {
+      modelLine = firstLine
+    }
+
+    if (shouldRetryRegenerateAgainstTarget(modelLine, replaceTarget)) {
+      return pickFallback('target-skeleton-repeat')
+    }
+
+    if (companionLineEqualsArchetypeExemplar(modelLine)) {
+      return pickFallback('echoed-archetype-exemplar')
+    }
+
+    const { tags: interestTags } = parseCompanionInterestTags(
+      input.companionInterests,
     )
-  }, { maxChars: input.maxChars })
+    if (
+      interestTags.length > 0 &&
+      companionRegenerateLineFailsInterestQuoteMode(modelLine)
+    ) {
+      try {
+        modelLine = await requestModelLine(
+          `${userPrompt}\n【硬约束·重写】须写一句与语气一致的歌词/影视台词/书本金句（可念、有辨识度）；禁止散文（晚风/午后/心灵/慢慢流淌/放下也是一种/每一次呼吸/慢慢归位）；禁止休息许可套句。`,
+          regenerateChatTemperature(
+            input.seed != null ? input.seed + 2_097_583 : undefined,
+          ),
+        )
+      } catch {
+        /* 保留首句 */
+      }
+      if (companionRegenerateLineFailsInterestQuoteMode(modelLine)) {
+        return pickFallback('generic-heal-not-quote')
+      }
+    }
+
+    if (companionRegenerateModelLineUnacceptable(modelLine, gateCtx)) {
+      logCompanionRegenerate('resolveRegenerateModelLine quality note (show model)', {
+        line: normalizeCompanionLine(modelLine),
+      })
+    }
+
+    const finalized = finalizeCompanionText(modelLine, input.maxChars, input.allowEmoji)
+    logCompanionRegenerate('resolveRegenerateModelLine ok', {
+      source: 'model',
+      text: finalized,
+    })
+    return {
+      text: finalized,
+      source: 'model',
+    }
+  }
+
+  if (isRegenerateChat) {
+    return resolveRegenerateModelLine()
+  }
+
+  const result = await getCompanionText(
+    async () => requestAndRefine(),
+    {
+      maxChars: input.maxChars,
+      pickFallback: () => pickRegeneratePoolLine(),
+    },
+  )
 
   return {
     ...result,
     text: finalizeCompanionText(result.text, input.maxChars, input.allowEmoji),
   }
 }
-

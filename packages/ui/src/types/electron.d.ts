@@ -66,6 +66,11 @@ type DashScopeChatPayload = {
   chatCompletionsUrl?: string
   /** 逗号分隔的额外 model 候选（VITE_DASHSCOPE_MODEL_FALLBACK）。 */
   modelFallbackEnv?: string
+  /** 换句：不拉 /v1/models，最多 4 个快速候选。 */
+  regenerateChatNoExpand?: boolean
+  quickModelFallbackOnly?: boolean
+  /** 主进程日志：文案触发场景 */
+  copyTrigger?: string
 }
 
 type DashScopeTtsPayload = {
@@ -152,6 +157,16 @@ type SidekickDesktopApi = {
     toastIntro?: boolean
     /** 是否在气泡窗加载后自动 TTS（与设置「生成后自动播报」同步，由精灵窗传入）。 */
     autoTts?: boolean
+    /** 换句等：已展示独立气泡时仍刷新文案（IPC 或带 `t=` 重载）。 */
+    forceToastContentReload?: boolean
+    copyMeta?: { trigger: string; source: 'model' | 'fallback' }
+  }) => Promise<void>
+  /** 精灵窗 companion-copy 日志转发到主进程终端 */
+  logCompanionCopyEvent?: (payload: Record<string, unknown>) => void
+  /** 精灵/设置窗：同步气泡停留偏好，供主进程 showToast 缺省 dwell 时使用。 */
+  syncToastDisplaySettings?: (payload: {
+    dwellSeconds: number
+    toastAlwaysVisible: boolean
   }) => Promise<void>
   /**
    * 已展示独立气泡时，主进程优先用 IPC 同步版式；仅在页面未就绪时整页重载。无气泡则仅更新主进程偏好。
@@ -199,6 +214,7 @@ type SidekickDesktopApi = {
   onDetachedToastContentSync?: (
     callback: (payload: {
       message: string
+      contentRevision?: number
       textId?: string
       favorite?: boolean
       autoTts?: boolean
@@ -248,10 +264,16 @@ type SidekickDesktopApi = {
   setSpriteAnchor?: (anchor: SidekickSpriteAnchor) => Promise<void>
   /** Toast window → main → widget: ask for a new companion line; resolves when widget finishes. */
   /** Fire-and-forget: main forwards to widget; do not invoke from toast (loadURL would break the promise). */
-  requestRegenerateCopy?: () => Promise<void>
+  requestRegenerateCopy?: (
+    line?: string,
+  ) => Promise<{ ok: boolean; reason?: string; message?: string }>
+  /** Widget：独立气泡 invoke 换句完成后通知主进程 resolve。 */
+  notifyRegenerateCopyDone?: (payload?: { message?: string }) => void
   requestSimilarCopy?: () => Promise<void>
   /** Widget only: main forwards clicks from the detached toast. */
-  onRegenerateCopyRequested?: (callback: () => void) => () => void
+  onRegenerateCopyRequested?: (
+    callback: (payload: { replaceTargetLine?: string }) => void,
+  ) => () => void
   onSimilarCopyRequested?: (callback: () => void) => () => void
   getWorkArea?: () => Promise<ScreenWorkArea | null>
   /** Main-process DashScope call (no renderer CORS). */

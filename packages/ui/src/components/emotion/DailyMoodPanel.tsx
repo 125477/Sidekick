@@ -91,6 +91,11 @@ export function DailyMoodPanel({
   const [aiHint, setAiHint] = useState<string | null>(null)
   const guideEnsuredDayRef = useRef<string | null>(null)
   const guideFetchGenRef = useRef(0)
+  const guideQuestionsRef = useRef<string[] | null>(null)
+
+  useEffect(() => {
+    guideQuestionsRef.current = guideQuestions
+  }, [guideQuestions])
 
   const noteTrimmed = note.replace(/\s+/g, ' ').trim()
   const polishDisabled =
@@ -164,9 +169,16 @@ export function DailyMoodPanel({
       setGuideBusy(true)
       setAiHint(null)
       try {
+        const previousOnScreen = guideQuestionsRef.current
         const result = await fetchMoodJournalGuideQuestions(settings, {
           moodLabel,
           noteDraft: note,
+          ...(options?.force && previousOnScreen?.length
+            ? {
+                previousQuestions: previousOnScreen,
+                refreshBatch: true,
+              }
+            : {}),
         })
         if (gen !== guideFetchGenRef.current) return
         setGuideQuestions(result.questions)

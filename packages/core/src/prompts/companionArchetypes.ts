@@ -3,6 +3,8 @@
  * 「偶尔…，…也是/世界并不会…」式逗号升华格言。
  */
 
+import { companionRecentBodyRestSaturated } from './companionLineSimilarity'
+
 export type CompanionArchetypeId =
   | 'body_sense'
   | 'plain_can'
@@ -24,36 +26,36 @@ export const COMPANION_ARCHETYPE_EXEMPLARS: Record<
   readonly string[]
 > = {
   body_sense: [
-    '眼皮有点沉，允许自己先慢半拍。',
-    '肩膀一直提着，可以先把它放下来。',
+    '脑子有点满的时候，写下来会轻一点。',
+    '肩膀发紧的话，可以往后靠几秒。',
   ],
   plain_can: [
-    '可以先把这件事放一放，不必现在想明白。',
-    '允许今天只做到这里，也已经够了。',
+    '可以晚一点再想想今天的事。',
+    '这件事不用今晚想明白，明天也行。',
   ],
   today_ok: [
-    '今天先到这儿，剩下的明天再碰。',
-    '此刻先把呼吸放慢半拍就好。',
+    '今天已经推进了不少，停一下也合理。',
+    '今天够用了，剩下的留给明天的你。',
   ],
   not_but: [
     '不是你不努力，而是今天已经够满了。',
-    '与其逼自己立刻想通，不如先喘口气。',
+    '难的部分留到精神好一点再做。',
   ],
   short_question: [
     '此刻更想安静一会儿，还是出去走走？',
     '今天哪件小事让你稍微松了一点？',
   ],
   patience: [
-    '晚一点再决定也没关系。',
-    '不用急着给出答案，先让心跳慢下来。',
+    '晚一点再回那条消息，也没关系。',
+    '晚一点再处理也行，不必赶在这一刻。',
   ],
   one_metaphor: [
-    '窗缝漏进一点光，先到这儿歇口气。',
-    '桌面安静了一会儿，不必急着填满它。',
+    '桌面乱的话，收一两样就好。',
+    '可以把闹钟往后推十分钟，不丢人。',
   ],
   concrete_pause: [
-    '先到这儿，已经很好。',
-    '先放一放，不必马上接着扛。',
+    '今天到此为止也可以，不必续命加班。',
+    '刚才那阵忙乱过去了，现在慢下来也行。',
   ],
 }
 
@@ -96,7 +98,7 @@ export const COMPANION_ARCHETYPES: readonly CompanionArchetype[] = [
   {
     id: 'concrete_pause',
     mandate:
-      '【灵感·口语停顿】可用「先到这儿/先放一放/先喘口气」；无世界观升华；勿「偶尔…，…」。',
+      '【灵感·收束】可用「今天够用了/到此为止」类判断；禁止先到这儿/先放一放/已经很好/歇会儿套句。',
   },
 ] as const
 
@@ -110,7 +112,7 @@ export function buildWritingAngleTaskHint(archetype: CompanionArchetype): string
     short_question: '【灵感】可写温柔问句，以？结尾。',
     patience: '【灵感】可用「晚一点/不用急」+ 内在节奏；勿写邮件/茶/家务。',
     one_metaphor: '【灵感】可有一处轻隐喻；勿窗外/闭上眼/思绪。',
-    concrete_pause: '【灵感】可用「先到这儿/先喘口气」口语；勿抽象放松口号。',
+    concrete_pause: '【灵感】可用「今天够用了/先搁着」；禁止先到这儿/先放一放/已经很好。',
   }
   return hints[archetype.id]
 }
@@ -156,6 +158,55 @@ export function pickAlternateCompanionArchetype(
   return COMPANION_ARCHETYPES[idx]!
 }
 
+/** 换句且有兴趣时：body_sense 置后；最近已有身体+休息句时剔除 body_sense。 */
+const REGENERATE_INTEREST_SAFE_IDS: readonly CompanionArchetypeId[] = [
+  'plain_can',
+  'concrete_pause',
+  'patience',
+  'not_but',
+  'short_question',
+  'body_sense',
+] as const
+
+function poolWithoutBodySenseIfRecent(
+  pool: readonly CompanionArchetype[],
+  recent: string[],
+): CompanionArchetype[] {
+  if (!companionRecentBodyRestSaturated(recent)) {
+    return [...pool]
+  }
+  const filtered = pool.filter((a) => a.id !== 'body_sense')
+  return filtered.length > 0 ? filtered : [...pool]
+}
+
+export function pickRegenerateCompanionArchetype(
+  seed: number,
+  recent: string[] = [],
+  hasInterests = false,
+): CompanionArchetype {
+  const cleaned = recent.map((s) => s.replace(/\s+/g, ' ').trim()).filter(Boolean)
+  if (!hasInterests) {
+    const base = pickCompanionArchetype(seed, cleaned)
+    const alt = pickAlternateCompanionArchetype(base, seed)
+    if (alt.id === 'body_sense' && companionRecentBodyRestSaturated(cleaned)) {
+      const pool = poolWithoutBodySenseIfRecent(COMPANION_ARCHETYPES, cleaned)
+      const idx =
+        Math.abs(seed + cleaned.length * 31) % pool.length
+      return pool[idx]!
+    }
+    return alt
+  }
+  const basePool = COMPANION_ARCHETYPES.filter((a) =>
+    REGENERATE_INTEREST_SAFE_IDS.includes(a.id),
+  )
+  const pool = poolWithoutBodySenseIfRecent(basePool, cleaned)
+  const idx =
+    Math.abs(
+      seed + cleaned.length * 31 + hashRecentForArchetype(cleaned) * 7,
+    ) % pool.length
+  return pool[idx]!
+}
+
 function hashSeedPart(s: string): number {
   let h = 0
   for (let i = 0; i < s.length; i++) {
@@ -165,17 +216,41 @@ function hashSeedPart(s: string): number {
 }
 
 /** 模型仍违反结构时，从本轮 archetype 示例句中抽取（与 writing_angle 一致）。 */
+function exemplarFitsLocalTime(line: string, now: Date = new Date()): boolean {
+  const h = now.getHours()
+  if (h >= 17 || h < 6) return true
+  if (/今天先到这儿|剩下的明天再碰|今天只做到这里.*已经够了/.test(line)) {
+    return false
+  }
+  return true
+}
+
+/** 模型或兜底是否原样输出 archetype 示范句（用户会看到「全是一个类型」）。 */
+export function companionLineEqualsArchetypeExemplar(line: string): boolean {
+  const t = line.replace(/\s+/g, ' ').trim()
+  if (!t) return false
+  for (const pool of Object.values(COMPANION_ARCHETYPE_EXEMPLARS)) {
+    for (const exemplar of pool) {
+      if (t === exemplar.replace(/\s+/g, ' ').trim()) return true
+    }
+  }
+  return false
+}
+
 export function pickArchetypeExemplarLine(
   archetypeId: CompanionArchetypeId,
-  opts: { seed?: number; maxChars: number; avoidRecent?: string[] },
+  opts: { seed?: number; maxChars: number; avoidRecent?: string[]; now?: Date },
 ): string {
-  const pool = [...COMPANION_ARCHETYPE_EXEMPLARS[archetypeId]]
+  const now = opts.now ?? new Date()
+  const pool = [...COMPANION_ARCHETYPE_EXEMPLARS[archetypeId]].filter((line) =>
+    exemplarFitsLocalTime(line, now),
+  )
   const seed = opts.seed ?? Date.now()
   const avoid = (opts.avoidRecent ?? [])
     .map((s) => s.replace(/\s+/g, ' ').trim())
     .filter(Boolean)
 
-  const ordered = pool.sort(
+  const ordered = (pool.length > 0 ? pool : [...COMPANION_ARCHETYPE_EXEMPLARS.body_sense]).sort(
     (a, b) => hashSeedPart(`${seed}:${a}`) - hashSeedPart(`${seed}:${b}`),
   )
 
@@ -189,5 +264,5 @@ export function pickArchetypeExemplarLine(
     }
     return trimmed
   }
-  return ordered[0] ?? '先到这儿也很好。'
+  return ordered[0] ?? '可以晚一点再想想今天的事。'
 }

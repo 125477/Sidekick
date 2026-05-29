@@ -14,6 +14,11 @@ const DEFAULT_COMPLETIONS_URL =
 /** 仅 /v1/models 拉取失败时使用；正常情况用接口返回的 100+ 模型。 */
 const STATIC_FALLBACK = ['qwen-turbo', 'qwen-plus', 'qwen-max']
 
+/** 单次 completion 最多尝试的 model 数（quick + 扩充列表合计）。 */
+const MAX_MODEL_ATTEMPTS_PER_CALL = 12
+/** 换句：仅快速候选，不拉 /v1/models（与 core dashscopeTextClient 一致）。 */
+const REGENERATE_MAX_MODEL_ATTEMPTS = 4
+
 let cachedModelIds = null
 let cachedAt = 0
 const CACHE_MS = 10 * 60_000
@@ -74,16 +79,32 @@ function isInternalOrServerError(status, body) {
   return (
     lower.includes('internal_error') ||
     lower.includes('internal error') ||
+    lower.includes('internalerror') ||
+    lower.includes('"code":"internal') ||
     lower.includes('service unavailable') ||
     lower.includes('bad gateway') ||
     lower.includes('gateway timeout')
   )
 }
 
+function bodyHasTopLevelApiError(body) {
+  const raw = String(body ?? '').trim()
+  if (!raw || raw[0] !== '{') return false
+  try {
+    const code = JSON.parse(raw).code
+    if (typeof code !== 'string' || !code.trim()) return false
+    const lower = code.trim().toLowerCase()
+    return lower !== 'success' && lower !== 'ok'
+  } catch {
+    return false
+  }
+}
+
 function bodyHasApiError(body) {
   const raw = String(body ?? '').trim()
   if (!raw || raw[0] !== '{') return false
   try {
+    if (bodyHasTopLevelApiError(body)) return true
     const err = JSON.parse(raw).error
     if (err == null) return false
     if (typeof err === 'string') return err.trim().length > 0
@@ -96,7 +117,13 @@ function bodyHasApiError(body) {
 
 function apiErrorLabel(body) {
   try {
-    const err = JSON.parse(String(body)).error
+    const parsed = JSON.parse(String(body))
+    if (typeof parsed.code === 'string' && parsed.code.trim()) {
+      const msg =
+        typeof parsed.message === 'string' ? parsed.message.trim() : ''
+      return [parsed.code.trim(), msg].filter(Boolean).join(': ').slice(0, 120)
+    }
+    const err = parsed.error
     if (typeof err === 'string') return err.slice(0, 80)
     if (err && typeof err === 'object') {
       return [err.type, err.code, err.message].filter(Boolean).join(' ').slice(0, 120)
@@ -236,7 +263,18 @@ async function completeOnce({
     throw err
   }
   const content = data.choices?.[0]?.message?.content?.trim()
-  if (!content) throw new Error('Empty content from DashScope')
+  if (!content) {
+    if (bodyHasTopLevelApiError(bodyText)) {
+      const err = new Error(
+        `DashScope ${response.status || 500} (model=${model}): ${apiErrorLabel(bodyText)}`,
+      )
+      err.status = response.status || 500
+      err.bodySnippet = bodyText
+      err.model = model
+      throw err
+    }
+    throw new Error('Empty content from DashScope')
+  }
   return content
 }
 
@@ -244,44 +282,41 @@ async function completeOnce({
  * @param {object} payload
  * @param {string} [payload.modelFallbackEnv]
  */
-export async function dashscopeChatCompleteWithFallback(payload) {
-  const apiKey = String(payload?.apiKey ?? '').trim()
-  if (!apiKey) throw new Error('Missing DASHSCOPE_API_KEY')
-
-  const systemPrompt = String(payload?.systemPrompt ?? '')
-  const userPrompt = String(payload?.userPrompt ?? '')
-  const primary = payload?.model?.trim() || 'qwen-turbo'
-  const temperature =
-    typeof payload?.temperature === 'number' && Number.isFinite(payload.temperature)
-      ? payload.temperature
-      : undefined
-  const chatCompletionsUrl = payload?.chatCompletionsUrl
-
-  const fetched = await listDashScopeChatModels(apiKey, chatCompletionsUrl)
-  if (fetched.length > 0) {
-    console.info(
-      `[sidekick] DashScope 已从 /v1/models 加载 ${fetched.length} 个候选模型`,
-    )
-  } else {
-    console.warn('[sidekick] DashScope /v1/models 未返回列表，使用内置兜底模型')
-  }
+async function tryModelsInOrder({
+  apiKey,
+  systemPrompt,
+  userPrompt,
+  temperature,
+  chatCompletionsUrl,
+  order,
+  triedModels,
+  logSkippedCached,
+  maxAttempts = MAX_MODEL_ATTEMPTS_PER_CALL,
+}) {
   const fullOrder = buildTryOrder(
-    primary,
-    fetched,
-    parseEnvFallback(payload?.modelFallbackEnv),
+    order.primary,
+    order.fetched,
+    order.envList,
   )
-  const tryOrder = prepareDashScopeModelTryOrder(fullOrder)
-  const skippedCached = fullOrder.length - tryOrder.length
-  if (skippedCached > 0) {
-    console.info(
-      `[sidekick] DashScope 跳过 ${skippedCached} 个本地记录的无额度/不可用模型`,
-    )
+  const tryOrder = prepareDashScopeModelTryOrder(fullOrder).filter(
+    (m) => !triedModels.includes(m),
+  )
+  if (logSkippedCached) {
+    const skippedCached = fullOrder.length - prepareDashScopeModelTryOrder(fullOrder).length
+    if (skippedCached > 0) {
+      console.info(
+        `[sidekick] DashScope 跳过 ${skippedCached} 个本地记录的无额度/不可用模型`,
+      )
+    }
   }
-
-  const triedModels = []
   let lastErr
-
   for (const model of tryOrder) {
+    if (triedModels.length >= maxAttempts) {
+      console.warn(
+        `[sidekick] DashScope 已达单次 model 尝试上限 ${maxAttempts}，停止轮换`,
+      )
+      break
+    }
     triedModels.push(model)
     try {
       const content = await completeOnce({
@@ -297,14 +332,16 @@ export async function dashscopeChatCompleteWithFallback(payload) {
           `[sidekick] DashScope 已切换模型: ${model}（此前 ${triedModels.length - 1} 个不可用）`,
         )
       }
-      return { content, model, triedModels }
+      return { content, model, triedModels: [...triedModels] }
     } catch (err) {
       lastErr = err
       const bodySnippet = err.bodySnippet ?? err.message ?? ''
       if (!shouldTryNextModel(err.status, bodySnippet)) {
         throw err
       }
-      markDashScopeModelUnavailable(model)
+      if (isQuotaOrAccess(err.status, bodySnippet)) {
+        markDashScopeModelUnavailable(model)
+      }
       const reason = bodyHasApiError(bodySnippet)
         ? apiErrorLabel(bodySnippet)
         : isInternalOrServerError(err.status, bodySnippet)
@@ -312,17 +349,87 @@ export async function dashscopeChatCompleteWithFallback(payload) {
           : isQuotaOrAccess(err.status, bodySnippet)
             ? 'quota/access'
             : 'retryable'
+      const cacheNote = isQuotaOrAccess(err.status, bodySnippet)
+        ? '，已标记不可用'
+        : '，尝试下一个模型'
       console.warn(
-        `[sidekick] DashScope model=${model} 已标记不可用（${reason}），尝试下一个模型`,
+        `[sidekick] DashScope model=${model} 失败（${reason}）${cacheNote}`,
       )
     }
   }
+  return { lastErr, triedModels }
+}
+
+export async function dashscopeChatCompleteWithFallback(payload) {
+  const apiKey = String(payload?.apiKey ?? '').trim()
+  if (!apiKey) throw new Error('Missing DASHSCOPE_API_KEY')
+
+  const systemPrompt = String(payload?.systemPrompt ?? '')
+  const userPrompt = String(payload?.userPrompt ?? '')
+  const regenerateFastPath = payload?.regenerateChatNoExpand === true
+  const primary = payload?.model?.trim() || 'qwen-turbo'
+  const temperature =
+    typeof payload?.temperature === 'number' && Number.isFinite(payload.temperature)
+      ? payload.temperature
+      : undefined
+  const chatCompletionsUrl = payload?.chatCompletionsUrl
+  const envList = parseEnvFallback(payload?.modelFallbackEnv)
+  const maxAttempts = regenerateFastPath
+    ? REGENERATE_MAX_MODEL_ATTEMPTS
+    : MAX_MODEL_ATTEMPTS_PER_CALL
+  const triedModels = []
+
+  const quick = await tryModelsInOrder({
+    apiKey,
+    systemPrompt,
+    userPrompt,
+    temperature,
+    chatCompletionsUrl,
+    order: { primary, fetched: [], envList },
+    triedModels,
+    logSkippedCached: true,
+    maxAttempts,
+  })
+  if (quick?.content) {
+    return quick
+  }
+
+  if (regenerateFastPath) {
+    console.warn(
+      `[sidekick] DashScope 换句快速候选均失败（已尝试 ${triedModels.length} 个），不再拉 /v1/models`,
+    )
+    throw new Error(
+      `${quick?.lastErr?.message ?? 'DashScope 换句失败'}（已依次尝试 ${triedModels.length} 个模型）`,
+    )
+  }
+
+  const fetched = await listDashScopeChatModels(apiKey, chatCompletionsUrl)
+  if (fetched.length > 0) {
+    console.info(
+      `[sidekick] DashScope 内置候选均失败，已从 /v1/models 加载 ${fetched.length} 个扩充模型`,
+    )
+  } else {
+    console.warn('[sidekick] DashScope /v1/models 未返回列表，无法扩充候选')
+  }
+
+  const expanded = await tryModelsInOrder({
+    apiKey,
+    systemPrompt,
+    userPrompt,
+    temperature,
+    chatCompletionsUrl,
+    order: { primary, fetched, envList },
+    triedModels,
+    logSkippedCached: false,
+    maxAttempts,
+  })
+  if (expanded?.content) return expanded
 
   console.warn(
     `[sidekick] DashScope 全部候选模型均失败（已尝试 ${triedModels.length} 个）；不可用列表已保留在 userData`,
   )
 
   throw new Error(
-    `${lastErr?.message ?? 'DashScope 失败'}（已依次尝试 ${triedModels.length} 个模型）`,
+    `${expanded?.lastErr?.message ?? 'DashScope 失败'}（已依次尝试 ${triedModels.length} 个模型）`,
   )
 }

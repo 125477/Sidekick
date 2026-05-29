@@ -2,7 +2,7 @@
 
 let regenerateInFlight = false
 let lastRegenerateFinishedAt = 0
-const REGENERATE_COOLDOWN_MS = 2500
+const REGENERATE_COOLDOWN_MS = 600
 
 export function shouldSkipRegenerateCopyRequest(): boolean {
   if (regenerateInFlight) return true

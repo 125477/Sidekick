@@ -6,8 +6,10 @@
 ## 粘贴后检查
 
 - 百炼应用内声明 **19 个**自定义变量（见下文表格，含 `scene_context`）；**勿**为 `style_guide` / `interest_guide` / `scene_context` 填写默认长文（由客户端每轮注入）。
-- 系统提示词须含完整「防套句」章节（见 `BAILIAN_AGENT_PROMPT.md`）；仅改 `style_guide` 变量不够。
-- 语气细则真源：`packages/core/src/prompts/textPrompt.ts` 中 `STYLE_GUIDE` / `STYLE_ANTI_FUNCTIONAL`。
+- 系统提示词以 **【待改写】+ 改写任务** 为主（见 `BAILIAN_AGENT_PROMPT.md`）。
+- **换一句 / 类似**：走 `chat/completions`（**改写屏上句**，短 prompt；不传兴趣、不注入参考锚句）；气泡与 API 返回一致。
+- **昨日问候**（`yesterday-greeting` + `yesterday_context`）：走百炼 Agent（未配置 AppId 时回退 chat）。
+- **今日小结收束**（保存后 `journal-closure` + `moment_context`）：走百炼 Agent。
 
 ## 调用关系
 
@@ -19,13 +21,17 @@ flowchart LR
   Params["textPrompt.ts\nbuildCompanionAgentUserPromptParams"]
   Console["百炼控制台\nBAILIAN_AGENT_PROMPT.md"]
   API["apps/{id}/completion"]
+  ChatAPI["chat/completions"]
+  Pool["companionRegeneratePool\n质检失败兜底"]
 
-  UI -->|VITE_BAILIAN_APP_ID| Agent
-  UI -->|失败或未配置| Chat
+  UI -->|换句| Chat
+  Chat -->|改写 prompt| ChatAPI
+  UI -->|定时/情绪等| Agent
   Agent --> Params
   Params -->|user_prompt_params| API
   Console -.->|模板变量| API
-  Chat -->|buildCompanionSystemPrompt| ChatAPI["chat/completions"]
+  Chat --> Pool
+  Agent --> Pool
 ```
 
 ## `textPrompt.ts` 职责拆分
@@ -37,7 +43,7 @@ flowchart LR
 | 短任务 `input.prompt` | `buildCompanionAgentUserPrompt()` | `buildCompanionUserPrompt*` |
 | 生成后套句/过短重试 | `refineCompanionCopyLine`（与 chat 共用） | 同左 |
 | 百炼 session | **不传** `session_id`（每轮独立，防格言腔记忆） | N/A |
-| 本地兜底句 | `getCompanionText` → `fallback/quotes.ts` | 同左 |
+| 本地兜底句 | 套句时 `companionRegeneratePool` | 同左 |
 | 情绪 → 语气 | `companionStyleForEmotion` → `text_style` | 同左 |
 
 **勿删 `textPrompt.ts`**：回退、轻反馈、兜底过滤、变量组装仍依赖它；语气细则真源为 `STYLE_GUIDE` / `STYLE_ANTI_FUNCTIONAL`，经 `style_guide` 变量注入智能体。
@@ -71,7 +77,7 @@ flowchart LR
 |--------|------|--------|
 | `trigger` | 触发场景 | `scheduled` / `regenerate` / `similar` / `emotion` / `manual` / `yesterday-greeting` / `focus-end` / `unlock` / `journal-closure` / `streak-nudge` / `interest-deepen` |
 | `scene_context` | **桌面挂件场景**（代码注入，勿写死） | 灵伴桌面气泡、默认未在读书等 |
-| `text_style` | 语气类型标签 | `治愈` / `励志` / `搞笑` / `助眠` / `职场解压` / `抽象` |
+| `text_style` | 语气类型标签 | `治愈` / `励志` / `搞笑` / `助眠` / `职场解压` / `抽象` / `鸡汤` / `沙雕` / `高冷` |
 | `style_guide` | **当前语气全文**（由代码从 `STYLE_GUIDE` 注入） | 每轮一条，勿在控制台写死 |
 | `interests` | 兴趣标签列表 | `音乐、影视` 或 `无` |
 | `interest_guide` | **匹配兴趣的写作说明** | 由代码按标签拼接或 `无` |

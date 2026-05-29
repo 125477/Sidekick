@@ -5,6 +5,9 @@ export type MoodJournalGuideAgentParamsInput = {
   noteDraft: string
   interests?: string[]
   interestNote?: string
+  /** 「换一批」时传入屏上旧问题，要求模型换角度。 */
+  previousQuestions?: string[]
+  refreshSeed?: number
 }
 
 export type MoodJournalPolishAgentParamsInput = {
@@ -15,6 +18,16 @@ export type MoodJournalPolishAgentParamsInput = {
 export function formatMoodJournalInterests(tags: string[] | undefined): string {
   const list = (tags ?? []).map((s) => s.trim()).filter(Boolean)
   return list.length > 0 ? list.join('、') : '无'
+}
+
+function formatMoodJournalGuideAvoidQuestions(
+  previous: string[] | undefined,
+): string {
+  const list = (previous ?? [])
+    .map((q) => q.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+  if (list.length === 0) return '无'
+  return list.map((q, i) => `${i + 1}. ${q}`).join('\n')
 }
 
 /** 百炼「写日记助手」应用 → `user_prompt_params`。 */
@@ -28,16 +41,70 @@ export function buildMoodJournalGuideAgentParams(
     interests: formatMoodJournalInterests(input.interests),
     interest_note:
       input.interestNote?.replace(/\s+/g, ' ').trim().slice(0, 120) || '无',
+    avoid_questions: formatMoodJournalGuideAvoidQuestions(input.previousQuestions),
+    refresh_seed: String(input.refreshSeed ?? Date.now()),
   }
 }
 
 /** 百炼「写日记助手」`input.prompt`。 */
-export function buildMoodJournalGuideAgentPrompt(): string {
-  return [
+export function buildMoodJournalGuideAgentPrompt(
+  input?: Pick<MoodJournalGuideAgentParamsInput, 'previousQuestions' | 'refreshSeed'>,
+): string {
+  const parts = [
     '请根据本轮动态上下文，输出恰好 3 条中文写日记引导问题。',
     '格式：每行一条，行首为「1.」「2.」「3.」；不要其它说明、不要 Markdown。',
     '仅简体中文，禁止英文。',
-  ].join('')
+  ]
+  const previous = (input?.previousQuestions ?? [])
+    .map((q) => q.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+  if (previous.length > 0) {
+    parts.push(
+      '【换一批】须与下列旧问题明显不同，禁止重复或只改一两个字：',
+      ...previous.map((q, i) => `${i + 1}. ${q}`),
+    )
+  }
+  if (input?.refreshSeed != null) {
+    parts.push(`salt=${input.refreshSeed}`)
+  }
+  return parts.join('')
+}
+
+export function buildMoodJournalGuideChatUserPrompt(input: {
+  previousQuestions?: string[]
+  refreshSeed?: number
+}): string {
+  const previous = (input.previousQuestions ?? [])
+    .map((q) => q.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+  const seed = input.refreshSeed ?? Date.now()
+  if (previous.length === 0) {
+    return `请输出 3 条引导问题。salt=${seed}`
+  }
+  return [
+    '请输出 3 条引导问题；须与下列旧问题明显不同，禁止重复或近义改写：',
+    ...previous.map((q, i) => `${i + 1}. ${q}`),
+    `salt=${seed}`,
+  ].join('\n')
+}
+
+export function normalizeMoodJournalGuideQuestionKey(text: string): string {
+  return text
+    .replace(/\s+/g, '')
+    .replace(/[？?！!。．.…]/g, '')
+    .toLowerCase()
+}
+
+export function moodJournalGuideQuestionsEquivalent(
+  a: string[],
+  b: string[],
+): boolean {
+  if (a.length !== b.length || a.length === 0) return false
+  return a.every(
+    (q, i) =>
+      normalizeMoodJournalGuideQuestionKey(q) ===
+      normalizeMoodJournalGuideQuestionKey(b[i] ?? ''),
+  )
 }
 
 /** 百炼「日记润色」应用 → `user_prompt_params`。 */

@@ -110,10 +110,16 @@ function moodJournalAgentExtras(apiKey: string | undefined): {
 
 export async function fetchMoodJournalGuideQuestions(
   settings: SidekickSettings,
-  input: { moodLabel: string; noteDraft: string },
+  input: {
+    moodLabel: string
+    noteDraft: string
+    previousQuestions?: string[]
+    refreshBatch?: boolean
+  },
 ): Promise<MoodJournalGuideResult> {
   const apiKey = apiKeyFromEnv()
   const { tags, note } = parseCompanionInterestNote(settings.companionInterests)
+  const refreshSeed = Date.now() ^ Math.floor(Math.random() * 1_000_000_000)
   return generateMoodJournalGuide({
     apiKey,
     appId: moodGuideAppIdFromEnv(),
@@ -122,6 +128,10 @@ export async function fetchMoodJournalGuideQuestions(
     noteDraft: input.noteDraft,
     ...(tags.length > 0 ? { interests: tags } : {}),
     ...(note.trim() ? { interestNote: note.trim() } : {}),
+    ...(input.previousQuestions?.length
+      ? { previousQuestions: input.previousQuestions }
+      : {}),
+    ...(input.refreshBatch ? { refreshSeed } : {}),
     ...moodJournalAgentExtras(apiKey),
   })
 }

@@ -3,7 +3,7 @@ import { useCallback, useEffect } from 'react'
 import { loadData, saveData, type AvatarPreset, type EmotionRecord } from '@sidekick/core'
 import { broadcastAvatarSync, subscribeAvatarSync } from '../state/avatarSync'
 import { broadcastSettingsSync, subscribeSettingsSync } from '../state/settingsSync'
-import { areSettingsEqual, type SidekickSettings } from '../state/settingsState'
+import { areSettingsEqual, dwellMinutesToSeconds, type SidekickSettings } from '../state/settingsState'
 import {
   loadOnboardingComplete,
   loadSettings,
@@ -168,6 +168,20 @@ export function useAppBootstrap({
     settings.avatarSize,
     settings.avatarOpacity,
     skipAvatarPersist,
+  ])
+
+  useEffect(() => {
+    const sync = window.sidekickDesktop?.syncToastDisplaySettings
+    if (!sync) return
+    void sync({
+      dwellSeconds: settings.toastAlwaysVisible
+        ? 0
+        : dwellMinutesToSeconds(settings.dwellMinutes),
+      toastAlwaysVisible: settings.toastAlwaysVisible,
+    })
+  }, [
+    settings.dwellMinutes,
+    settings.toastAlwaysVisible,
   ])
 
   return { flushPendingPanelSliderSave }

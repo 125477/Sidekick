@@ -8,6 +8,13 @@ export type ShowToastWindowPayloadInput = {
   textId?: string
   favorite?: boolean
   toastIntro?: boolean
+  /** 换句等：独立气泡已挂载时仍强制 IPC 同步或整页重载，避免屏上句不变。 */
+  forceToastContentReload?: boolean
+  /** 主进程日志：文案来源与触发场景 */
+  copyMeta?: {
+    trigger: string
+    source: 'model' | 'fallback'
+  }
 }
 
 export type BuildShowToastWindowPayloadOpts = {

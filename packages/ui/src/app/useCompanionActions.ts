@@ -2,7 +2,11 @@ import type { Dispatch, MutableRefObject, RefObject, SetStateAction } from 'reac
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import {
   appendText,
+  companionLineIsNonRewriteTarget,
+  buildRegenerateAvoidForPrompt,
   loadData,
+  logCompanionRegenerate,
+  pickCompanionRegenerateLineDistinct,
   saveData,
   type AvatarPreset,
   type CompanionCopyStyle,
@@ -16,6 +20,7 @@ import type { SidekickSettings } from '../state/settingsState'
 import type { SpriteState, UiAction, UiState } from '../state/uiState'
 import { buildShowToastWindowPayload } from '../utils/toastWindowPayload'
 import { reportSpriteAnchorToMain } from '../utils/reportSpriteAnchor'
+import { usesDetachedToastWindow } from '../utils/companionTts'
 import { SIDEKICK_MORE_FEATURES_PLACEHOLDER } from '../constants/toastCopy'
 import { openEmotionPanel } from './openEmotionPanel'
 import {
@@ -30,9 +35,8 @@ import {
   startCompanionCopyRequest,
 } from './companionCopySession'
 import {
-  markRegenerateCopyFinished,
   markRegenerateCopyStarted,
-  shouldSkipRegenerateCopyRequest,
+  markRegenerateCopyFinished,
 } from './companionRegenerateBridge'
 
 export type UseCompanionActionsArgs = {
@@ -51,7 +55,12 @@ export type UseCompanionActionsArgs = {
   moreRestoreToastTimerRef: MutableRefObject<number | null>
   recentCompanionLinesRef: MutableRefObject<string[]>
   requestCompanionTextRef: MutableRefObject<
-    ((keyword?: string, emotion?: EmotionKind) => Promise<void>) | undefined
+    | ((
+        keyword?: string,
+        emotion?: EmotionKind,
+        fetchOptions?: FetchCompanionCopyOptions,
+      ) => Promise<void>)
+    | undefined
   >
   onboardingOpenSentRef: MutableRefObject<boolean>
   avatars: AvatarPreset[]
@@ -94,6 +103,9 @@ export function useCompanionActions({
 }: UseCompanionActionsArgs) {
   const companionFetchBusyRef = useRef(false)
   const regenerateSeqRef = useRef(0)
+  /** 屏上句未刷新时，仍避免连点换句打出相同 model 句。 */
+  const lastRegenerateModelOutputsRef = useRef<string[]>([])
+  const regenerateInFlightRef = useRef(false)
 
   const showToastMessage = async (
     message: string,
@@ -102,11 +114,24 @@ export function useCompanionActions({
       textId?: string | null
       favorite?: boolean
       toastMode?: 'normal' | 'intro'
+      /** 收藏刷新等须强制同步主进程时设为 true */
+      forceRefresh?: boolean
+      copyMeta?: { trigger: string; source: 'model' | 'fallback' }
     },
   ) => {
     if (moreRestoreToastTimerRef.current != null) {
       window.clearTimeout(moreRestoreToastTimerRef.current)
       moreRestoreToastTimerRef.current = null
+    }
+    const normalized = message.replace(/\s+/g, ' ').trim()
+    const prevShown = lastShownToastMessageRef.current.replace(/\s+/g, ' ').trim()
+    if (
+      normalized &&
+      normalized === prevShown &&
+      opts?.toastMode !== 'intro' &&
+      !opts?.forceRefresh
+    ) {
+      return
     }
     const dwellSeconds =
       opts?.dwellSeconds !== undefined
@@ -127,6 +152,8 @@ export function useCompanionActions({
             message,
             anchor: uiState.toastAnchor,
             dwellSeconds,
+            ...(opts?.copyMeta ? { copyMeta: opts.copyMeta } : {}),
+            ...(opts?.forceRefresh ? { forceToastContentReload: true } : {}),
             ...(opts?.toastMode === 'intro' ? { toastIntro: true } : {}),
             ...(opts?.textId
               ? {
@@ -139,6 +166,13 @@ export function useCompanionActions({
         ),
       )
       lastShownToastMessageRef.current = message
+      if (!usesDetachedToastWindow()) {
+        dispatch({
+          type: 'SHOW_TOAST',
+          message,
+          ...(opts?.toastMode ? { toastMode: opts.toastMode } : {}),
+        })
+      }
       return
     }
     if (isToastMode && window.sidekickDesktop?.showToastWindow) {
@@ -150,6 +184,8 @@ export function useCompanionActions({
             message,
             anchor: toastDetachAnchor,
             dwellSeconds,
+            ...(opts?.copyMeta ? { copyMeta: opts.copyMeta } : {}),
+            ...(opts?.forceRefresh ? { forceToastContentReload: true } : {}),
             ...(opts?.toastMode === 'intro' ? { toastIntro: true } : {}),
             ...(opts?.textId
               ? {
@@ -174,6 +210,8 @@ export function useCompanionActions({
             message,
             anchor: settingsRef.current.toastAnchor,
             dwellSeconds,
+            ...(opts?.copyMeta ? { copyMeta: opts.copyMeta } : {}),
+            ...(opts?.forceRefresh ? { forceToastContentReload: true } : {}),
             ...(opts?.toastMode === 'intro' ? { toastIntro: true } : {}),
             ...(opts?.textId
               ? {
@@ -356,10 +394,35 @@ export function useCompanionActions({
     const isRegenerate =
       fetchOptions?.trigger === 'regenerate' ||
       keyword?.trim() === '换一句'
-    if (isRegenerate && shouldSkipRegenerateCopyRequest()) return
-    if (companionFetchBusyRef.current) return
+    if (!isRegenerate && companionFetchBusyRef.current) return
+    if (isRegenerate && regenerateInFlightRef.current) {
+      logCompanionRegenerate('widget regenerate skipped (in flight)')
+      return
+    }
+    if (isRegenerate) {
+      const locked = await window.sidekickDesktop?.getSpriteInteractionLocked?.()
+      if (locked) {
+        logCompanionRegenerate('widget regenerate skipped (locked)')
+        return
+      }
+      logCompanionRegenerate('widget requestCompanionText start', {
+        keyword,
+        replaceTargetLine: fetchOptions?.replaceTargetLine,
+        seed: fetchOptions?.seed,
+      })
+    }
     companionFetchBusyRef.current = true
+    if (isRegenerate) regenerateInFlightRef.current = true
     if (isRegenerate) markRegenerateCopyStarted()
+    let regenNotified = false
+    const finishRegenerateNotify = (message?: string) => {
+      if (!isRegenerate || regenNotified) return
+      regenNotified = true
+      markRegenerateCopyFinished()
+      window.sidekickDesktop?.notifyRegenerateCopyDone?.({
+        ...(message?.trim() ? { message: message.trim() } : {}),
+      })
+    }
     try {
       const fetchId = startCompanionCopyRequest()
       const trigger =
@@ -371,17 +434,47 @@ export function useCompanionActions({
             : keyword?.trim() === '类似这句'
               ? ('similar' as const)
               : ('manual' as const))
-      const avoid = [...recentCompanionLinesRef.current]
-      const currentToast = uiState.toastMessage.replace(/\s+/g, ' ').trim()
-      if (
-        trigger === 'regenerate' &&
-        currentToast &&
-        currentToast !== SIDEKICK_MORE_FEATURES_PLACEHOLDER &&
-        !avoid.includes(currentToast)
-      ) {
-        avoid.push(currentToast)
-      }
+      /** 独立气泡换句：主进程转发屏上句；否则用 lastShown / widget 状态。 */
+      const screenLineFromRequest = fetchOptions?.replaceTargetLine
+        ?.replace(/\s+/g, ' ')
+        .trim()
+      const currentToast = (
+        screenLineFromRequest ||
+        lastShownToastMessageRef.current ||
+        uiState.toastMessage ||
+        (isToastMode ? toastMessageFromQuery : '')
+      )
+        .replace(/\s+/g, ' ')
+        .trim()
+      const avoid = isRegenerate
+        ? buildRegenerateAvoidForPrompt({
+            ...(currentToast ? { screenLine: currentToast } : {}),
+            lastRegenerateOutputs: lastRegenerateModelOutputsRef.current,
+          })
+        : [...recentCompanionLinesRef.current]
       regenerateSeqRef.current += 1
+      const rewriteTarget =
+        currentToast &&
+        (trigger === 'regenerate' || trigger === 'similar') &&
+        currentToast !== SIDEKICK_MORE_FEATURES_PLACEHOLDER &&
+        !companionLineIsNonRewriteTarget(currentToast)
+          ? currentToast
+          : undefined
+      const regenSeed =
+        fetchOptions?.seed ??
+        (Date.now() ^
+          Math.floor(Math.random() * 1_000_000_000) ^
+          regenerateSeqRef.current * 1_048_583)
+      if (isRegenerate) {
+        logCompanionRegenerate('widget fetch params', {
+          fetchId,
+          currentToast,
+          avoid,
+          lastRegenerateOutputs: [...lastRegenerateModelOutputsRef.current],
+          seed: regenSeed,
+          companionInterests: settingsRef.current.companionInterests,
+        })
+      }
       const result = await fetchCompanionCopy(
         settingsRef.current,
         keyword,
@@ -391,39 +484,128 @@ export function useCompanionActions({
           ...fetchOptions,
           trigger,
           fetchKind: 'interactive',
-          maxQualityRetries: 0,
+          ...(isRegenerate && currentToast
+            ? { replaceTargetLine: currentToast }
+            : rewriteTarget
+              ? { replaceTargetLine: rewriteTarget }
+              : {}),
+          seed: regenSeed,
+        },
+      )
+      if (isRegenerate) {
+        logCompanionRegenerate('widget fetchCompanionCopy returned', {
+          fetchId,
+          source: result.source,
+          text: result.text,
+          skipped: result.skipped === true,
+        })
+      }
+      if (isRegenerate && result.skipped) {
+        finishRegenerateNotify()
+        return
+      }
+      await persistBailianAgentSessionId(settingsRef, result.sessionId)
+      if (!shouldApplyCompanionCopyResult(fetchId, result.source)) {
+        if (isRegenerate) {
+          logCompanionRegenerate('widget stale fetchId → discard (keep latest)', {
+            fetchId,
+            source: result.source,
+            text: result.text,
+          })
+        }
+        finishRegenerateNotify()
+        return
+      }
+      let displayText = result.text.trim()
+      if (!displayText && isRegenerate) {
+        displayText = pickCompanionRegenerateLineDistinct({
+          maxChars: settingsRef.current.textMaxChars,
+          style: settingsRef.current.textStyle,
+          ...(currentToast ? { mustDifferFrom: currentToast } : {}),
           seed:
             fetchOptions?.seed ??
             (Date.now() ^
               Math.floor(Math.random() * 1_000_000_000) ^
               regenerateSeqRef.current * 1_048_583),
-        },
-      )
-      await persistBailianAgentSessionId(settingsRef, result.sessionId)
-      if (!shouldApplyCompanionCopyResult(fetchId, result.source)) return
-      if (!result.text.trim()) return
+          ...(avoid.length ? { avoidRecent: avoid } : {}),
+        }).trim()
+      }
+      if (!displayText) {
+        finishRegenerateNotify()
+        return
+      }
+
+      if (isRegenerate) {
+        const trimmed = displayText.replace(/\s+/g, ' ').trim()
+        if (trimmed) {
+          lastRegenerateModelOutputsRef.current = [
+            ...lastRegenerateModelOutputsRef.current.filter((line) => line !== trimmed),
+            trimmed,
+          ].slice(-6)
+        }
+      }
+
+      if (
+        isRegenerate &&
+        currentToast &&
+        displayText.replace(/\s+/g, ' ').trim() === currentToast
+      ) {
+        for (let attempt = 0; attempt < 32; attempt++) {
+          displayText = pickCompanionRegenerateLineDistinct({
+            maxChars: settingsRef.current.textMaxChars,
+            style: settingsRef.current.textStyle,
+            mustDifferFrom: currentToast,
+            seed:
+              (fetchOptions?.seed ??
+                (Date.now() ^
+                  Math.floor(Math.random() * 1_000_000_000) ^
+                  regenerateSeqRef.current * 1_048_583)) +
+              attempt * 1_048_583,
+            ...(avoid.length ? { avoidRecent: avoid } : {}),
+          }).trim()
+          if (displayText.replace(/\s+/g, ' ').trim() !== currentToast) break
+        }
+      }
 
       const next = await appendText({
         id: `text-${Date.now()}`,
-        content: result.text,
+        content: displayText,
         createdAt: new Date().toISOString(),
         source: result.source,
         favorite: false,
       })
       const newId = next.texts.history[0]?.id
       await showToastMessage(
-        result.text,
-        newId ? { textId: newId, favorite: false } : undefined,
+        displayText,
+        newId
+          ? {
+              textId: newId,
+              favorite: false,
+              forceRefresh: isRegenerate,
+              copyMeta: {
+                trigger: isRegenerate ? 'regenerate' : (fetchOptions?.trigger ?? 'manual'),
+                source: result.source,
+              },
+            }
+          : {
+              forceRefresh: isRegenerate,
+              copyMeta: {
+                trigger: isRegenerate ? 'regenerate' : (fetchOptions?.trigger ?? 'manual'),
+                source: result.source,
+              },
+            },
       )
+      finishRegenerateNotify(displayText)
       recentCompanionLinesRef.current = [
         ...recentCompanionLinesRef.current,
-        result.text,
+        displayText,
       ].slice(-RECENT_COMPANION_LINES_MAX)
       setSpriteState('notify')
       window.setTimeout(() => setSpriteState('idle'), 520)
     } finally {
       companionFetchBusyRef.current = false
-      if (isRegenerate) markRegenerateCopyFinished()
+      if (isRegenerate) regenerateInFlightRef.current = false
+      finishRegenerateNotify()
     }
   }
 
@@ -466,9 +648,16 @@ export function useCompanionActions({
 
   useEffect(() => {
     if (!isWidgetMode) return
-    const unRegen = window.sidekickDesktop?.onRegenerateCopyRequested?.(() => {
-      void requestCompanionTextRef.current?.('换一句')
-    })
+    const unRegen = window.sidekickDesktop?.onRegenerateCopyRequested?.(
+      (payload) => {
+        void requestCompanionTextRef.current?.('换一句', undefined, {
+          trigger: 'regenerate',
+          ...(payload?.replaceTargetLine
+            ? { replaceTargetLine: payload.replaceTargetLine }
+            : {}),
+        })
+      },
+    )
     const unSimilar = window.sidekickDesktop?.onSimilarCopyRequested?.(() => {
       void requestCompanionSimilar()
     })

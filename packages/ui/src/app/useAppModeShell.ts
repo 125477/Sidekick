@@ -399,8 +399,14 @@ export function useAppModeShell({
 
   useEffect(() => {
     if (!isToastMode) return
-    void window.sidekickDesktop?.getSpriteInteractionLocked?.().then((v) => {
+    const d = window.sidekickDesktop
+    if (!d?.getSpriteInteractionLocked) return
+    void d.getSpriteInteractionLocked().then((v) => {
       if (typeof v === 'boolean') setSpriteInteractionLocked(v)
+    })
+    if (!d.onSpriteInteractionLocked) return
+    return d.onSpriteInteractionLocked((locked) => {
+      setSpriteInteractionLocked(locked)
     })
   }, [isToastMode, setSpriteInteractionLocked])
 

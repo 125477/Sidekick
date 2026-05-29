@@ -2,6 +2,7 @@ import { TOAST_WINDOW_WIDTH, TOAST_WINDOW_HEIGHT } from './constants.mjs'
 import { buildRoute, toastWebContentsUrlIsDetachedToastMode } from './route.mjs'
 import { state } from './state.mjs'
 import { stopToastPassthroughHitTest } from './toastPassthrough.mjs'
+import { scheduleToastAutoHide, pauseToastAutoHide } from './toastAutoHide.mjs'
 import { computeToastPlacement } from './toastPlacement.mjs'
 import { awaitWebContentsNavigationSettled } from './navigationWait.mjs'
 
@@ -76,10 +77,7 @@ export async function refreshDetachedToastAfterAnchorPreferenceChange() {
   }
   state.lastToastTailDown = effectiveAnchor === 'top'
 
-  if (state.toastTimerId) {
-    clearTimeout(state.toastTimerId)
-    state.toastTimerId = null
-  }
+  pauseToastAutoHide()
   const wasVisible = state.toastWindow.isVisible()
   const wc = state.toastWindow.webContents
   const placementPayload = {
@@ -130,15 +128,7 @@ export async function refreshDetachedToastAfterAnchorPreferenceChange() {
     state.toastWindow.showInactive()
   }
 
-  if (dwellSeconds > 0) {
-    state.toastTimerId = setTimeout(() => {
-      if (state.toastWindow && !state.toastWindow.isDestroyed()) {
-        stopToastPassthroughHitTest()
-        state.toastWindow.hide()
-      }
-      state.toastTimerId = null
-    }, dwellSeconds * 1000)
-  }
+  scheduleToastAutoHide(dwellSeconds)
 }
 
 async function runDetachedToastAnchorRefreshLoop() {

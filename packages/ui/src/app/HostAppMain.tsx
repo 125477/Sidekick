@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction, MutableRefObject, ReactNode } from 'react'
-import type { AvatarPreset } from '@sidekick/core'
+import type { FetchCompanionCopyOptions } from './companionCopy'
+import type { EmotionKind, AvatarPreset } from '@sidekick/core'
 import { toggleToastFavorite } from './toastFavoriteToggle'
 import { resolveCompanionQuoteBubbleVariant } from '../components/emotion/moodHistory/quoteBubbleSettings'
 import { SpriteMenu, type MenuAction } from '../components/menu/SpriteMenu'
@@ -22,7 +23,11 @@ export type HostAppMainProps = {
   spriteMenuSurface: 'sprite' | 'toast-bubble'
   setSpriteMenuSurface: Dispatch<SetStateAction<'sprite' | 'toast-bubble'>>
   setSpriteShellHovered: (v: boolean) => void
-  requestCompanionText: (keyword?: string) => Promise<void>
+  requestCompanionText: (
+    keyword?: string,
+    emotion?: EmotionKind,
+    fetchOptions?: FetchCompanionCopyOptions,
+  ) => Promise<void>
   requestCompanionSimilar: () => Promise<void>
   dispatch: Dispatch<UiAction>
   handleMenuAction: (action: MenuAction) => void
@@ -137,7 +142,12 @@ export function HostAppMain({
                     settings.quoteBubbleVariant,
                   )}
                   maxChars={settings.textMaxChars}
-                  onRegenerate={() => requestCompanionText('换一句')}
+                  onRegenerate={() =>
+                    requestCompanionText('换一句', undefined, {
+                      trigger: 'regenerate',
+                      replaceTargetLine: uiState.toastMessage,
+                    })
+                  }
                   onSimilar={() => requestCompanionSimilar()}
                   showLightFeedback
                   onClose={hideEmotionToast}

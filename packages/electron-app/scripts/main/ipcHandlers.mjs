@@ -21,6 +21,7 @@ import {
   applyToastWindowBounds,
   scheduleCoalescedDetachedToastAnchorRefresh,
 } from './detachedToast.mjs'
+import { pauseToastAutoHide, resumeToastAutoHide } from './toastAutoHide.mjs'
 import { persistWidgetBounds } from './widgetBounds.mjs'
 import {
   closeWidgetSpriteMenuWindow,
@@ -125,6 +126,23 @@ export function registerSidekickIpcHandlers() {
   ipcMain.handle('sidekick:show-toast', async (_event, payload) => {
     await showToastWindow(payload)
   })
+  ipcMain.handle('sidekick:sync-toast-display-settings', (_event, payload) => {
+    const always = payload?.toastAlwaysVisible === true
+    state.toastAlwaysVisiblePref = always
+    if (always) {
+      state.toastDisplayDwellSeconds = 0
+      return undefined
+    }
+    const raw = Number(payload?.dwellSeconds)
+    if (Number.isFinite(raw) && raw > 0) {
+      state.toastDisplayDwellSeconds = raw
+    }
+    return undefined
+  })
+  ipcMain.on('sidekick:companion-copy-log', (_event, payload) => {
+    const stage = payload?.stage ?? 'event'
+    console.warn(`[sidekick:companion-copy] ${stage}`, payload ?? {})
+  })
   ipcMain.handle('sidekick:set-toast-anchor-preference', async (_event, payload) => {
     const next = payload?.anchor === 'bottom' ? 'bottom' : 'top'
     const forceReplay = payload?.forceReplay === true
@@ -163,6 +181,19 @@ export function registerSidekickIpcHandlers() {
         state.lastSpriteInteractionLocked,
       )
       applyWidgetWindowSpritePassthrough(state.lastSpriteInteractionLocked)
+    }
+    if (state.toastWindow && !state.toastWindow.isDestroyed()) {
+      state.toastWindow.webContents.send(
+        'sidekick:sprite-interaction-locked',
+        state.lastSpriteInteractionLocked,
+      )
+    }
+    if (state.toastWindow && !state.toastWindow.isDestroyed() && state.toastWindow.isVisible()) {
+      if (state.lastSpriteInteractionLocked) {
+        pauseToastAutoHide()
+      } else if (state.lastToastSession) {
+        resumeToastAutoHide()
+      }
     }
     return undefined
   })
@@ -372,13 +403,60 @@ export function registerSidekickIpcHandlers() {
   })
   let lastToastRegenerateAt = 0
   let lastToastSimilarAt = 0
-  const TOAST_COPY_ACTION_DEBOUNCE_MS = 2500
-  ipcMain.on('sidekick:toast-regenerate-request', () => {
+  /** 与 UI 层 companionCopy 去重；此处仅挡连点，不宜过长否则气泡在 loading 但 widget 未收到请求。 */
+  const TOAST_COPY_ACTION_DEBOUNCE_MS = 600
+  const REGENERATE_INVOKE_TIMEOUT_MS = 30_000
+  /** @type {((result: { ok: boolean; reason?: string; message?: string }) => void) | null} */
+  let resolveRegenerateCopyInvoke = null
+
+  ipcMain.handle('sidekick:toast-regenerate-request', async (_event, payload) => {
     const now = Date.now()
-    if (now - lastToastRegenerateAt < TOAST_COPY_ACTION_DEBOUNCE_MS) return
+    if (now - lastToastRegenerateAt < TOAST_COPY_ACTION_DEBOUNCE_MS) {
+      return { ok: false, reason: 'debounced' }
+    }
+    if (state.lastSpriteInteractionLocked) {
+      return { ok: false, reason: 'locked' }
+    }
     lastToastRegenerateAt = now
-    if (!state.spriteWindow || state.spriteWindow.isDestroyed()) return
-    state.spriteWindow.webContents.send('sidekick:regenerate-copy')
+    if (!state.spriteWindow || state.spriteWindow.isDestroyed()) {
+      return { ok: false, reason: 'no-widget' }
+    }
+    if (resolveRegenerateCopyInvoke) {
+      return { ok: false, reason: 'busy' }
+    }
+    const fromToast =
+      typeof payload?.line === 'string' ? payload.line.trim() : ''
+    const fromSession = state.lastToastSession?.message?.trim() ?? ''
+    const replaceTargetLine = fromToast || fromSession
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        if (resolveRegenerateCopyInvoke === resolve) {
+          resolveRegenerateCopyInvoke = null
+          console.warn('[sidekick:regenerate] main IPC timeout 30s', {
+            replaceTargetLine: replaceTargetLine.slice(0, 80),
+          })
+          resolve({ ok: false, reason: 'timeout' })
+        }
+      }, REGENERATE_INVOKE_TIMEOUT_MS)
+      resolveRegenerateCopyInvoke = (result) => {
+        clearTimeout(timeout)
+        resolveRegenerateCopyInvoke = null
+        resolve(result)
+      }
+      state.spriteWindow.webContents.send('sidekick:regenerate-copy', {
+        ...(replaceTargetLine ? { replaceTargetLine } : {}),
+      })
+    })
+  })
+  ipcMain.on('sidekick:regenerate-copy-done', (_event, payload) => {
+    const message =
+      typeof payload?.message === 'string' ? payload.message.trim() : ''
+    if (typeof resolveRegenerateCopyInvoke === 'function') {
+      resolveRegenerateCopyInvoke({
+        ok: true,
+        ...(message ? { message } : {}),
+      })
+    }
   })
   ipcMain.on('sidekick:toast-similar-request', () => {
     const now = Date.now()

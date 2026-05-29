@@ -10,6 +10,8 @@ import {
   type AvatarPreset,
   type EmotionKind,
   type EmotionRecord,
+  logCompanionRegenerate,
+  stripCompanionLineCornerQuotes,
 } from '@sidekick/core'
 import { DEFAULT_AVATARS } from './assets/defaultAvatars'
 import { OnboardingWizard } from './components/onboarding/OnboardingWizard'
@@ -36,6 +38,10 @@ import { readAppSearchParams } from './app/readAppSearchParams'
 import { AppPanelContent } from './app/AppPanelContent'
 import { WidgetSpriteLayer } from './app/WidgetSpriteLayer'
 import { DetachedToastShell } from './app/DetachedToastShell'
+import {
+  installDetachedToastContentBridge,
+  subscribeDetachedToastContent,
+} from './app/detachedToastContentBridge'
 import { FortuneWidgetModal } from './app/FortuneWidgetModal'
 import { HostAppMain } from './app/HostAppMain'
 import { DragTrailOverlayPage } from './app/DragTrailOverlayPage'
@@ -55,7 +61,12 @@ function App() {
   const companionBootstrapDoneRef = useRef(false)
   const pushCopyToastSuccessCountRef = useRef(0)
   const requestCompanionTextRef = useRef<
-    ((keyword?: string, emotion?: EmotionKind) => Promise<void>) | undefined
+    | ((
+        keyword?: string,
+        emotion?: EmotionKind,
+        fetchOptions?: import('./app/companionCopy').FetchCompanionCopyOptions,
+      ) => Promise<void>)
+    | undefined
   >(undefined)
   const toastShellRef = useRef<HTMLDivElement>(null)
   const widgetMeasureRef = useRef<HTMLDivElement>(null)
@@ -191,6 +202,9 @@ function App() {
   const [detachedToastLiveFavorite, setDetachedToastLiveFavorite] = useState<
     boolean | null
   >(null)
+  const [detachedToastContentRevision, setDetachedToastContentRevision] =
+    useState(0)
+  const detachedToastBridgeInstalledRef = useRef(false)
   const toastDetachAnchor = detachPlacementFromMain?.anchor ?? toastAnchorFromQuery
   const toastDetachBubblePlacement =
     detachPlacementFromMain?.placement ?? toastBubblePlacement
@@ -214,6 +228,10 @@ function App() {
   const runsScheduledPush = isWidgetMode
   const [toastDetachFavorite, setToastDetachFavorite] =
     useState(toastFavoriteFromUrl)
+  const handleDetachedToastFavoriteChange = useCallback((favorite: boolean) => {
+    setToastDetachFavorite(favorite)
+    setDetachedToastLiveFavorite(favorite)
+  }, [])
   const spriteAvatarSize = settings.avatarSize
   const menuOpen = uiState.menuState === 'opening' || uiState.menuState === 'open'
   const menuExpandedForToggle = uiState.menuState !== 'closed'
@@ -497,24 +515,50 @@ function App() {
 
   useEffect(() => {
     if (!isToastMode) return
-    const unsub = window.sidekickDesktop?.onDetachedToastContentSync?.(
-      (payload) => {
-        setDetachedToastLiveMessage(payload.message)
-        if (payload.textId !== undefined) {
-          setDetachedToastLiveTextId(payload.textId ?? null)
-        }
-        if (payload.favorite !== undefined) {
-          setDetachedToastLiveFavorite(payload.favorite)
-        }
-      },
-    )
-    return () => {
-      unsub?.()
+    const initial = toastMessageFromQuery.trim()
+    if (!initial) return
+    setDetachedToastLiveMessage((prev) => (prev.trim() ? prev : initial))
+  }, [isToastMode, toastMessageFromQuery])
+
+  useEffect(() => {
+    if (!isToastMode) return
+    if (!detachedToastBridgeInstalledRef.current) {
+      installDetachedToastContentBridge()
+      detachedToastBridgeInstalledRef.current = true
     }
+    return subscribeDetachedToastContent((payload) => {
+      const next = payload.message.trim()
+      if (!next) return
+      logCompanionRegenerate('toast window content sync', {
+        message: next,
+        contentRevision: payload.contentRevision,
+        textId: payload.textId,
+      })
+      setDetachedToastLiveMessage(stripCompanionLineCornerQuotes(next))
+      if (typeof payload.contentRevision === 'number') {
+        setDetachedToastContentRevision(payload.contentRevision)
+      }
+      try {
+        const url = new URL(window.location.href)
+        if (url.searchParams.get('message') !== next) {
+          url.searchParams.set('message', next)
+          window.history.replaceState(null, '', url.toString())
+        }
+      } catch {
+        // ignore invalid URL in dev
+      }
+      if (payload.textId !== undefined) {
+        setDetachedToastLiveTextId(payload.textId ?? null)
+      }
+      if (payload.favorite !== undefined) {
+        setDetachedToastLiveFavorite(payload.favorite)
+      }
+    })
   }, [isToastMode])
 
-  const detachedToastDisplayMessage =
-    detachedToastLiveMessage.trim() || toastMessageFromQuery
+  const detachedToastDisplayMessage = stripCompanionLineCornerQuotes(
+    detachedToastLiveMessage.trim() || toastMessageFromQuery,
+  )
   const detachedToastDisplayTextId =
     detachedToastLiveTextId ?? toastTextIdFromQuery
 
@@ -539,6 +583,7 @@ function App() {
         toastDetachAnchor={toastDetachAnchor}
         toastDetachBubblePlacement={toastDetachBubblePlacement}
         toastMessageFromQuery={detachedToastDisplayMessage}
+        toastContentRevision={detachedToastContentRevision}
         toastIntroFromQuery={toastIntroFromQuery}
         toastAutoTtsFromQuery={toastAutoTtsFromQuery}
         settings={settings}
@@ -547,7 +592,7 @@ function App() {
         toastDetachFavorite={
           detachedToastLiveFavorite ?? toastDetachFavorite
         }
-        setToastDetachFavorite={setToastDetachFavorite}
+        setToastDetachFavorite={handleDetachedToastFavoriteChange}
         openEmotionFromToast={openEmotionFromToast}
         openSettingsFromToast={openSettingsFromToast}
         openSkinFromToast={openSkinFromToast}

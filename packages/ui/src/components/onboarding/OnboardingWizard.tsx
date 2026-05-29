@@ -20,6 +20,9 @@ const STYLE_OPTIONS: CompanionCopyStyle[] = [
   '助眠',
   '职场解压',
   '抽象',
+  '鸡汤',
+  '沙雕',
+  '高冷',
 ]
 
 const INTEREST_PRESETS = COMPANION_INTEREST_TAG_OPTIONS

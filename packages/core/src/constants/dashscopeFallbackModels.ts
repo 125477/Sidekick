@@ -3,7 +3,7 @@
  *
  * 1. `VITE_DASHSCOPE_MODEL`（默认 qwen-turbo）
  * 2. `VITE_DASHSCOPE_MODEL_FALLBACK`（可选，逗号分隔）
- * 3. **GET /compatible-mode/v1/models**（有 Key 时拉取全部 model id，缓存 10 分钟）
+ * 3. **GET /compatible-mode/v1/models**（内置候选均失败后拉取，缓存 10 分钟；换句 `quickModelFallbackOnly` 亦走此步）
  *    - 接口**不返回**各模型剩余免费 Token，无法只拉「还有额度」的列表
  *    - 响应 JSON 含非空 error、429/403/400、internal_error/5xx 时自动换下一个
  *    - 失败的 model 记入本地缓存（Electron：userData/dashscope-unavailable-models.json；浏览器：localStorage）
@@ -17,6 +17,12 @@ export const DASHSCOPE_CHAT_FALLBACK_MODELS: readonly string[] = [
   'qwen-plus',
   'qwen-max',
 ]
+
+/** 单次陪伴文案请求最多轮换的 model 数（含 quick + /v1/models 扩充），避免换句卡几十秒。 */
+export const DASHSCOPE_MAX_MODEL_ATTEMPTS_PER_CALL = 12
+
+/** 换句：仅快速候选，上限更低，与浏览器单次命中行为接近。 */
+export const DASHSCOPE_REGENERATE_MAX_MODEL_ATTEMPTS = 4
 
 /** 从 OpenAI 兼容 /v1/models 结果中筛出可能支持 chat/completions 的 model id。 */
 export function filterLikelyChatModelIds(ids: string[]): string[] {

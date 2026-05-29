@@ -80,6 +80,7 @@ export function useEmotionToastChrome({
   const [regenerating, setRegenerating] = useState(false)
   const [copyDone, setCopyDone] = useState(false)
   const regenerateBusyRef = useRef(false)
+  const regenerateBaselineMessageRef = useRef('')
   const copyResetTimerRef = useRef<number | null>(null)
   const toastUnlockHitRef = useRef<HTMLDivElement>(null)
   const toastHitRootRef = useRef<HTMLDivElement>(null)
@@ -103,7 +104,16 @@ export function useEmotionToastChrome({
 
   useEffect(() => {
     if (!keepRegenerateLoadingUntilUnmount || !regenerating) return
-    const id = window.setTimeout(() => setRegenerating(false), 90_000)
+    const baseline = regenerateBaselineMessageRef.current.replace(/\s+/g, ' ').trim()
+    const current = message.replace(/\s+/g, ' ').trim()
+    if (current && current !== baseline) {
+      setRegenerating(false)
+    }
+  }, [message, keepRegenerateLoadingUntilUnmount, regenerating])
+
+  useEffect(() => {
+    if (!keepRegenerateLoadingUntilUnmount || !regenerating) return
+    const id = window.setTimeout(() => setRegenerating(false), 20_000)
     return () => window.clearTimeout(id)
   }, [keepRegenerateLoadingUntilUnmount, regenerating])
 
@@ -116,6 +126,7 @@ export function useEmotionToastChrome({
   const regenInToolbar = !introMode && Boolean(onRegenerate)
   const messageClickable =
     !introMode &&
+    !spriteInteractionLocked &&
     Boolean(onRegenerate && messageRegeneratesOnClick !== false)
   const showCopy = !introMode && Boolean(onCopy && message.trim())
   const showFavorite = !introMode && Boolean(onToggleFavorite)
@@ -375,13 +386,23 @@ export function useEmotionToastChrome({
   const runRegenerate = async () => {
     if (regenerateBusyRef.current) return
     regenerateBusyRef.current = true
+    regenerateBaselineMessageRef.current = message
+    const started = Date.now()
     setRegenerating(true)
     try {
-      await Promise.resolve(onRegenerate?.())
+      await onRegenerate?.()
     } finally {
       regenerateBusyRef.current = false
-      if (!keepRegenerateLoadingUntilUnmount) {
-        setRegenerating(false)
+      const clearLoading = () => {
+        if (!keepRegenerateLoadingUntilUnmount) {
+          setRegenerating(false)
+        }
+      }
+      const elapsed = Date.now() - started
+      if (!keepRegenerateLoadingUntilUnmount && elapsed < 280) {
+        window.setTimeout(clearLoading, 280 - elapsed)
+      } else if (!keepRegenerateLoadingUntilUnmount) {
+        clearLoading()
       }
     }
   }

@@ -49,6 +49,43 @@ function extractAgentError(payload: AgentCompletionResponse, status: number): st
   return code ? `${code}: ${msg}` : msg
 }
 
+function agentTopLevelErrorCode(payload: AgentCompletionResponse): string | null {
+  const code = typeof payload.code === 'string' ? payload.code.trim() : ''
+  if (!code) return null
+  const lower = code.toLowerCase()
+  if (lower === 'success' || lower === 'ok') return null
+  return code
+}
+
+/** 百炼 Agent API 传输层失败（应回退 chat/completions 轮换 model，勿落本地句库）。 */
+export function isBailianAgentApiFailure(err: unknown): boolean {
+  if (!(err instanceof Error)) return false
+  const msg = err.message.trim()
+  if (!msg) return false
+  if (
+    msg === 'empty agent line' ||
+    msg === 'mixed language agent line' ||
+    msg === 'agent meta clarification' ||
+    msg === 'empty text'
+  ) {
+    return false
+  }
+  const lower = msg.toLowerCase()
+  return (
+    lower.startsWith('internalerror') ||
+    lower.includes('internal error') ||
+    lower.includes('internalerror:') ||
+    lower.includes('missing dashscope') ||
+    lower.includes('missing bailian') ||
+    lower.includes('http 5') ||
+    lower.includes('http 4') ||
+    lower.includes('throttl') ||
+    lower.includes('flowcontrol') ||
+    lower.includes('quota') ||
+    lower.includes('service unavailable')
+  )
+}
+
 /**
  * 调用百炼智能体应用 completion（非 chat/completions）。
  * @see https://help.aliyun.com/zh/model-studio/new-agent-application-api-reference
@@ -101,6 +138,9 @@ async function requestDashScopeAgentCompletionOnce(
   const raw = await res.text()
   const payload = parseAgentBody(raw)
   if (!res.ok) {
+    throw new Error(extractAgentError(payload, res.status))
+  }
+  if (agentTopLevelErrorCode(payload) != null) {
     throw new Error(extractAgentError(payload, res.status))
   }
 
