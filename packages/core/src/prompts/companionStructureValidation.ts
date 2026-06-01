@@ -251,6 +251,28 @@ export function companionTextHasPoeticTimeMelodyCliche(text: string): boolean {
   return false
 }
 
+/** 「愿你如月光洒落…」类祝福/祝愿散文套句（定时推送 chat 回退高频）。 */
+export function companionTextHasBlessingWishCliche(text: string): boolean {
+  const t = text.trim()
+  if (!t) return false
+  if (/^愿你/.test(t)) return true
+  if (/愿你如/.test(t)) return true
+  if (/如.{0,12}(月光|清泉|山间|星辰|春风|阳光|雪花|微风)/.test(t)) {
+    if (/(洒落|流淌|照亮|温柔|洗净|陪伴)/.test(t)) return true
+  }
+  if (/潺潺流淌|洗净尘世|温柔照亮|照亮每一|洒落湖面/.test(t)) return true
+  if (/洒落.{0,8}(湖面|人间|世界|角落|旅程)/.test(t)) return true
+  return false
+}
+
+export function buildBlessingWishRetryUserSuffix(): string {
+  return [
+    '【硬约束·重写】上一句是「愿你如…/洒落/照亮」式祝福散文套句。',
+    '改写成口语桌面短句：对你写许可或短判断（你/可以/今天/不必）；禁止愿你/如月光/如清泉/洒落/洗净/温柔照亮。',
+    '若用户选了兴趣，须写可念出的歌词/台词/金句，禁止祝福套句。',
+  ].join('')
+}
+
 /** 输出时段词与本地时刻明显不符（如上午仍写午后）。 */
 export function companionTextHasMismatchedPeriodWord(
   text: string,
@@ -437,6 +459,7 @@ export function companionTextViolatesBannedStructure(
   if (companionTextHasInterestProseMetaphorTemplate(t)) return true
   if (companionTextHasPoeticTimeMelodyCliche(t)) return true
   if (companionTextHasSceneryMoodCliche(t)) return true
+  if (companionTextHasBlessingWishCliche(t)) return true
   if (companionTextHasLiterarySensoryCliche(t)) return true
   if (companionTextHasLiteraryPermissionCliche(t)) return true
   if (companionTextIsAgentMetaClarification(t)) return true

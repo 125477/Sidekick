@@ -11,7 +11,7 @@ import {
 } from './emotionChips'
 
 export function EmotionQuickFeedback({ onSelect }: EmotionQuickFeedbackProps) {
-  const [selected, setSelected] = useState<string>('开心')
+  const [selected, setSelected] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [hint, setHint] = useState<string | null>(null)
   const hintTimerRef = useRef<number | null>(null)
@@ -41,7 +41,7 @@ export function EmotionQuickFeedback({ onSelect }: EmotionQuickFeedbackProps) {
         hintTimerRef.current = null
       }, 4500)
     } catch {
-      setSelected('开心')
+      setSelected(null)
       setHint('记录失败，请稍后再试。')
       hintTimerRef.current = window.setTimeout(() => {
         setHint(null)

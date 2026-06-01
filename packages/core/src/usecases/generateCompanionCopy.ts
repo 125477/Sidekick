@@ -45,6 +45,7 @@ export type GenerateCompanionCopyInput = {
   avoidRecentOutputs?: string[]
   invokeDashScope?: (input: DashScopeTextRequest) => Promise<string>
   modelFallbackEnv?: string
+  modelIgnoreEnv?: string
   chatCompletionsUrl?: string
   companionInterests?: string[]
   companionLightFeedbackHints?: string[]
@@ -206,14 +207,8 @@ export async function generateCompanionCopy(
       model: input.model,
       systemPrompt,
       userPrompt: userPromptLine,
-      ...(isRegenerateChat
-        ? {
-            quickModelFallbackOnly: true,
-            regenerateChatNoExpand: true,
-            ...(regenTemperature !== undefined
-              ? { temperature: regenTemperature }
-              : {}),
-          }
+      ...(isRegenerateChat && regenTemperature !== undefined
+        ? { temperature: regenTemperature }
         : {}),
       ...(input.chatCompletionsUrl !== undefined
         ? { chatCompletionsUrl: input.chatCompletionsUrl }
@@ -242,9 +237,12 @@ export async function generateCompanionCopy(
         raw = await input.invokeDashScope(req)
       } else {
         const res = await requestDashScopeTextWithFallback(req, {
-          fetchRemoteModelList: false,
+          ...(isRegenerateChat ? {} : { fetchRemoteModelList: false }),
           ...(input.modelFallbackEnv
             ? { envFallbackList: input.modelFallbackEnv }
+            : {}),
+          ...(input.modelIgnoreEnv
+            ? { modelIgnoreEnv: input.modelIgnoreEnv }
             : {}),
         })
         raw = res.content
@@ -298,7 +296,7 @@ export async function generateCompanionCopy(
     ) {
       try {
         line = await requestModelLine(
-          `${userPrompt}\n【硬约束·重写】用户选了兴趣标签，须写一句可念出的歌词/影视台词/书本金句；禁止散文套句（在这/片刻/灵魂/安宁/栖息/宁静/静谧）。`,
+          `${userPrompt}\n【硬约束·重写】用户选了兴趣标签，须写一句可念出的歌词/影视台词/书本金句；禁止散文套句（在这/片刻/灵魂/安宁/愿你/如月光洒落/温柔照亮）。`,
         )
       } catch {
         /* keep line */
@@ -320,8 +318,22 @@ export async function generateCompanionCopy(
       throw new Error('empty companion copy')
     }
     if (companionCopyStillBanned(line, qualityCtx)) {
-      if (typeof console !== 'undefined' && console.warn) {
-        console.warn('[sidekick] 陪伴句质检未过，仍上屏模型产出', line)
+      const { tags: interestTags } = parseCompanionInterestTags(input.companionInterests)
+      if (companionInterestTagsRequireQuote(interestTags)) {
+        line = pickCompanionInterestRegenerateLine({
+          interestTags,
+          maxChars: input.maxChars,
+          style: effectiveStyle,
+          ...(input.seed !== undefined ? { seed: input.seed } : {}),
+          ...(input.avoidRecentOutputs?.length
+            ? { avoidRecent: input.avoidRecentOutputs }
+            : {}),
+        })
+      } else {
+        line = pickRegeneratePoolLine()
+      }
+      if (companionCopyStillBanned(line, qualityCtx)) {
+        throw new Error('companion copy still matches banned template')
       }
     }
     return line

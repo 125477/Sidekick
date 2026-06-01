@@ -66,9 +66,8 @@ type DashScopeChatPayload = {
   chatCompletionsUrl?: string
   /** 逗号分隔的额外 model 候选（VITE_DASHSCOPE_MODEL_FALLBACK）。 */
   modelFallbackEnv?: string
-  /** 换句：不拉 /v1/models，最多 4 个快速候选。 */
-  regenerateChatNoExpand?: boolean
-  quickModelFallbackOnly?: boolean
+  /** 逗号分隔的忽略 model（VITE_DASHSCOPE_MODEL_IGNORE）。 */
+  modelIgnoreEnv?: string
   /** 主进程日志：文案触发场景 */
   copyTrigger?: string
 }

@@ -3,7 +3,9 @@
  *
  * 1. `VITE_DASHSCOPE_MODEL`（默认 qwen-turbo）
  * 2. `VITE_DASHSCOPE_MODEL_FALLBACK`（可选，逗号分隔）
- * 3. **GET /compatible-mode/v1/models**（内置候选均失败后拉取，缓存 10 分钟；换句 `quickModelFallbackOnly` 亦走此步）
+ * 3. **上次成功的 model**（持久化本地，下次排在最前）
+ * 4. **GET /compatible-mode/v1/models**（内置候选均失败后；**首次拉取后持久化本地**）
+ *    - 模型列表缓存：Electron `userData/dashscope-model-list-cache.json`；浏览器 `localStorage`
  *    - 接口**不返回**各模型剩余免费 Token，无法只拉「还有额度」的列表
  *    - 响应 JSON 含非空 error、429/403/400、internal_error/5xx 时自动换下一个
  *    - 失败的 model 记入本地缓存（Electron：userData/dashscope-unavailable-models.json；浏览器：localStorage）
@@ -11,6 +13,8 @@
  * 4. 下方 `DASHSCOPE_CHAT_FALLBACK_MODELS` —— 仅当 /v1/models 失败时的离线兜底
  *
  * 若只要尝试控制台里仍有额度的模型，请把 id 写入 `VITE_DASHSCOPE_MODEL_FALLBACK`（逗号分隔，会排在最前）。
+ *
+ * `VITE_DASHSCOPE_MODEL_IGNORE`（逗号分隔）：轮换时跳过指定 model（含 `qwen3.7-max` 匹配 `qwen3.7-max-2026-05-17`）。
  */
 export const DASHSCOPE_CHAT_FALLBACK_MODELS: readonly string[] = [
   'qwen-turbo',
@@ -18,11 +22,8 @@ export const DASHSCOPE_CHAT_FALLBACK_MODELS: readonly string[] = [
   'qwen-max',
 ]
 
-/** 单次陪伴文案请求最多轮换的 model 数（含 quick + /v1/models 扩充），避免换句卡几十秒。 */
+/** 内置快速候选（primary + env + static）最多轮换数；/v1/models 扩充后不设上限。 */
 export const DASHSCOPE_MAX_MODEL_ATTEMPTS_PER_CALL = 12
-
-/** 换句：仅快速候选，上限更低，与浏览器单次命中行为接近。 */
-export const DASHSCOPE_REGENERATE_MAX_MODEL_ATTEMPTS = 4
 
 /** 从 OpenAI 兼容 /v1/models 结果中筛出可能支持 chat/completions 的 model id。 */
 export function filterLikelyChatModelIds(ids: string[]): string[] {
@@ -60,12 +61,45 @@ export function parseExtraFallbackModelsFromEnv(
     .filter(Boolean)
 }
 
+/** 与 `VITE_DASHSCOPE_MODEL_IGNORE` 联用；逗号 / 分号 / 空白分隔。 */
+export function parseDashScopeModelIgnoreFromEnv(
+  raw: string | undefined,
+): string[] {
+  return parseExtraFallbackModelsFromEnv(raw)
+}
+
+/** 精确匹配，或 model id 为 `token-…` 后缀变体（如 `qwen3.7-max-2026-05-17`）。 */
+export function isDashScopeModelIgnored(
+  modelId: string,
+  ignoreList: readonly string[],
+): boolean {
+  const id = modelId.trim()
+  if (!id || ignoreList.length === 0) return false
+  const lower = id.toLowerCase()
+  for (const raw of ignoreList) {
+    const token = raw.trim().toLowerCase()
+    if (!token) continue
+    if (lower === token || lower.startsWith(`${token}-`)) return true
+  }
+  return false
+}
+
+export function filterIgnoredDashScopeModels(
+  modelIds: string[],
+  ignoreList: readonly string[],
+): string[] {
+  if (ignoreList.length === 0) return modelIds
+  return modelIds.filter((id) => !isDashScopeModelIgnored(id, ignoreList))
+}
+
 export function buildDashScopeModelTryOrder(
   primary: string | undefined,
   extras: {
     fetched?: string[]
     envList?: string[]
     staticList?: readonly string[]
+    /** 上次成功 model，排在 primary 之前优先尝试。 */
+    preferredModel?: string
   } = {},
 ): string[] {
   const staticList = extras.staticList ?? DASHSCOPE_CHAT_FALLBACK_MODELS
@@ -77,6 +111,7 @@ export function buildDashScopeModelTryOrder(
     seen.add(m)
     order.push(m)
   }
+  push(extras.preferredModel)
   push(primary)
   for (const id of extras.envList ?? []) push(id)
   for (const id of extras.fetched ?? []) push(id)

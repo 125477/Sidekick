@@ -12,6 +12,7 @@ import {
   logCompanionCopy,
   parseCompanionInterestTags,
   pickCompanionRegenerateLineDistinct,
+  pickCompanionInterestRegenerateLine,
   pickCompanionTriggerFallback,
   sanitizeRecentCompanionLinesForPrompt,
   type CompanionCopyTrigger,
@@ -254,6 +255,61 @@ export async function fetchCompanionCopy(
   return execute()
 }
 
+function pickPushCopyFallback(
+  settings: SidekickSettings,
+  trigger: CompanionCopyTrigger,
+  emotion: EmotionKind | undefined,
+  sanitizedAvoid: string[],
+  generationSeed: number,
+): string {
+  const style =
+    emotion != null ? companionStyleForEmotion(emotion) : settings.textStyle
+  const { tags: interestTags } = parseCompanionInterestTags(
+    settings.companionInterests,
+  )
+  if (companionInterestTagsRequireQuote(interestTags)) {
+    return pickCompanionInterestRegenerateLine({
+      interestTags,
+      maxChars: settings.textMaxChars,
+      style,
+      seed: generationSeed,
+      ...(sanitizedAvoid.length ? { avoidRecent: sanitizedAvoid } : {}),
+    })
+  }
+  return pickCompanionTriggerFallback(trigger, {
+    maxChars: settings.textMaxChars,
+    seed: generationSeed,
+    ...(sanitizedAvoid.length ? { avoidRecent: sanitizedAvoid } : {}),
+  })
+}
+
+function pushCompanionLineRejected(
+  text: string,
+  settings: SidekickSettings,
+  emotion: EmotionKind | undefined,
+  sanitizedAvoid: string[],
+): boolean {
+  const style =
+    emotion != null ? companionStyleForEmotion(emotion) : settings.textStyle
+  const gateCtx = {
+    style,
+    maxChars: settings.textMaxChars,
+    avoidRecent: sanitizedAvoid,
+    now: new Date(),
+  }
+  const { tags: interestTags } = parseCompanionInterestTags(
+    settings.companionInterests,
+  )
+  if (companionAgentLineStructurallyRejected(text, gateCtx)) return true
+  if (
+    companionInterestTagsRequireQuote(interestTags) &&
+    companionRegenerateLineFailsInterestQuoteMode(text)
+  ) {
+    return true
+  }
+  return companionAgentLineRejected(text, gateCtx)
+}
+
 async function fetchCompanionCopyInner(
   settings: SidekickSettings,
   keyword?: string,
@@ -486,6 +542,9 @@ async function fetchCompanionCopyInner(
   const modelFallbackEnv = import.meta.env.VITE_DASHSCOPE_MODEL_FALLBACK as
     | string
     | undefined
+  const modelIgnoreEnv = import.meta.env.VITE_DASHSCOPE_MODEL_IGNORE as
+    | string
+    | undefined
 
   const chatMaxQualityRetries = resolveMaxQualityRetries(
     trigger,
@@ -498,6 +557,7 @@ async function fetchCompanionCopyInner(
       (import.meta.env.VITE_DASHSCOPE_MODEL as string | undefined) ??
       'qwen-turbo',
     ...(modelFallbackEnv !== undefined ? { modelFallbackEnv } : {}),
+    ...(modelIgnoreEnv !== undefined ? { modelIgnoreEnv } : {}),
     keyword,
     ...common,
     ...(chatMaxQualityRetries !== undefined
@@ -513,6 +573,7 @@ async function fetchCompanionCopyInner(
               ...req,
               copyTrigger: trigger,
               ...(modelFallbackEnv !== undefined ? { modelFallbackEnv } : {}),
+              ...(modelIgnoreEnv !== undefined ? { modelIgnoreEnv } : {}),
             }),
         }
       : {}),
@@ -521,6 +582,31 @@ async function fetchCompanionCopyInner(
 
   const chatText = chatResult.text.trim()
   if (chatText) {
+    if (
+      fetchKind !== 'interactive' &&
+      pushCompanionLineRejected(chatText, settings, emotion, sanitizedAvoid)
+    ) {
+      const fallbackText = trimFallbackLine(
+        pickPushCopyFallback(
+          settings,
+          trigger,
+          emotion,
+          sanitizedAvoid,
+          generationSeed,
+        ),
+        settings.textMaxChars,
+      )
+      logCompanionCopy('fetch done (push fallback after chat reject)', {
+        trigger,
+        fetchKind,
+        rejected: chatText.slice(0, 48),
+        text: fallbackText.slice(0, 120),
+      })
+      return {
+        text: fallbackText,
+        source: 'fallback',
+      }
+    }
     return chatResult
   }
 

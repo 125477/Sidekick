@@ -7,6 +7,14 @@ import {
   markDashScopeModelUnavailable,
   prepareDashScopeModelTryOrder,
 } from './dashscopeUnavailableModels.mjs'
+import {
+  getCachedDashScopeModelList,
+  saveDashScopeModelListCache,
+} from './dashscopeModelListCache.mjs'
+import {
+  getDashScopePreferredModel,
+  saveDashScopePreferredModel,
+} from './dashscopePreferredModel.mjs'
 
 const DEFAULT_COMPLETIONS_URL =
   'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
@@ -14,10 +22,10 @@ const DEFAULT_COMPLETIONS_URL =
 /** 仅 /v1/models 拉取失败时使用；正常情况用接口返回的 100+ 模型。 */
 const STATIC_FALLBACK = ['qwen-turbo', 'qwen-plus', 'qwen-max']
 
-/** 单次 completion 最多尝试的 model 数（quick + 扩充列表合计）。 */
-const MAX_MODEL_ATTEMPTS_PER_CALL = 12
-/** 换句：仅快速候选，不拉 /v1/models（与 core dashscopeTextClient 一致）。 */
-const REGENERATE_MAX_MODEL_ATTEMPTS = 4
+/** 内置快速候选最多尝试数；/v1/models 扩充列表不设上限。 */
+const MAX_QUICK_MODEL_ATTEMPTS = 12
+/** /v1/models 扩充后尝试全部 chat 模型（不设单次上限）。 */
+const MAX_EXPANDED_MODEL_ATTEMPTS = Number.POSITIVE_INFINITY
 
 let cachedModelIds = null
 let cachedAt = 0
@@ -167,7 +175,7 @@ function filterChatIds(ids) {
   return out
 }
 
-function buildTryOrder(primary, fetched, envList) {
+function buildTryOrder(primary, fetched, envList, preferredModel) {
   const order = []
   const seen = new Set()
   const push = (id) => {
@@ -176,6 +184,7 @@ function buildTryOrder(primary, fetched, envList) {
     seen.add(m)
     order.push(m)
   }
+  push(preferredModel)
   push(primary)
   for (const id of envList ?? []) push(id)
   for (const id of fetched ?? []) push(id)
@@ -183,7 +192,7 @@ function buildTryOrder(primary, fetched, envList) {
   return order
 }
 
-function parseEnvFallback(raw) {
+function parseEnvList(raw) {
   if (!raw?.trim()) return []
   return raw
     .split(/[,;\s]+/)
@@ -191,13 +200,50 @@ function parseEnvFallback(raw) {
     .filter(Boolean)
 }
 
-export async function listDashScopeChatModels(apiKey, chatCompletionsUrl) {
-  const key = String(apiKey ?? '').trim()
-  if (!key) return []
+function parseEnvFallback(raw) {
+  return parseEnvList(raw)
+}
 
-  const now = Date.now()
-  if (cachedModelIds && now - cachedAt < CACHE_MS) {
-    return cachedModelIds
+function parseEnvIgnore(raw) {
+  return parseEnvList(raw)
+}
+
+function isModelIgnored(modelId, ignoreList) {
+  const id = String(modelId ?? '').trim()
+  if (!id || ignoreList.length === 0) return false
+  const lower = id.toLowerCase()
+  for (const raw of ignoreList) {
+    const token = String(raw).trim().toLowerCase()
+    if (!token) continue
+    if (lower === token || lower.startsWith(`${token}-`)) return true
+  }
+  return false
+}
+
+function filterIgnoredModels(modelIds, ignoreList) {
+  if (ignoreList.length === 0) return modelIds
+  return modelIds.filter((id) => !isModelIgnored(id, ignoreList))
+}
+
+export async function listDashScopeChatModels(
+  apiKey,
+  chatCompletionsUrl,
+  forceRefresh = false,
+) {
+  const key = String(apiKey ?? '').trim()
+  if (!key) return { ids: [], fromCache: false }
+
+  if (!forceRefresh) {
+    const persisted = getCachedDashScopeModelList()
+    if (persisted?.length) {
+      cachedModelIds = persisted
+      cachedAt = Date.now()
+      return { ids: persisted, fromCache: true }
+    }
+    const now = Date.now()
+    if (cachedModelIds && now - cachedAt < CACHE_MS) {
+      return { ids: cachedModelIds, fromCache: true }
+    }
   }
 
   const url = `${completionsBaseUrl(chatCompletionsUrl)}/models`
@@ -205,13 +251,22 @@ export async function listDashScopeChatModels(apiKey, chatCompletionsUrl) {
     method: 'GET',
     headers: { Authorization: `Bearer ${key}` },
   })
-  if (!response.ok) return cachedModelIds ?? []
+  if (!response.ok) {
+    const fallback = getCachedDashScopeModelList() ?? cachedModelIds
+    return { ids: fallback ?? [], fromCache: true }
+  }
 
   const payload = await response.json()
   const ids = filterChatIds((payload.data ?? []).map((row) => row.id))
   cachedModelIds = ids
-  cachedAt = now
-  return ids
+  cachedAt = Date.now()
+  if (ids.length > 0) {
+    saveDashScopeModelListCache(ids)
+    console.info(
+      `[sidekick] DashScope /v1/models 已拉取并写入本地缓存 (${ids.length} 个模型)`,
+    )
+  }
+  return { ids, fromCache: false }
 }
 
 async function completeOnce({
@@ -291,12 +346,18 @@ async function tryModelsInOrder({
   order,
   triedModels,
   logSkippedCached,
-  maxAttempts = MAX_MODEL_ATTEMPTS_PER_CALL,
+  maxAttempts = MAX_QUICK_MODEL_ATTEMPTS,
+  preferredModel,
+  ignoreList = [],
 }) {
-  const fullOrder = buildTryOrder(
-    order.primary,
-    order.fetched,
-    order.envList,
+  const fullOrder = filterIgnoredModels(
+    buildTryOrder(
+      order.primary,
+      order.fetched,
+      order.envList,
+      preferredModel,
+    ),
+    ignoreList,
   )
   const tryOrder = prepareDashScopeModelTryOrder(fullOrder).filter(
     (m) => !triedModels.includes(m),
@@ -332,6 +393,7 @@ async function tryModelsInOrder({
           `[sidekick] DashScope 已切换模型: ${model}（此前 ${triedModels.length - 1} 个不可用）`,
         )
       }
+      saveDashScopePreferredModel(model)
       return { content, model, triedModels: [...triedModels] }
     } catch (err) {
       lastErr = err
@@ -366,7 +428,6 @@ export async function dashscopeChatCompleteWithFallback(payload) {
 
   const systemPrompt = String(payload?.systemPrompt ?? '')
   const userPrompt = String(payload?.userPrompt ?? '')
-  const regenerateFastPath = payload?.regenerateChatNoExpand === true
   const primary = payload?.model?.trim() || 'qwen-turbo'
   const temperature =
     typeof payload?.temperature === 'number' && Number.isFinite(payload.temperature)
@@ -374,10 +435,24 @@ export async function dashscopeChatCompleteWithFallback(payload) {
       : undefined
   const chatCompletionsUrl = payload?.chatCompletionsUrl
   const envList = parseEnvFallback(payload?.modelFallbackEnv)
-  const maxAttempts = regenerateFastPath
-    ? REGENERATE_MAX_MODEL_ATTEMPTS
-    : MAX_MODEL_ATTEMPTS_PER_CALL
+  const ignoreList = parseEnvIgnore(payload?.modelIgnoreEnv)
+  let preferredModel = getDashScopePreferredModel()
+  if (preferredModel && isModelIgnored(preferredModel, ignoreList)) {
+    preferredModel = null
+  }
   const triedModels = []
+
+  if (ignoreList.length > 0) {
+    console.info(
+      `[sidekick] DashScope 忽略 model 列表: ${ignoreList.join(', ')}`,
+    )
+  }
+
+  if (preferredModel) {
+    console.info(
+      `[sidekick] DashScope 优先使用上次成功模型: ${preferredModel}`,
+    )
+  }
 
   const quick = await tryModelsInOrder({
     apiKey,
@@ -388,25 +463,24 @@ export async function dashscopeChatCompleteWithFallback(payload) {
     order: { primary, fetched: [], envList },
     triedModels,
     logSkippedCached: true,
-    maxAttempts,
+    maxAttempts: MAX_QUICK_MODEL_ATTEMPTS,
+    preferredModel,
+    ignoreList,
   })
   if (quick?.content) {
     return quick
   }
 
-  if (regenerateFastPath) {
-    console.warn(
-      `[sidekick] DashScope 换句快速候选均失败（已尝试 ${triedModels.length} 个），不再拉 /v1/models`,
-    )
-    throw new Error(
-      `${quick?.lastErr?.message ?? 'DashScope 换句失败'}（已依次尝试 ${triedModels.length} 个模型）`,
-    )
-  }
-
-  const fetched = await listDashScopeChatModels(apiKey, chatCompletionsUrl)
+  const { ids: fetchedRaw, fromCache } = await listDashScopeChatModels(
+    apiKey,
+    chatCompletionsUrl,
+  )
+  const fetched = filterIgnoredModels(fetchedRaw, ignoreList)
   if (fetched.length > 0) {
     console.info(
-      `[sidekick] DashScope 内置候选均失败，已从 /v1/models 加载 ${fetched.length} 个扩充模型`,
+      fromCache
+        ? `[sidekick] DashScope 内置候选均失败，使用本地缓存扩充 ${fetched.length} 个模型候选`
+        : `[sidekick] DashScope 内置候选均失败，已从 /v1/models 拉取 ${fetched.length} 个扩充模型`,
     )
   } else {
     console.warn('[sidekick] DashScope /v1/models 未返回列表，无法扩充候选')
@@ -421,7 +495,9 @@ export async function dashscopeChatCompleteWithFallback(payload) {
     order: { primary, fetched, envList },
     triedModels,
     logSkippedCached: false,
-    maxAttempts,
+    maxAttempts: MAX_EXPANDED_MODEL_ATTEMPTS,
+    preferredModel,
+    ignoreList,
   })
   if (expanded?.content) return expanded
 

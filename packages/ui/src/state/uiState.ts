@@ -63,7 +63,7 @@ export const initialUiState: UiState = {
   toastAnchor: 'bottom',
   toastMessage: '今天也在稳稳前进，先奖励自己一口深呼吸。',
   toastMode: 'normal',
-  emotionMoodTab: 'moment',
+  emotionMoodTab: 'summary',
 }
 
 export function uiReducer(state: UiState, action: UiAction): UiState {
@@ -81,7 +81,7 @@ export function uiReducer(state: UiState, action: UiAction): UiState {
         ...state,
         activePanel: action.panel,
         emotionMoodTab:
-          action.panel === 'emotion' ? state.emotionMoodTab : 'moment',
+          action.panel === 'emotion' ? state.emotionMoodTab : 'summary',
       }
     case 'SET_EMOTION_MOOD_TAB':
       return { ...state, emotionMoodTab: action.tab }

@@ -80,12 +80,10 @@ export function filterOutUnavailableDashScopeModels(modelIds) {
 }
 
 /**
- * 跳过已标记模型；若全部被跳过则本轮仍返回完整列表（不清磁盘缓存）。
+ * 跳过已标记模型；若全部不可用则本轮不再重试（充值后请清不可用缓存）。
  */
 export function prepareDashScopeModelTryOrder(fullOrder) {
   loadFromDisk()
   if (fullOrder.length === 0) return fullOrder
-  const active = filterOutUnavailableDashScopeModels(fullOrder)
-  if (active.length === 0) return fullOrder
-  return active
+  return filterOutUnavailableDashScopeModels(fullOrder)
 }

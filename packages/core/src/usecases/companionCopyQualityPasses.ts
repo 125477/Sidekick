@@ -9,6 +9,8 @@ import {
   buildRegenerateProductMarketingRetryUserSuffix,
   buildRegenerateStepMantraRetryUserSuffix,
   buildRegenerateVagueMantraRetryUserSuffix,
+  buildBlessingWishRetryUserSuffix,
+  companionTextHasBlessingWishCliche,
   companionTextHasLiteraryPermissionCliche,
   companionTextHasLiterarySensoryCliche,
   companionTextHasMismatchedPeriodWord,
@@ -160,6 +162,10 @@ const QUALITY_PASSES: QualityPass[] = [
   {
     test: (line) => companionTextHasSceneryMoodCliche(line),
     suffix: () => buildPoeticTemplateRetryUserSuffix(),
+  },
+  {
+    test: (line) => companionTextHasBlessingWishCliche(line),
+    suffix: () => buildBlessingWishRetryUserSuffix(),
   },
   {
     test: (line) => companionTextHasFormulaSkeleton(line),

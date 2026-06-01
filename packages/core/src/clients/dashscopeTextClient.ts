@@ -2,14 +2,24 @@ import {
   buildDashScopeModelTryOrder,
   DASHSCOPE_CHAT_FALLBACK_MODELS,
   DASHSCOPE_MAX_MODEL_ATTEMPTS_PER_CALL,
-  DASHSCOPE_REGENERATE_MAX_MODEL_ATTEMPTS,
+  filterIgnoredDashScopeModels,
   filterLikelyChatModelIds,
+  isDashScopeModelIgnored,
+  parseDashScopeModelIgnoreFromEnv,
   parseExtraFallbackModelsFromEnv,
 } from '../constants/dashscopeFallbackModels'
 import {
   markDashScopeModelUnavailable,
   prepareDashScopeModelTryOrder,
 } from '../constants/dashscopeUnavailableModels'
+import {
+  getCachedDashScopeModelList,
+  saveDashScopeModelListCache,
+} from '../constants/dashscopeModelListCache'
+import {
+  getDashScopePreferredModel,
+  saveDashScopePreferredModel,
+} from '../constants/dashscopePreferredModel'
 
 export type DashScopeTextRequest = {
   apiKey: string | undefined
@@ -20,13 +30,6 @@ export type DashScopeTextRequest = {
   temperature?: number
   /** Full POST URL (e.g. Vite dev `/dashscope/...` proxy). Defaults to DashScope compatible-mode Beijing. */
   chatCompletionsUrl?: string
-  /**
-   * 换句等交互：先 primary → env → 内置 qwen 轮换；遇 403/429 自动换下一个 model。
-   * 与 `regenerateChatNoExpand` 联用：换句只走快速候选，不拉 /v1/models（与浏览器直连一致）。
-   */
-  quickModelFallbackOnly?: boolean
-  /** 换句专用：快速候选失败后不再拉 /v1/models，直接失败走句库（避免 Electron 卡几十秒）。 */
-  regenerateChatNoExpand?: boolean
   /** 主进程日志：scheduled / regenerate / manual 等 */
   copyTrigger?: string
 }
@@ -245,22 +248,34 @@ type OpenAiModelsPayload = {
   data?: Array<{ id?: string }>
 }
 
+export type DashScopeModelListResult = {
+  ids: string[]
+  fromCache: boolean
+}
+
 /** 需有效 API Key；compatible-mode 支持 GET /v1/models（与 chat 同域）。 */
 export async function listDashScopeChatModels(input: {
   apiKey: string | undefined
   chatCompletionsUrl?: string
   forceRefresh?: boolean
-}): Promise<string[]> {
+}): Promise<DashScopeModelListResult> {
   const apiKey = input.apiKey?.trim()
-  if (!apiKey) return []
+  if (!apiKey) return { ids: [], fromCache: false }
 
   const now = Date.now()
-  if (
-    !input.forceRefresh &&
-    cachedFetchedModelIds &&
-    now - cachedFetchedAt < MODEL_LIST_CACHE_MS
-  ) {
-    return cachedFetchedModelIds
+  if (!input.forceRefresh) {
+    const persisted = getCachedDashScopeModelList()
+    if (persisted?.length) {
+      cachedFetchedModelIds = persisted
+      cachedFetchedAt = now
+      return { ids: persisted, fromCache: true }
+    }
+    if (
+      cachedFetchedModelIds &&
+      now - cachedFetchedAt < MODEL_LIST_CACHE_MS
+    ) {
+      return { ids: cachedFetchedModelIds, fromCache: true }
+    }
   }
 
   const url = modelsListUrl(input.chatCompletionsUrl)
@@ -269,7 +284,8 @@ export async function listDashScopeChatModels(input: {
     headers: { Authorization: `Bearer ${apiKey}` },
   })
   if (!response.ok) {
-    return cachedFetchedModelIds ?? []
+    const fallback = getCachedDashScopeModelList() ?? cachedFetchedModelIds
+    return { ids: fallback ?? [], fromCache: true }
   }
 
   const payload = (await response.json()) as OpenAiModelsPayload
@@ -278,7 +294,15 @@ export async function listDashScopeChatModels(input: {
   )
   cachedFetchedModelIds = ids
   cachedFetchedAt = now
-  return ids
+  if (ids.length > 0) {
+    saveDashScopeModelListCache(ids)
+    if (typeof console !== 'undefined' && console.info) {
+      console.info(
+        `[sidekick] DashScope /v1/models 已拉取并写入本地缓存 (${ids.length} 个模型)`,
+      )
+    }
+  }
+  return { ids, fromCache: false }
 }
 
 export async function requestDashScopeChatCompletion(
@@ -339,6 +363,8 @@ export async function requestDashScopeChatCompletion(
 export type RequestDashScopeTextWithFallbackOptions = {
   /** 逗号分隔的额外候选 model id（通常来自 VITE_DASHSCOPE_MODEL_FALLBACK）。 */
   envFallbackList?: string
+  /** 逗号分隔的忽略 model id（通常来自 VITE_DASHSCOPE_MODEL_IGNORE）。 */
+  modelIgnoreEnv?: string
   /** 为 true 时先拉取 /v1/models 扩充候选（需有效 Key）。 */
   fetchRemoteModelList?: boolean
 }
@@ -353,21 +379,37 @@ export async function requestDashScopeTextWithFallback(
 ): Promise<DashScopeChatCompleteResult> {
   const primary = input.model?.trim() || 'qwen-turbo'
   const envList = parseExtraFallbackModelsFromEnv(options.envFallbackList)
+  const ignoreList = parseDashScopeModelIgnoreFromEnv(options.modelIgnoreEnv)
+  const preferredRaw = getDashScopePreferredModel() ?? undefined
+  const preferredModel =
+    preferredRaw && isDashScopeModelIgnored(preferredRaw, ignoreList)
+      ? undefined
+      : preferredRaw
   const triedModels: string[] = []
   let lastErr: unknown
-  const maxModelAttempts = input.regenerateChatNoExpand
-    ? DASHSCOPE_REGENERATE_MAX_MODEL_ATTEMPTS
-    : DASHSCOPE_MAX_MODEL_ATTEMPTS_PER_CALL
+  const maxQuickAttempts = DASHSCOPE_MAX_MODEL_ATTEMPTS_PER_CALL
 
   const attemptOrder = async (
     orderExtras: {
       fetched?: string[]
       envList?: string[]
       staticList?: readonly string[]
+      preferredModel?: string
     },
     logSkippedCached: boolean,
+    maxAttempts = maxQuickAttempts,
   ): Promise<DashScopeChatCompleteResult | null> => {
-    const fullOrder = buildDashScopeModelTryOrder(primary, orderExtras)
+    const resolvedPreferred =
+      orderExtras.preferredModel ?? preferredModel ?? undefined
+    const fullOrder = filterIgnoredDashScopeModels(
+      buildDashScopeModelTryOrder(primary, {
+        ...(orderExtras.fetched ? { fetched: orderExtras.fetched } : {}),
+        ...(orderExtras.envList ? { envList: orderExtras.envList } : {}),
+        ...(orderExtras.staticList ? { staticList: orderExtras.staticList } : {}),
+        ...(resolvedPreferred ? { preferredModel: resolvedPreferred } : {}),
+      }),
+      ignoreList,
+    )
     const tryOrder = prepareDashScopeModelTryOrder(fullOrder).filter(
       (m) => !triedModels.includes(m),
     )
@@ -384,10 +426,10 @@ export async function requestDashScopeTextWithFallback(
       }
     }
     for (const model of tryOrder) {
-      if (triedModels.length >= maxModelAttempts) {
+      if (triedModels.length >= maxAttempts) {
         if (typeof console !== 'undefined' && console.warn) {
           console.warn(
-            `[sidekick] DashScope 已达单次 model 尝试上限 ${maxModelAttempts}，停止轮换（已试: ${triedModels.join(', ') || '无'}）`,
+            `[sidekick] DashScope 已达单次 model 尝试上限 ${maxAttempts}，停止轮换（已试: ${triedModels.join(', ') || '无'}）`,
           )
         }
         break
@@ -404,6 +446,7 @@ export async function requestDashScopeTextWithFallback(
             `[sidekick] DashScope model=${model} 成功 (${Date.now() - attemptStarted}ms)`,
           )
         }
+        saveDashScopePreferredModel(model)
         return { content, model, triedModels: [...triedModels] }
       } catch (err) {
         lastErr = err
@@ -452,21 +495,20 @@ export async function requestDashScopeTextWithFallback(
   )
   if (quickResult) return quickResult
 
-  const expandFromRemoteList =
-    options.fetchRemoteModelList !== false &&
-    input.regenerateChatNoExpand !== true
-
-  if (expandFromRemoteList) {
-    const fetched = await listDashScopeChatModels({
+  if (options.fetchRemoteModelList !== false) {
+    const { ids: fetchedRaw, fromCache } = await listDashScopeChatModels({
       apiKey: input.apiKey,
       ...(input.chatCompletionsUrl !== undefined
         ? { chatCompletionsUrl: input.chatCompletionsUrl }
         : {}),
     })
+    const fetched = filterIgnoredDashScopeModels(fetchedRaw, ignoreList)
     if (fetched.length > 0) {
       if (typeof console !== 'undefined' && console.info) {
         console.info(
-          `[sidekick] DashScope 内置候选均失败，已从 /v1/models 加载 ${fetched.length} 个扩充模型`,
+          fromCache
+            ? `[sidekick] DashScope 内置候选均失败，使用本地缓存扩充 ${fetched.length} 个模型候选`
+            : `[sidekick] DashScope 内置候选均失败，已从 /v1/models 拉取 ${fetched.length} 个扩充模型`,
         )
       }
       const expandedResult = await attemptOrder(
@@ -476,6 +518,7 @@ export async function requestDashScopeTextWithFallback(
           staticList: DASHSCOPE_CHAT_FALLBACK_MODELS,
         },
         false,
+        Number.POSITIVE_INFINITY,
       )
       if (expandedResult) return expandedResult
     } else if (typeof console !== 'undefined' && console.warn) {
