@@ -58,7 +58,10 @@
 
 macOS、Windows 安装包见 **[最新版本](https://github.com/125477/Sidekick/releases/latest)**（在页面中按系统选择对应文件即可）。
 
-- **macOS**：若系统提示无法打开，请在「系统设置 → 隐私与安全性」中选择仍要打开。
+- **macOS**：若系统提示无法打开，请在「系统设置 → 隐私与安全性」中选择仍要打开；或在终端执行（**仅 macOS**，将 App 拖入「应用程序」后）：
+  ```bash
+  sudo xattr -r -d com.apple.quarantine /Applications/灵伴.app
+  ```
 - **Windows**：若出现 SmartScreen 提示，请选择「仍要运行」。
 
 ---
