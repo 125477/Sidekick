@@ -159,6 +159,7 @@ function App() {
     if (uiState.activePanel === 'emotion') return '情绪反馈'
     if (uiState.activePanel === 'fortune') return '每日抽签'
     if (uiState.activePanel === 'favorites') return '收藏历史'
+    if (uiState.activePanel === 'companion-export') return '导出卡片'
     return ''
   }, [uiState.activePanel])
 

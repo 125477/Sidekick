@@ -58,6 +58,8 @@ export function EmotionToastCard({
   favorite = false,
   onToggleFavorite,
   onCopy,
+  onExportCard,
+  onInterestAnswer,
   onReplayTts,
   onOpenEmotion,
   onOpenSettings,
@@ -188,6 +190,7 @@ export function EmotionToastCard({
                 setCopyDone={chrome.setCopyDone}
                 regenInToolbar={chrome.regenInToolbar}
                 showCopy={chrome.showCopy}
+                showExport={chrome.showExport}
                 showReplay={chrome.showReplay}
                 showFavorite={chrome.showFavorite}
                 showEmotionFeedback={chrome.showEmotionFeedback}
@@ -202,6 +205,8 @@ export function EmotionToastCard({
                 lightFeedbackMessage={message}
                 compactMessageLayout={chrome.compactMessageLayout}
                 {...(onCopy ? { onCopy } : {})}
+                {...(onExportCard ? { onExportCard } : {})}
+                {...(onInterestAnswer ? { onInterestAnswer } : {})}
                 {...(onReplayTts ? { onReplayTts } : {})}
                 {...(onToggleFavorite ? { onToggleFavorite } : {})}
                 {...(onOpenEmotion ? { onOpenEmotion } : {})}

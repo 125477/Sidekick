@@ -9,6 +9,8 @@ import type {
   CompanionCopyStyle,
 } from '@sidekick/core'
 import { toggleToastFavorite } from './toastFavoriteToggle'
+import { openCompanionExportPanel } from './companionExportSession'
+import { appendCompanionInterestAnswer } from './appendCompanionInterestAnswer'
 import { resolveCompanionQuoteBubbleVariant } from '../components/emotion/moodHistory/quoteBubbleSettings'
 import { OnboardingWizard } from '../components/onboarding/OnboardingWizard'
 import { SpriteMenu, type MenuAction } from '../components/menu/SpriteMenu'
@@ -23,6 +25,12 @@ import { replayCompanionSpeech } from '../utils/companionTts'
 import type { SidekickSettings } from '../state/settingsState'
 import type { UiAction, UiState, SpriteState } from '../state/uiState'
 import { zLayers } from '../state/uiState'
+import {
+  useWidgetDockVisual,
+  widgetDockPeekOpacity,
+  widgetDockScale,
+  widgetDockTransformOrigin,
+} from '../app/useWidgetDockVisual'
 
 export type WidgetSpriteLayerProps = {
   widgetMeasureRef: RefObject<HTMLDivElement | null> | undefined
@@ -114,6 +122,61 @@ export function WidgetSpriteLayer({
   spriteMenuUsesBrowserPopup,
 }: WidgetSpriteLayerProps) {
   const dragStarTrailEnabled = isWidgetMode && settings.motionEnabled
+  const widgetDock = useWidgetDockVisual(isWidgetMode)
+  const dockActive =
+    widgetDock.side != null && widgetDock.phase !== 'free'
+  const dockScale = widgetDockScale(widgetDock.phase)
+  const dockOrigin = widgetDockTransformOrigin(widgetDock.side)
+  const dockOpacity = widgetDockPeekOpacity(widgetDock.phase)
+
+  const dockTransformParts: string[] = []
+  if (dockActive) {
+    dockTransformParts.push(`scale(${dockScale})`)
+  }
+
+  const spriteShellBlock = (
+    <div
+      data-widget-layout-bound
+      className="relative motion-reduce:transition-none"
+      style={{
+        transform: dockTransformParts.length
+          ? dockTransformParts.join(' ')
+          : undefined,
+        transformOrigin: dockActive ? dockOrigin : undefined,
+        opacity: dockActive ? dockOpacity : undefined,
+        transition: dockActive
+          ? 'transform 280ms cubic-bezier(0.33, 1, 0.68, 1), opacity 220ms ease'
+          : undefined,
+      }}
+    >
+      <SpriteShell
+        spriteState={spriteState}
+        avatarSrc={selectedAvatar?.src}
+        motionProfile={selectedAvatar?.motionProfile}
+        avatarSize={spriteAvatarSize}
+        avatarOpacity={settings.avatarOpacity}
+        avatarCornerRadiusPercent={settings.avatarCornerRadiusPercent}
+        interactionLocked={spriteInteractionLocked}
+        {...(dragStarTrailEnabled
+          ? {
+              onDragTrailStart: (screenX: number, screenY: number) =>
+                beginDesktopDragTrail(screenX, screenY),
+              onDragTrailPoint: pushDesktopDragTrailPoint,
+              onDragTrailEnd: endDesktopDragTrail,
+            }
+          : {})}
+        onToggleMenu={() => {
+          if (!menuExpandedForToggle) {
+            setSpriteMenuSurface('sprite')
+          }
+          dispatch({
+            type: menuExpandedForToggle ? 'MENU_CLOSE' : 'MENU_OPEN',
+          })
+        }}
+        onStateChange={setSpriteState}
+      />
+    </div>
+  )
 
   return (
     <div
@@ -145,31 +208,7 @@ export function WidgetSpriteLayer({
               onMouseEnter={() => setSpriteShellHovered(true)}
               onMouseLeave={() => setSpriteShellHovered(false)}
             >
-              <SpriteShell
-                spriteState={spriteState}
-                avatarSrc={selectedAvatar?.src}
-                motionProfile={selectedAvatar?.motionProfile}
-                avatarSize={spriteAvatarSize}
-                avatarOpacity={settings.avatarOpacity}
-                interactionLocked={spriteInteractionLocked}
-                {...(dragStarTrailEnabled
-                  ? {
-                      onDragTrailStart: (screenX: number, screenY: number) =>
-                        beginDesktopDragTrail(screenX, screenY),
-                      onDragTrailPoint: pushDesktopDragTrailPoint,
-                      onDragTrailEnd: endDesktopDragTrail,
-                    }
-                  : {})}
-                onToggleMenu={() => {
-                  if (!menuExpandedForToggle) {
-                    setSpriteMenuSurface('sprite')
-                  }
-                  dispatch({
-                    type: menuExpandedForToggle ? 'MENU_CLOSE' : 'MENU_OPEN',
-                  })
-                }}
-                onStateChange={setSpriteState}
-              />
+              {spriteShellBlock}
               {isWidgetMode && spriteInteractionLocked ? (
                 <div
                   aria-hidden
@@ -229,6 +268,20 @@ export function WidgetSpriteLayer({
                 onCopy={() =>
                   navigator.clipboard.writeText(uiState.toastMessage)
                 }
+                onExportCard={() =>
+                  openCompanionExportPanel(
+                    uiState.toastMessage,
+                    settings.quoteBubbleVariant,
+                  )
+                }
+                onInterestAnswer={(answer) => {
+                  void appendCompanionInterestAnswer(
+                    settingsRef.current,
+                    answer,
+                  ).then((next) => {
+                    settingsRef.current = next
+                  })
+                }}
                 onReplayTts={() =>
                   void replayCompanionSpeech(uiState.toastMessage, {
                     enabled: settingsRef.current.companionTtsEnabled,

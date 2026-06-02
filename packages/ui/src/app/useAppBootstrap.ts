@@ -178,10 +178,12 @@ export function useAppBootstrap({
         ? 0
         : dwellMinutesToSeconds(settings.dwellMinutes),
       toastAlwaysVisible: settings.toastAlwaysVisible,
+      dockPushDwellSeconds: settings.dockPushDwellSeconds,
     })
   }, [
     settings.dwellMinutes,
     settings.toastAlwaysVisible,
+    settings.dockPushDwellSeconds,
   ])
 
   return { flushPendingPanelSliderSave }

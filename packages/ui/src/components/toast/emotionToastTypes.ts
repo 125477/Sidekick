@@ -21,6 +21,8 @@ export type EmotionToastProps = {
   favorite?: boolean
   onToggleFavorite?: () => void | Promise<void>
   onCopy?: () => void | Promise<void>
+  onExportCard?: () => void | Promise<void>
+  onInterestAnswer?: (answer: string) => void | Promise<void>
   messageRegeneratesOnClick?: boolean
   onReplayTts?: () => void | Promise<void>
   onOpenEmotion?: () => void | Promise<void>

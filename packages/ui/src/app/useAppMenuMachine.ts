@@ -119,7 +119,8 @@ export function useAppMenuMachine({
       panelFromQuery === 'settings' ||
       panelFromQuery === 'emotion' ||
       panelFromQuery === 'fortune' ||
-      panelFromQuery === 'favorites'
+      panelFromQuery === 'favorites' ||
+      panelFromQuery === 'companion-export'
     ) {
       dispatch({ type: 'SET_PANEL', panel: panelFromQuery })
       if (

@@ -2,8 +2,8 @@ const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('sidekickDesktop', {
   openPanelWindow(panel, opts) {
-    if (opts && typeof opts === 'object' && opts.emotionTab) {
-      return ipcRenderer.invoke('sidekick:open-panel', { panel, emotionTab: opts.emotionTab })
+    if (opts && typeof opts === 'object') {
+      return ipcRenderer.invoke('sidekick:open-panel', { panel, ...opts })
     }
     return ipcRenderer.invoke('sidekick:open-panel', panel)
   },
@@ -42,6 +42,14 @@ contextBridge.exposeInMainWorld('sidekickDesktop', {
   },
   syncToastDisplaySettings(payload) {
     return ipcRenderer.invoke('sidekick:sync-toast-display-settings', payload)
+  },
+  onGlobalShortcut(callback) {
+    const channel = 'sidekick:global-shortcut'
+    const listener = (_event, payload) => {
+      callback(payload ?? {})
+    }
+    ipcRenderer.on(channel, listener)
+    return () => ipcRenderer.removeListener(channel, listener)
   },
   logCompanionCopyEvent(payload) {
     ipcRenderer.send('sidekick:companion-copy-log', payload ?? {})
@@ -137,6 +145,32 @@ contextBridge.exposeInMainWorld('sidekickDesktop', {
   /** 挂件精灵窗：在 `no-drag` 热区内用指针增量移动窗口（与 CSS `drag` 二选一，避免吞点击）。 */
   moveWidgetBy(payload) {
     return ipcRenderer.invoke('sidekick:move-widget-by', payload)
+  },
+  finishWidgetDrag() {
+    return ipcRenderer.invoke('sidekick:finish-widget-drag')
+  },
+  onWidgetDockVisual(callback) {
+    const channel = 'sidekick:widget-dock-visual'
+    const listener = (_event, payload) => {
+      if (!payload || typeof payload !== 'object') return
+      const side = payload.side
+      const phase = payload.phase
+      const validSide = side === 'right' ? side : null
+      const validPhase =
+        phase === 'free' ||
+        phase === 'docking' ||
+        phase === 'docked' ||
+        phase === 'expanding' ||
+        phase === 'expanded'
+          ? phase
+          : 'free'
+      callback({
+        side: validSide,
+        phase: validPhase,
+      })
+    }
+    ipcRenderer.on(channel, listener)
+    return () => ipcRenderer.removeListener(channel, listener)
   },
   beginDragTrail(payload) {
     return ipcRenderer.invoke('sidekick:begin-drag-trail', payload ?? {})
@@ -268,6 +302,9 @@ contextBridge.exposeInMainWorld('sidekickDesktop', {
   },
   closeWidgetSpriteMenu(opts) {
     return ipcRenderer.invoke('sidekick:close-widget-sprite-menu', opts ?? {})
+  },
+  dismissSpriteMenuOutsideClick() {
+    ipcRenderer.send('sidekick:sprite-menu-outside-click')
   },
   submitWidgetSpriteMenuAction(action) {
     return ipcRenderer.invoke('sidekick:widget-sprite-menu-submit', action)

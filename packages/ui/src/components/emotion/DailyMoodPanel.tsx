@@ -47,6 +47,7 @@ import {
   loadMoodJournalGuideForDay,
   saveMoodJournalGuideForDay,
 } from '../../state/moodJournalGuideStorage'
+import { MoodJournalStreakBadge } from './MoodJournalStreakBadge'
 import { IconToolbarRefresh } from '../toast/EmotionToastToolbarIcons'
 
 const EmotionTrendChart = lazy(async () => {
@@ -345,6 +346,9 @@ export function DailyMoodPanel({
                 </section>
               }
             >
+              <div className="mb-2 flex justify-end px-2 pt-1">
+                <MoodJournalStreakBadge entries={entries} />
+              </div>
               <EmotionTrendChart records={emotionRecords} />
             </Suspense>
           </div>

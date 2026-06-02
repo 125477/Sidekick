@@ -24,6 +24,7 @@ import { broadcastSettingsSync } from '../state/settingsSync'
 import { saveSettings } from '../state/settingsStorage'
 import type { SidekickSettings } from '../state/settingsState'
 import { getCompanionLightFeedbackHints } from './companionLightFeedbackStorage'
+import { pickFavoriteResurfaceLine } from './favoriteResurface'
 import {
   beginCompanionFetch,
   markCompanionStartupFetchSucceeded,
@@ -326,6 +327,16 @@ async function fetchCompanionCopyInner(
   const generationSeed =
     options?.seed ??
     (Date.now() ^ Math.floor(Math.random() * 1_000_000_000))
+
+  const resurfaced = await pickFavoriteResurfaceLine(
+    settings.favoriteResurfaceEnabled,
+    trigger,
+    sanitizedAvoid,
+  )
+  if (resurfaced) {
+    logCompanionCopy('favorite resurface', { trigger, text: resurfaced.slice(0, 40) })
+    return { text: resurfaced, source: 'fallback' as const }
+  }
 
   const common = {
     style: settings.textStyle,

@@ -24,11 +24,18 @@ import {
 import { pauseToastAutoHide, resumeToastAutoHide } from './toastAutoHide.mjs'
 import { persistWidgetBounds } from './widgetBounds.mjs'
 import {
+  clampWidgetPositionDuringDrag,
+  onSpriteInteractionLockedChange,
+  onWidgetDragEnd,
+  onWidgetDragMove,
+} from './widgetEdgeDock.mjs'
+import {
   closeWidgetSpriteMenuWindow,
   normalizeSpriteMenuScreenBounds,
   openWidgetSpriteMenuWindow,
   warmSpriteMenuWindow,
 } from './spriteMenu.mjs'
+import { onSpriteMenuOutsideClick } from './spriteMenuDismissOverlay.mjs'
 import { state } from './state.mjs'
 import {
   applyWidgetWindowSpritePassthrough,
@@ -75,13 +82,16 @@ export function registerSidekickIpcHandlers() {
       panel === 'settings' ||
       panel === 'emotion' ||
       panel === 'fortune' ||
-      panel === 'favorites'
+      panel === 'favorites' ||
+      panel === 'companion-export'
     ) {
       openPanelWindow(
         panel,
         emotionTab === 'summary' || emotionTab === 'moment'
           ? { emotionTab }
-          : {},
+          : typeof payload?.exportMessage === 'string'
+            ? { exportMessage: payload.exportMessage }
+            : {},
       )
     }
     return undefined
@@ -129,6 +139,10 @@ export function registerSidekickIpcHandlers() {
   ipcMain.handle('sidekick:sync-toast-display-settings', (_event, payload) => {
     const always = payload?.toastAlwaysVisible === true
     state.toastAlwaysVisiblePref = always
+    const dockRaw = Number(payload?.dockPushDwellSeconds)
+    if (Number.isFinite(dockRaw) && dockRaw >= 10 && dockRaw <= 30) {
+      state.dockPushDwellSeconds = Math.round(dockRaw)
+    }
     if (always) {
       state.toastDisplayDwellSeconds = 0
       return undefined
@@ -173,7 +187,7 @@ export function registerSidekickIpcHandlers() {
       enabled === '1'
     applyWidgetWindowSpritePassthrough(on)
   })
-  ipcMain.handle('sidekick:set-sprite-interaction-locked', (_event, locked) => {
+  ipcMain.handle('sidekick:set-sprite-interaction-locked', async (_event, locked) => {
     state.lastSpriteInteractionLocked = locked === true
     if (state.spriteWindow && !state.spriteWindow.isDestroyed()) {
       state.spriteWindow.webContents.send(
@@ -182,6 +196,7 @@ export function registerSidekickIpcHandlers() {
       )
       applyWidgetWindowSpritePassthrough(state.lastSpriteInteractionLocked)
     }
+    await onSpriteInteractionLockedChange(state.lastSpriteInteractionLocked)
     if (state.toastWindow && !state.toastWindow.isDestroyed()) {
       state.toastWindow.webContents.send(
         'sidekick:sprite-interaction-locked',
@@ -229,6 +244,9 @@ export function registerSidekickIpcHandlers() {
     const theme = payload?.theme === 'dark' || payload?.theme === 'light' ? payload.theme : undefined
     void warmSpriteMenuWindow(theme ? { theme } : {})
     return undefined
+  })
+  ipcMain.on('sidekick:sprite-menu-outside-click', () => {
+    onSpriteMenuOutsideClick()
   })
   ipcMain.handle('sidekick:close-widget-sprite-menu', (event, opts) => {
     const allowed =
@@ -308,20 +326,23 @@ export function registerSidekickIpcHandlers() {
     if (!Number.isFinite(dx) || !Number.isFinite(dy) || (dx === 0 && dy === 0)) {
       return undefined
     }
+    onWidgetDragMove()
     const b = state.spriteWindow.getBounds()
     const cx = b.x + b.width / 2
     const cy = b.y + b.height / 2
     const display = screen.getDisplayNearestPoint({ x: cx, y: cy })
     const wa = display.workArea
-    const margin = 48
     let nx = b.x + dx
     let ny = b.y + dy
-    nx = clamp(nx, wa.x - b.width + margin, wa.x + wa.width - margin)
-    ny = clamp(ny, wa.y - b.height + margin, wa.y + wa.height - margin)
-    state.spriteWindow.setBounds({ ...b, x: nx, y: ny })
+    const clamped = clampWidgetPositionDuringDrag({ ...b, x: nx, y: ny }, wa)
+    state.spriteWindow.setBounds({ ...b, x: clamped.x, y: clamped.y })
     persistWidgetBounds(state.spriteWindow)
     if (state.dragTrailDragging) keepSpriteAboveDragTrail()
     // 气泡位置由 `spriteWindow` 的 `move` 事件里 `applyToastWindowBounds` 同步，避免与 `move` 重复 setBounds。
+    return undefined
+  })
+  ipcMain.handle('sidekick:finish-widget-drag', async () => {
+    await onWidgetDragEnd()
     return undefined
   })
   ipcMain.handle('sidekick:begin-drag-trail', (_event, payload) => {

@@ -9,6 +9,7 @@ import { registerPowerMonitorResume } from './main/powerMonitor.mjs'
 import { appDockIconPath } from './main/paths.mjs'
 import { state } from './main/state.mjs'
 import { persistWidgetBounds } from './main/widgetBounds.mjs'
+import { registerGlobalShortcuts } from './main/globalShortcuts.mjs'
 
 registerSidekickIpcHandlers()
 
@@ -26,6 +27,7 @@ app.whenReady().then(() => {
   }
 
   createSpriteWindow()
+  registerGlobalShortcuts()
   registerAutoUpdaterLifecycle()
   registerPowerMonitorResume()
   registerDailyMoodReminderWatchdog()

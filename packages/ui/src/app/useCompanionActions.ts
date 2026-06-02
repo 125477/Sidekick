@@ -29,6 +29,7 @@ import {
   type FetchCompanionCopyOptions,
 } from './companionCopy'
 import { pushProactiveCompanionCopy } from './companionProactivePush'
+import { openCompanionExportPanel } from './companionExportSession'
 import { RECENT_COMPANION_LINES_MAX } from './recentCompanionLines'
 import {
   shouldApplyCompanionCopyResult,
@@ -661,11 +662,30 @@ export function useCompanionActions({
     const unSimilar = window.sidekickDesktop?.onSimilarCopyRequested?.(() => {
       void requestCompanionSimilar()
     })
+    const unGlobal = window.sidekickDesktop?.onGlobalShortcut?.(({ action }) => {
+      if (action === 'regenerate') {
+        void requestCompanionTextRef.current?.('换一句', undefined, {
+          trigger: 'regenerate',
+        })
+      }
+      if (action === 'export-card') {
+        const msg =
+          uiState.toastMessage.trim() ||
+          lastShownToastMessageRef.current.trim()
+        if (msg) {
+          openCompanionExportPanel(
+            msg,
+            settingsRef.current.quoteBubbleVariant,
+          )
+        }
+      }
+    })
     return () => {
       unRegen?.()
       unSimilar?.()
+      unGlobal?.()
     }
-  }, [isWidgetMode])
+  }, [isWidgetMode, uiState.toastMessage, settingsRef])
 
   return {
     showToastMessage,

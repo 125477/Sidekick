@@ -12,6 +12,8 @@ import { resolveCompanionQuoteBubbleVariant } from '../components/emotion/moodHi
 import type { SidekickSettings } from '../state/settingsState'
 import { saveAppSelfIntroShown } from '../state/appSelfIntroStorage'
 import { broadcastAppSelfIntroDismissed } from '../state/appSelfIntroSync'
+import { openCompanionExportPanel } from './companionExportSession'
+import { appendCompanionInterestAnswer } from './appendCompanionInterestAnswer'
 import { TOAST_CARD_MAX_CLASS_DETACHED } from '../components/toast/toastCardMetrics'
 import { zLayers } from '../state/uiState'
 
@@ -194,6 +196,15 @@ export function DetachedToastShell({
                 })()
               }}
               onCopy={() => navigator.clipboard.writeText(displayMessage)}
+              onExportCard={() =>
+                openCompanionExportPanel(
+                  displayMessage,
+                  settings.quoteBubbleVariant,
+                )
+              }
+              onInterestAnswer={(answer) => {
+                void appendCompanionInterestAnswer(settings, answer)
+              }}
               onReplayTts={() =>
                 void replayCompanionSpeech(displayMessage, {
                   enabled: settings.companionTtsEnabled,

@@ -5,10 +5,10 @@ import {
   type RefObject,
 } from 'react'
 import { ToastLightFeedbackRow } from './ToastLightFeedbackRow'
+import { ToastInterestCaptureRow } from './ToastInterestCaptureRow'
 import { EmotionToastToolbarIconButton } from './EmotionToastToolbarButton'
 import {
   IconToolbarClose,
-  IconToolbarCopy,
   IconToolbarEmotion,
   IconToolbarLockClosed,
   IconToolbarLockOpen,
@@ -53,6 +53,7 @@ export type EmotionToastUnlockedToolbarProps = {
   setCopyDone: (v: boolean) => void
   regenInToolbar: boolean
   showCopy: boolean
+  showExport: boolean
   showReplay: boolean
   showFavorite: boolean
   showEmotionFeedback: boolean
@@ -67,6 +68,8 @@ export type EmotionToastUnlockedToolbarProps = {
   lightFeedbackMessage?: string
   compactMessageLayout?: boolean
   onCopy?: () => void | Promise<void>
+  onExportCard?: () => void | Promise<void>
+  onInterestAnswer?: (answer: string) => void | Promise<void>
   onReplayTts?: () => void | Promise<void>
   onToggleFavorite?: () => void | Promise<void>
   onOpenEmotion?: () => void | Promise<void>
@@ -84,7 +87,7 @@ export function EmotionToastUnlockedToolbar({
   detached,
   motionEnabled,
   regenerating,
-  copyDone,
+  copyDone: _copyDone,
   favorite,
   maxChars: _maxChars,
   toastBarPinnedOpen,
@@ -93,11 +96,12 @@ export function EmotionToastUnlockedToolbar({
   spriteInteractionLockedOnly = false,
   toastUnlockHitRef,
   unlockedToastbarGroupRef,
-  copyResetTimerRef,
+  copyResetTimerRef: _copyResetTimerRef,
   setUnlockedToolbarHot,
-  setCopyDone,
+  setCopyDone: _setCopyDone,
   regenInToolbar: _regenInToolbar,
-  showCopy,
+  showCopy: _showCopy,
+  showExport,
   showReplay,
   showFavorite,
   showEmotionFeedback,
@@ -111,7 +115,8 @@ export function EmotionToastUnlockedToolbar({
   showLightFeedback = false,
   lightFeedbackMessage = '',
   compactMessageLayout = false,
-  onCopy,
+  onExportCard,
+  onInterestAnswer,
   onReplayTts,
   onToggleFavorite,
   onOpenEmotion,
@@ -209,6 +214,14 @@ export function EmotionToastUnlockedToolbar({
                 />
               </div>
             ) : null}
+            {!introMode && onInterestAnswer ? (
+              <div className="px-1 pb-1">
+                <ToastInterestCaptureRow
+                  disabled={regenerating}
+                  onSubmit={(answer) => onInterestAnswer(answer)}
+                />
+              </div>
+            ) : null}
             <div aria-hidden className="h-1.5 w-full shrink-0" />
             <div className="emotion-toast-toolbar -mt-1.5 overflow-hidden rounded-b-2xl">
               <div className={toastToolbarChromeClassName()}>
@@ -269,30 +282,23 @@ export function EmotionToastUnlockedToolbar({
               </EmotionToastToolbarIconButton>
             ) : null}
             */}
+            {/* 复制已改为「导出卡片」
             {!spriteInteractionLockedOnly && showCopy ? (
+              ...
+            ) : null}
+            */}
+            {!spriteInteractionLockedOnly && showExport ? (
               <EmotionToastToolbarIconButton
-                title={copyDone ? '已复制' : '复制'}
-                ariaLabel={copyDone ? '已复制' : '复制'}
+                title="导出卡片"
+                ariaLabel="导出陪伴卡片"
                 disabled={regenerating}
                 onClick={async (event) => {
                   event.stopPropagation()
                   if (regenerating) return
-                  try {
-                    await Promise.resolve(onCopy?.())
-                    setCopyDone(true)
-                    if (copyResetTimerRef.current != null) {
-                      window.clearTimeout(copyResetTimerRef.current)
-                    }
-                    copyResetTimerRef.current = window.setTimeout(() => {
-                      setCopyDone(false)
-                      copyResetTimerRef.current = null
-                    }, 2000)
-                  } catch {
-                    /* clipboard denied */
-                  }
+                  await Promise.resolve(onExportCard?.())
                 }}
               >
-                <IconToolbarCopy className="h-[15px] w-[15px] shrink-0" />
+                <span className="text-[10px] font-semibold leading-none">导出</span>
               </EmotionToastToolbarIconButton>
             ) : null}
             {!spriteInteractionLockedOnly && showReplay ? (

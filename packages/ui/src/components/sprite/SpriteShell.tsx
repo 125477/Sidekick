@@ -9,6 +9,8 @@ type SpriteShellProps = {
   avatarSrc: string | undefined
   motionProfile: 'enhanced' | 'template' | undefined
   avatarOpacity: number
+  /** 相对边长的裁剪圆角（%）；0 直角，50 圆形。 */
+  avatarCornerRadiusPercent?: number
   avatarSize: number
   /** 为 true 时禁止拖动精灵热区、禁止点击形象与菜单。 */
   interactionLocked?: boolean
@@ -30,6 +32,7 @@ export function SpriteShell({
   motionProfile = 'template',
   avatarOpacity,
   avatarSize,
+  avatarCornerRadiusPercent = 0,
   interactionLocked = false,
   onDragTrailStart,
   onDragTrailPoint,
@@ -42,6 +45,8 @@ export function SpriteShell({
   const isSmile = spriteState === 'hover' || spriteState === 'notify'
   const faceOpacity = motionProfile === 'enhanced' ? 0.95 : 0.55
   const layoutSizePx = spriteLayoutSizePx(avatarSize)
+  const cornerRadius = `${Math.min(50, Math.max(0, avatarCornerRadiusPercent))}%`
+  const mediaClipStyle = { borderRadius: cornerRadius }
 
   const dragRef = useRef<{
     startX: number
@@ -101,6 +106,7 @@ export function SpriteShell({
       if (dragged) {
         suppressNextClickRef.current = true
         onDragTrailEnd?.()
+        void window.sidekickDesktop?.finishWidgetDrag?.()
       }
       if (fireMenuIfTap && wasTap) {
         suppressNextClickRef.current = true
@@ -159,7 +165,7 @@ export function SpriteShell({
           className={`relative h-full w-full cursor-pointer overflow-hidden outline-none motion-reduce:transition-none focus:outline-none focus-visible:outline-none [-webkit-app-region:no-drag] disabled:cursor-default ${
             interactionLocked ? 'pointer-events-none' : ''
           }`}
-          style={{ animation }}
+          style={{ animation, borderRadius: cornerRadius }}
           aria-label="精灵热区"
         >
           <style>{`
@@ -209,6 +215,7 @@ export function SpriteShell({
                 className="h-full w-full object-contain"
                 style={{
                   opacity: Math.min(1, Math.max(0.4, avatarOpacity / 100)),
+                  ...mediaClipStyle,
                 }}
                 muted
                 playsInline
@@ -221,6 +228,7 @@ export function SpriteShell({
                 className="relative h-full w-full [&_.dotlottie-react]:h-full [&_.dotlottie-react]:w-full"
                 style={{
                   opacity: Math.min(1, Math.max(0.4, avatarOpacity / 100)),
+                  ...mediaClipStyle,
                 }}
               >
                 <DotLottieReact
@@ -239,6 +247,7 @@ export function SpriteShell({
                   className="h-full w-full object-contain"
                   style={{
                     opacity: Math.min(1, Math.max(0.4, avatarOpacity / 100)),
+                    ...mediaClipStyle,
                   }}
                 />
                 <div

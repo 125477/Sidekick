@@ -27,7 +27,7 @@
 以下位置的 **`version` 建议一致**（至少 `packages/electron-app/package.json` 与 Git 标签）：
 
 - 根目录 `package.json`（`0.1.0`）
-- `packages/electron-app/package.json`
+- `packages/electron-app/package.json`（当前 shipping 版本 **1.2.0**）
 
 在 `CHANGELOG.md` 的 **`[Unreleased]`** 下写好本版变更，发版时可新建 `## [0.1.0] - 2026-05-19` 小节。
 
@@ -66,7 +66,7 @@ git push origin v0.1.0
 1. 打开 <https://github.com/125477/Sidekick/releases/new>
 2. **Choose a tag**：选刚推送的 `v0.1.0`（或新建同名 tag）
 3. **Release title**：例如 `v1.1.0` 或 `灵伴 1.1.0`
-4. **Describe**：从 `CHANGELOG.md` 粘贴，或直接使用 [`RELEASE_NOTES_v1.1.0.md`](./RELEASE_NOTES_v1.1.0.md)（GitHub 发布页正文，含下载表与自动更新说明）；可附上：
+4. **Describe**：从 `CHANGELOG.md` 粘贴，或直接使用 [`RELEASE_NOTES_v1.2.0.md`](./RELEASE_NOTES_v1.2.0.md)（或 [`RELEASE_NOTES_v1.1.0.md`](./RELEASE_NOTES_v1.1.0.md)）；可附上：
    - macOS / Windows 各下哪个文件
    - 未签名时的系统安全提示说明
    - 需要的系统版本（如 macOS 12+、Windows 10+）

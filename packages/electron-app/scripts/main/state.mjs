@@ -38,6 +38,7 @@ export function resolveInitialBaseUrl() {
  *   toastTimerId: ReturnType<typeof setTimeout> | null
  *   toastAutoHideAtMs: number | null
  *   toastDisplayDwellSeconds: number
+ *   dockPushDwellSeconds: number
  *   toastAlwaysVisiblePref: boolean
  *   passthroughPollId: ReturnType<typeof setInterval> | null
  *   toastPassthroughClientRect: { left: number; top: number; width: number; height: number } | null
@@ -93,6 +94,7 @@ export const state = {
   toastTimerId: null,
   toastAutoHideAtMs: null,
   toastDisplayDwellSeconds: 0,
+  dockPushDwellSeconds: 15,
   toastAlwaysVisiblePref: false,
   passthroughPollId: null,
   toastPassthroughClientRect: null,

@@ -26,6 +26,7 @@ export type EmotionToastChrome = {
   regenInToolbar: boolean
   messageClickable: boolean
   showCopy: boolean
+  showExport: boolean
   showFavorite: boolean
   showReplay: boolean
   showEmotionFeedback: boolean
@@ -60,7 +61,7 @@ export function useEmotionToastChrome({
   onRegenerate,
   keepRegenerateLoadingUntilUnmount = false,
   onClose,
-  onCopy,
+  onExportCard,
   messageRegeneratesOnClick = true,
   onReplayTts,
   onOpenEmotion,
@@ -128,7 +129,8 @@ export function useEmotionToastChrome({
     !introMode &&
     !spriteInteractionLocked &&
     Boolean(onRegenerate && messageRegeneratesOnClick !== false)
-  const showCopy = !introMode && Boolean(onCopy && message.trim())
+  const showCopy = false
+  const showExport = !introMode && Boolean(onExportCard && message.trim())
   const showFavorite = !introMode && Boolean(onToggleFavorite)
   const showReplay = !introMode && Boolean(onReplayTts)
   const showEmotionFeedback = !introMode && Boolean(onOpenEmotion)
@@ -140,6 +142,7 @@ export function useEmotionToastChrome({
   const hasToolbarActions =
     regenInToolbar ||
     showCopy ||
+    showExport ||
     showFavorite ||
     showReplay ||
     showEmotionFeedback ||
@@ -426,6 +429,7 @@ export function useEmotionToastChrome({
     regenInToolbar,
     messageClickable,
     showCopy,
+    showExport,
     showFavorite,
     showReplay,
     showEmotionFeedback,

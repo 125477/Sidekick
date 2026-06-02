@@ -1,39 +1,50 @@
-import { app, BrowserWindow, screen } from 'electron'
+import { app, BrowserWindow } from 'electron'
 import {
   CORNER_NOTIFICATION_HEIGHT,
-  CORNER_NOTIFICATION_MARGIN,
   CORNER_NOTIFICATION_WIDTH,
 } from './constants.mjs'
+import {
+  computeCornerNotificationBounds,
+  raiseCornerNotificationWindow,
+} from './cornerNotificationLayout.mjs'
+import { loadCornerNotificationFallback } from './cornerNotificationFallback.mjs'
 import { awaitWebContentsNavigationSettled } from './navigationWait.mjs'
 import { preloadPath } from './paths.mjs'
 import { buildRoute, cornerNotificationWebContentsReady } from './route.mjs'
-import { devBaseUrlCandidates } from './resolveLiveBaseUrl.mjs'
+import { resolveLiveBaseUrl } from './resolveLiveBaseUrl.mjs'
 import { state } from './state.mjs'
 import { openPanelWindow } from './windows.mjs'
 
-/**
- * @param {number} width
- * @param {number} height
- * @param {number} [margin]
- */
-export function computeCornerNotificationBounds(
-  width,
-  height,
-  margin = CORNER_NOTIFICATION_MARGIN,
-) {
-  const { workArea } = screen.getPrimaryDisplay()
-  return {
-    x: Math.round(workArea.x + workArea.width - width - margin),
-    y: Math.round(workArea.y + workArea.height - height - margin),
-    width,
-    height,
-  }
-}
+export { computeCornerNotificationBounds } from './cornerNotificationLayout.mjs'
+
+/** 串行加载，避免多路 tick 同时 loadURL 互相 ERR_ABORTED。 */
+let cornerShowQueue = Promise.resolve()
 
 export function hideCornerNotificationWindow() {
   const win = state.cornerNotificationWindow
   if (!win || win.isDestroyed()) return
   win.hide()
+}
+
+/** dev 下优先用精灵/气泡已成功加载的 Vite origin。 */
+function resolveCornerNotificationBaseUrl() {
+  for (const win of [state.spriteWindow, state.toastWindow, state.panelWindow]) {
+    if (!win || win.isDestroyed()) continue
+    try {
+      const raw = win.webContents.getURL()
+      if (!raw || raw === 'about:blank') continue
+      const u = new URL(raw)
+      if (u.protocol === 'http:' || u.protocol === 'https:') {
+        return `${u.origin}/`
+      }
+    } catch {
+      /* noop */
+    }
+  }
+  if (state.baseUrl) {
+    return state.baseUrl.endsWith('/') ? state.baseUrl : `${state.baseUrl}/`
+  }
+  return resolveLiveBaseUrl()
 }
 
 /**
@@ -42,14 +53,34 @@ export function hideCornerNotificationWindow() {
  */
 async function loadCornerNotificationRoute(win, url) {
   await win.loadURL(url)
-  await awaitWebContentsNavigationSettled(win.webContents)
-  return cornerNotificationWebContentsReady(win.webContents)
+  await awaitWebContentsNavigationSettled(win.webContents, { timeoutMs: 12_000 })
+  if (cornerNotificationWebContentsReady(win.webContents)) return true
+  try {
+    return await win.webContents.executeJavaScript(
+      `Boolean(document.querySelector('[role="status"]'))`,
+    )
+  } catch {
+    return false
+  }
 }
 
 /**
  * @param {{ title?: string; body: string; panel?: string; emotionTab?: string }} payload
  */
-export async function showCornerNotificationWindow(payload) {
+export function showCornerNotificationWindow(payload) {
+  cornerShowQueue = cornerShowQueue
+    .then(() => showCornerNotificationWindowInner(payload))
+    .catch((err) => {
+      console.warn('[sidekick] corner notification show error', err)
+      return false
+    })
+  return cornerShowQueue
+}
+
+/**
+ * @param {{ title?: string; body: string; panel?: string; emotionTab?: string }} payload
+ */
+async function showCornerNotificationWindowInner(payload) {
   const body = String(payload?.body ?? '').trim()
   if (!body) return false
 
@@ -79,7 +110,6 @@ export async function showCornerNotificationWindow(payload) {
       focusable: true,
       show: false,
       backgroundColor: '#00000000',
-      ...(process.platform === 'darwin' ? { type: 'panel' } : {}),
       webPreferences: {
         preload: preloadPath,
         contextIsolation: true,
@@ -108,16 +138,29 @@ export async function showCornerNotificationWindow(payload) {
   }
 
   let loaded = false
-  for (const baseUrl of devBaseUrlCandidates()) {
-    const url = buildRoute(baseUrl, 'corner-notification', routeParams)
+  let loadSource = 'vite'
+  const baseUrl = resolveCornerNotificationBaseUrl()
+  const url = buildRoute(baseUrl, 'corner-notification', routeParams)
+
+  try {
+    loaded = await loadCornerNotificationRoute(state.cornerNotificationWindow, url)
+    if (loaded && !app.isPackaged) state.baseUrl = baseUrl
+  } catch (err) {
+    console.warn('[sidekick] corner notification vite load failed', baseUrl, err)
+  }
+
+  if (!loaded) {
+    console.warn('[sidekick] corner notification using inline fallback UI')
+    loadSource = 'fallback'
     try {
-      loaded = await loadCornerNotificationRoute(state.cornerNotificationWindow, url)
-      if (loaded) {
-        if (!app.isPackaged) state.baseUrl = baseUrl
-        break
-      }
+      await loadCornerNotificationFallback(
+        state.cornerNotificationWindow,
+        title,
+        body,
+      )
+      loaded = true
     } catch (err) {
-      console.warn('[sidekick] corner notification load failed', baseUrl, err)
+      console.warn('[sidekick] corner notification fallback load failed', err)
     }
   }
 
@@ -134,6 +177,12 @@ export async function showCornerNotificationWindow(payload) {
   } else {
     state.cornerNotificationWindow.showInactive()
   }
+  raiseCornerNotificationWindow()
+  console.info('[sidekick] corner notification shown', {
+    loadSource,
+    baseUrl: loadSource === 'vite' ? baseUrl : '(inline)',
+    bounds: state.cornerNotificationWindow.getBounds(),
+  })
 
   return true
 }

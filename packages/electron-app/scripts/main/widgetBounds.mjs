@@ -10,13 +10,25 @@ import {
   WIDGET_MIN_HEIGHT,
   WIDGET_MAX_HEIGHT,
 } from './constants.mjs'
+import { readWidgetSessionSnapshot } from './widgetEdgeDock.mjs'
 import { state } from './state.mjs'
 
 export function widgetBoundsFilePath() {
   return path.join(app.getPath('userData'), 'widget-bounds.json')
 }
 
-export function readSavedWidgetBounds() {
+/**
+ * @returns {null | {
+ *   x: number
+ *   y: number
+ *   width: number
+ *   height: number
+ *   dockSide?: 'right' | null
+ *   dockCollapsed?: boolean
+ *   interactionLocked?: boolean
+ * }}
+ */
+export function readSavedWidgetSession() {
   try {
     const raw = fs.readFileSync(widgetBoundsFilePath(), 'utf8')
     const o = JSON.parse(raw)
@@ -25,10 +37,28 @@ export function readSavedWidgetBounds() {
     const width = Number(o.width)
     const height = Number(o.height)
     if (![x, y, width, height].every(Number.isFinite)) return null
-    return { x, y, width, height }
+    const dockSide = o.dockSide === 'right' ? 'right' : null
+    const dockCollapsed = o.dockCollapsed === true
+    const interactionLocked = o.interactionLocked === true
+    return {
+      x,
+      y,
+      width,
+      height,
+      dockSide,
+      dockCollapsed,
+      interactionLocked,
+    }
   } catch {
     return null
   }
+}
+
+/** @deprecated use readSavedWidgetSession */
+export function readSavedWidgetBounds() {
+  const s = readSavedWidgetSession()
+  if (!s) return null
+  return { x: s.x, y: s.y, width: s.width, height: s.height }
 }
 
 /** 首次启动：主显示器工作区右下角；右缘多留空，避免气泡以精灵为中心时超出屏幕。 */
@@ -73,8 +103,11 @@ export function ensureWidgetBoundsVisible(bounds) {
 }
 
 export function resolveInitialWidgetBounds() {
-  const saved = readSavedWidgetBounds()
-  if (saved) return ensureWidgetBoundsVisible(saved)
+  const saved = readSavedWidgetSession()
+  if (saved) {
+    const { x, y, width, height } = saved
+    return ensureWidgetBoundsVisible({ x, y, width, height })
+  }
   return defaultWidgetBounds()
 }
 
@@ -90,7 +123,13 @@ export function schedulePersistWidgetBounds(win) {
 export function persistWidgetBounds(win) {
   if (!win || win.isDestroyed()) return
   try {
-    fs.writeFileSync(widgetBoundsFilePath(), JSON.stringify(win.getBounds()), 'utf8')
+    const bounds = win.getBounds()
+    const session = readWidgetSessionSnapshot()
+    fs.writeFileSync(
+      widgetBoundsFilePath(),
+      JSON.stringify({ ...bounds, ...session }),
+      'utf8',
+    )
   } catch (e) {
     console.error('[sidekick] persist widget bounds failed', e)
   }

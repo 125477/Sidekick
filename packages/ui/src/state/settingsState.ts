@@ -18,6 +18,18 @@ export function clampTextMaxChars(chars: number): number {
   return Math.min(MAX_TEXT_MAX_CHARS, Math.max(MIN_TEXT_MAX_CHARS, Math.floor(n)))
 }
 
+export const MIN_AVATAR_CORNER_RADIUS_PERCENT = 0
+export const MAX_AVATAR_CORNER_RADIUS_PERCENT = 50
+
+export function clampAvatarCornerRadiusPercent(percent: number): number {
+  const n = Number(percent)
+  if (!Number.isFinite(n)) return defaultSettings.avatarCornerRadiusPercent
+  return Math.min(
+    MAX_AVATAR_CORNER_RADIUS_PERCENT,
+    Math.max(MIN_AVATAR_CORNER_RADIUS_PERCENT, Math.floor(n)),
+  )
+}
+
 /** 旧版持久化字段：停留秒数。 */
 export const LEGACY_DEFAULT_DWELL_SECONDS = 60
 
@@ -47,6 +59,19 @@ export function dwellMinutesToSeconds(minutes: number): number {
   return clampDwellMinutes(minutes) * 60
 }
 
+export const MIN_DOCK_PUSH_DWELL_SECONDS = 10
+export const MAX_DOCK_PUSH_DWELL_SECONDS = 30
+export const DEFAULT_DOCK_PUSH_DWELL_SECONDS = 15
+
+export function clampDockPushDwellSeconds(seconds: number): number {
+  const n = Number(seconds)
+  if (!Number.isFinite(n)) return DEFAULT_DOCK_PUSH_DWELL_SECONDS
+  return Math.min(
+    MAX_DOCK_PUSH_DWELL_SECONDS,
+    Math.max(MIN_DOCK_PUSH_DWELL_SECONDS, Math.round(n)),
+  )
+}
+
 export type SidekickSettings = {
   pushEnabled: boolean
   pushIntervalMinutes: number
@@ -60,10 +85,16 @@ export type SidekickSettings = {
   quoteBubbleVariant: QuoteBubbleDisplayMode
   /** 气泡停留时长（分钟）；与推送间隔默认同值。 */
   dwellMinutes: number
+  /** 右缘半露时推送探头展示秒数（10–30）。 */
+  dockPushDwellSeconds: number
+  /** 定时/情境推送时偶尔 resurfacing 收藏句。 */
+  favoriteResurfaceEnabled: boolean
   toastAlwaysVisible: boolean
   clickToFetchEnabled: boolean
   avatarSize: number
   avatarOpacity: number
+  /** 形象裁剪圆角（相对边长的 %）；0 为直角，50 为圆形。 */
+  avatarCornerRadiusPercent: number
   /** 预留：文生图 / 形象生成等接入后可作图像侧 temperature；当前仅持久化，生成链路未读取。 */
   imageTemperature: number
   textStyle: CompanionCopyStyle
@@ -149,7 +180,12 @@ export function settingsEqualExceptAvatarSliders(
   b: SidekickSettings,
 ): boolean {
   for (const k of Object.keys(a) as (keyof SidekickSettings)[]) {
-    if (k === 'avatarSize' || k === 'avatarOpacity') continue
+    if (
+      k === 'avatarSize' ||
+      k === 'avatarOpacity' ||
+      k === 'avatarCornerRadiusPercent'
+    )
+      continue
     const va = a[k]
     const vb = b[k]
     if (k === 'companionInterests') {
@@ -172,7 +208,11 @@ export function onlyAvatarSlidersChanged(
   next: SidekickSettings,
 ): boolean {
   if (!settingsEqualExceptAvatarSliders(prev, next)) return false
-  return prev.avatarSize !== next.avatarSize || prev.avatarOpacity !== next.avatarOpacity
+  return (
+    prev.avatarSize !== next.avatarSize ||
+    prev.avatarOpacity !== next.avatarOpacity ||
+    prev.avatarCornerRadiusPercent !== next.avatarCornerRadiusPercent
+  )
 }
 
 export const defaultSettings: SidekickSettings = {
@@ -186,10 +226,13 @@ export const defaultSettings: SidekickSettings = {
   toastAnchor: 'bottom',
   quoteBubbleVariant: 'companion-tail',
   dwellMinutes: DEFAULT_PUSH_INTERVAL_MINUTES,
+  dockPushDwellSeconds: DEFAULT_DOCK_PUSH_DWELL_SECONDS,
+  favoriteResurfaceEnabled: true,
   toastAlwaysVisible: false,
   clickToFetchEnabled: true,
   avatarSize: 80,
   avatarOpacity: 90,
+  avatarCornerRadiusPercent: 0,
   imageTemperature: 0.5,
   textStyle: '治愈',
   allowEmoji: false,

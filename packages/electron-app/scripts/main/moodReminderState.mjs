@@ -2,10 +2,15 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { app } from 'electron'
 import { showCornerNotificationWindow } from './cornerNotification.mjs'
+import { showSidekickSystemNotification } from './notification.mjs'
 import { state } from './state.mjs'
 
 const REMINDER_TITLE = '灵伴 · 今日心情'
 const REMINDER_BODY = '花一分钟记下今天的心情与日记吧。'
+const MOOD_REMINDER_RETRY_AFTER_FAIL_MS = 5 * 60_000
+
+let moodReminderShowInFlight = false
+let moodReminderLastFailedAt = 0
 
 /** @type {null | {
  *   settingsReady: boolean
@@ -135,20 +140,42 @@ export async function evaluateMoodReminderFromMain() {
     return
   }
 
+  if (moodReminderShowInFlight) return
+  if (
+    moodReminderLastFailedAt > 0 &&
+    Date.now() - moodReminderLastFailedAt < MOOD_REMINDER_RETRY_AFTER_FAIL_MS
+  ) {
+    return
+  }
+
+  const reminderPayload = {
+    title: REMINDER_TITLE,
+    body: REMINDER_BODY,
+    panel: 'emotion',
+    emotionTab: 'summary',
+  }
+
+  moodReminderShowInFlight = true
   try {
-    const ok = await showCornerNotificationWindow({
-      title: REMINDER_TITLE,
-      body: REMINDER_BODY,
-      panel: 'emotion',
-      emotionTab: 'summary',
-    })
+    let ok = await showCornerNotificationWindow(reminderPayload)
+    if (!ok) {
+      console.warn(
+        '[sidekick] in-app corner reminder unavailable, trying system notification',
+      )
+      ok = await showSidekickSystemNotification(reminderPayload)
+    }
     if (ok) {
       persistFiredKey(firedKey)
+      moodReminderLastFailedAt = 0
       console.info('[sidekick] mood reminder shown', firedKey)
     } else {
+      moodReminderLastFailedAt = Date.now()
       console.warn('[sidekick] mood reminder show returned false', firedKey)
     }
   } catch (err) {
+    moodReminderLastFailedAt = Date.now()
     console.warn('[sidekick] mood reminder show failed', err)
+  } finally {
+    moodReminderShowInFlight = false
   }
 }

@@ -4,6 +4,7 @@ import { APP_DISPLAY_NAME } from '../../constants/brand'
 import { PanelBackgroundPicker } from '../panel/PanelBackgroundPicker'
 import {
   clampDwellMinutes,
+  clampDockPushDwellSeconds,
   clampIntervalMinutes,
   clampTextMaxChars,
   isFocusPresetMinutesValid,
@@ -558,6 +559,39 @@ export function SettingsPanel({
                   className="sk-input disabled:cursor-not-allowed"
                 />
               </label>
+              <label
+                className={`grid gap-1 ${settings.toastAlwaysVisible ? 'opacity-50' : ''}`}
+              >
+                <span className="sk-label">贴边推送展示（秒）</span>
+                <input
+                  type="number"
+                  min={10}
+                  max={30}
+                  step={1}
+                  value={settings.dockPushDwellSeconds}
+                  onChange={(event) =>
+                    update(
+                      'dockPushDwellSeconds',
+                      clampDockPushDwellSeconds(
+                        Number(event.target.value) ||
+                          defaultSettings.dockPushDwellSeconds,
+                      ),
+                    )
+                  }
+                  disabled={settings.toastAlwaysVisible}
+                  className="sk-input disabled:cursor-not-allowed"
+                />
+                <span className="text-xs text-[var(--sk-text-muted)]">
+                  精灵贴右缘半露时，主动推送滑出后停留时长（10–30 秒）。
+                </span>
+              </label>
+              <SettingsSwitchRow
+                id="settings-favorite-resurface"
+                labelId="settings-favorite-resurface-lbl"
+                label="收藏句偶尔再现"
+                checked={settings.favoriteResurfaceEnabled}
+                onCheckedChange={(v) => update('favoriteResurfaceEnabled', v)}
+              />
             </SettingsSubsection>
 
             <SettingsSubsection title="气泡位置">
@@ -730,6 +764,22 @@ export function SettingsPanel({
                   className="sk-range w-full"
                 />
               </label>
+              <label className="grid gap-1">
+                <span className="sk-label">圆角（%）</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={50}
+                  value={settings.avatarCornerRadiusPercent}
+                  onChange={(event) =>
+                    update(
+                      'avatarCornerRadiusPercent',
+                      Number(event.target.value),
+                    )
+                  }
+                  className="sk-range w-full"
+                />
+              </label>
             </SettingsSubsection>
           </div>
         )}
@@ -801,6 +851,22 @@ export function SettingsPanel({
                 checked={settings.launchAtLogin}
                 onCheckedChange={(v) => update('launchAtLogin', v)}
               />
+            </SettingsSubsection>
+            <SettingsSubsection title="快捷键">
+              <ul className="list-inside list-disc space-y-1 text-xs text-[var(--sk-text-muted)]">
+                <li>
+                  <kbd className="rounded bg-[var(--sk-callout-bg)] px-1">⌘⇧R</kbd>{' '}
+                  / Ctrl+Shift+R：换一句
+                </li>
+                <li>
+                  <kbd className="rounded bg-[var(--sk-callout-bg)] px-1">⌘⇧E</kbd>{' '}
+                  / Ctrl+Shift+E：打开今日小结
+                </li>
+                <li>
+                  <kbd className="rounded bg-[var(--sk-callout-bg)] px-1">⌘⇧C</kbd>{' '}
+                  / Ctrl+Shift+C：导出当前陪伴卡片
+                </li>
+              </ul>
             </SettingsSubsection>
             <AppUpdateSettingsSection />
             <SettingsSubsection title="外观与语言">

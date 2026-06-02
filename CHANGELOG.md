@@ -8,6 +8,22 @@
 
 （暂无）
 
+## [1.2.0] - 2026-06-01
+
+### Added
+
+- 贴边推送展示秒数可配置（`dockPushDwellSeconds`，默认 15s）。
+- 兴趣深化：气泡 hover「点击输入」→ 提交写入 `companionInterests`。
+- 收藏句偶尔再现（`favoriteResurfaceEnabled`）。
+- 今日小结连续天数徽章（`MoodJournalStreakBadge`）。
+- 开机恢复窗口位置、右缘半露与勿扰锁状态。
+- 全局快捷键：换一句 / 今日小结 / 导出卡片。
+- 陪伴卡片导出面板（多气泡样式、PNG 导出）；工具栏复制改为导出。
+
+### Changed
+
+- 吸附推送 dwell 由硬编码改为主进程读取设置同步值。
+
 ## [1.1.0] - 2026-05-22
 
 ### Added

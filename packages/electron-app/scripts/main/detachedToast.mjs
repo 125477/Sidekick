@@ -1,4 +1,5 @@
 import { TOAST_WINDOW_WIDTH, TOAST_WINDOW_HEIGHT } from './constants.mjs'
+import { refreshCornerNotificationBoundsIfVisible } from './cornerNotificationLayout.mjs'
 import { buildRoute, toastWebContentsUrlIsDetachedToastMode } from './route.mjs'
 import { state } from './state.mjs'
 import { stopToastPassthroughHitTest } from './toastPassthrough.mjs'
@@ -53,6 +54,7 @@ export function applyToastWindowBounds() {
     anchor: effectiveAnchor,
     placement: effectiveAnchor === 'top' ? 'above' : 'below',
   })
+  refreshCornerNotificationBoundsIfVisible()
 }
 
 /**

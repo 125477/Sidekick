@@ -8,9 +8,18 @@ import {
 import { devBaseUrlCandidates, resolveLiveBaseUrl } from './resolveLiveBaseUrl.mjs'
 import { preloadPath } from './paths.mjs'
 import { buildRoute } from './route.mjs'
+import {
+  hideSpriteMenuDismissOverlays,
+  setSpriteMenuOutsideDismissHandler,
+  showSpriteMenuDismissOverlays,
+} from './spriteMenuDismissOverlay.mjs'
 import { state } from './state.mjs'
 
 const SPRITE_MENU_BLUR_GRACE_MS = 400
+
+setSpriteMenuOutsideDismissHandler(() => {
+  closeWidgetSpriteMenuWindow({ notify: true })
+})
 
 /** @type {number} */
 let spriteMenuIgnoreBlurUntil = 0
@@ -97,12 +106,16 @@ function detachSpriteMenuDismissHooks() {
 function shouldDismissSpriteMenu(menuWin) {
   if (!menuWin || menuWin.isDestroyed() || !menuWin.isVisible()) return false
   if (Date.now() < spriteMenuIgnoreBlurUntil) return false
-  return BrowserWindow.getFocusedWindow() !== menuWin
+  return true
 }
 
 function dismissSpriteMenuIfNeeded(menuWin) {
   if (!shouldDismissSpriteMenu(menuWin)) return
   closeWidgetSpriteMenuWindow({ notify: true })
+}
+
+function scheduleDismissSpriteMenuIfNeeded(menuWin) {
+  setTimeout(() => dismissSpriteMenuIfNeeded(menuWin), 0)
 }
 
 /** 失焦或点到其它窗口（含桌面 / 其它 App）时关闭菜单。 */
@@ -113,11 +126,11 @@ function attachSpriteMenuDismissHandlers(menuWin) {
   } catch {
     /* noop */
   }
-  menuWin.on('blur', () => dismissSpriteMenuIfNeeded(menuWin))
+  menuWin.on('blur', () => scheduleDismissSpriteMenuIfNeeded(menuWin))
 
   const onAppWindowFocus = (_event, focusedWin) => {
     if (focusedWin === menuWin) return
-    dismissSpriteMenuIfNeeded(menuWin)
+    scheduleDismissSpriteMenuIfNeeded(menuWin)
   }
   app.on('browser-window-focus', onAppWindowFocus)
   spriteMenuDismissHooks = { onAppWindowFocus }
@@ -153,6 +166,7 @@ async function loadSpriteMenuPage(win, theme) {
 
 export function closeWidgetSpriteMenuWindow(opts = {}) {
   detachSpriteMenuDismissHooks()
+  hideSpriteMenuDismissOverlays()
   const notify = opts.notify === true
   const w = state.spriteMenuWindow
   if (!w || w.isDestroyed()) {
@@ -273,8 +287,10 @@ export function openWidgetSpriteMenuWindow(payload, invoker) {
       if (win.isDestroyed() || state.spriteMenuWindow !== win) return
       spriteMenuIgnoreBlurUntil = Date.now() + SPRITE_MENU_BLUR_GRACE_MS
       attachSpriteMenuDismissHandlers(win)
+      showSpriteMenuDismissOverlays(win)
       win.show()
       win.focus()
+      win.moveTop()
       spriteMenuIgnoreBlurUntil = Date.now() + SPRITE_MENU_BLUR_GRACE_MS
     }
 

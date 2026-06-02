@@ -67,6 +67,7 @@ export const PANEL_WINDOW_TITLE = {
   emotion: '情绪反馈',
   fortune: '每日抽签',
   favorites: '收藏历史',
+  'companion-export': '导出卡片',
 }
 
 export const WIDGET_MIN_WIDTH = 300

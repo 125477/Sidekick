@@ -1,11 +1,65 @@
 import { screen } from 'electron'
+import { tickWidgetDockHoverPassthrough, isWidgetDockActive } from './widgetEdgeDock.mjs'
 import { state } from './state.mjs'
 
 function stopPassthroughPollIfIdle() {
-  if (state.toastPassthroughClientRect || state.widgetPassthroughClientRect) return
+  if (
+    state.toastPassthroughClientRect ||
+    state.widgetPassthroughClientRect ||
+    state.lastSpriteInteractionLocked ||
+    isWidgetDockActive()
+  ) {
+    return
+  }
   if (state.passthroughPollId != null) {
     clearInterval(state.passthroughPollId)
     state.passthroughPollId = null
+  }
+}
+
+function pointInScreenRect(p, rect) {
+  return (
+    p.x >= rect.left &&
+    p.x < rect.left + rect.width &&
+    p.y >= rect.top &&
+    p.y < rect.top + rect.height
+  )
+}
+
+/** `clientRect` 为窗口客户区坐标。 */
+function tickWindowPassthrough(win, clientRect) {
+  if (!win || win.isDestroyed() || !clientRect) return
+  let cb
+  try {
+    cb = win.getContentBounds()
+  } catch {
+    return
+  }
+  const ax = cb.x + clientRect.left
+  const ay = cb.y + clientRect.top
+  const p = screen.getCursorScreenPoint()
+  const inside = pointInScreenRect(p, {
+    left: ax,
+    top: ay,
+    width: clientRect.width,
+    height: clientRect.height,
+  })
+  try {
+    win.setIgnoreMouseEvents(!inside, { forward: true })
+  } catch {
+    /* noop */
+  }
+}
+
+/** `screenRect` 为屏幕坐标（边缘吸附 hover 条带）。 */
+function tickWindowPassthroughScreen(win, screenRect) {
+  if (!win || win.isDestroyed() || !screenRect) return
+  const p = screen.getCursorScreenPoint()
+  const inside = pointInScreenRect(p, screenRect)
+  try {
+    win.setIgnoreMouseEvents(!inside, { forward: true })
+  } catch {
+    /* noop */
   }
 }
 
@@ -27,58 +81,59 @@ function normalizeClientRect(payload) {
   return { left, top, width, height }
 }
 
-function tickWindowPassthrough(win, clientRect) {
-  if (!win || win.isDestroyed() || !clientRect) return
-  let cb
-  try {
-    cb = win.getContentBounds()
-  } catch {
+function applyToastWindowMousePolicy() {
+  if (!state.toastWindow || state.toastWindow.isDestroyed()) return
+  if (state.toastPassthroughClientRect) {
+    tickWindowPassthrough(state.toastWindow, state.toastPassthroughClientRect)
     return
   }
-  const ax = cb.x + clientRect.left
-  const ay = cb.y + clientRect.top
-  const p = screen.getCursorScreenPoint()
-  const inside =
-    p.x >= ax &&
-    p.x < ax + clientRect.width &&
-    p.y >= ay &&
-    p.y < ay + clientRect.height
+  /** 独立气泡已显示但尚未上报热区（或锁定态暂无可点条）：透明区域应穿透，避免挡住右下角提醒等其它窗。 */
+  const detachedVisible =
+    state.toastWindow.isVisible() && state.lastToastSession != null
   try {
-    win.setIgnoreMouseEvents(!inside, { forward: true })
+    if (detachedVisible) {
+      state.toastWindow.setIgnoreMouseEvents(true, { forward: true })
+    } else {
+      state.toastWindow.setIgnoreMouseEvents(false)
+    }
+  } catch {
+    /* noop */
+  }
+}
+
+function applyWidgetWindowMousePolicy() {
+  if (!state.spriteWindow || state.spriteWindow.isDestroyed()) return
+
+  const dockHit = tickWidgetDockHoverPassthrough()
+  if (dockHit) {
+    tickWindowPassthroughScreen(state.spriteWindow, dockHit)
+    return
+  }
+
+  if (state.lastSpriteInteractionLocked) {
+    try {
+      state.spriteWindow.setIgnoreMouseEvents(true, { forward: true })
+    } catch {
+      /* noop */
+    }
+    return
+  }
+
+  if (state.widgetPassthroughClientRect) {
+    tickWindowPassthrough(state.spriteWindow, state.widgetPassthroughClientRect)
+    return
+  }
+
+  try {
+    state.spriteWindow.setIgnoreMouseEvents(false)
   } catch {
     /* noop */
   }
 }
 
 export function tickPassthroughHitTests() {
-  if (state.toastWindow && !state.toastWindow.isDestroyed() && state.toastPassthroughClientRect) {
-    tickWindowPassthrough(state.toastWindow, state.toastPassthroughClientRect)
-  } else if (state.toastWindow && !state.toastWindow.isDestroyed()) {
-    try {
-      state.toastWindow.setIgnoreMouseEvents(false)
-    } catch {
-      /* noop */
-    }
-  }
-
-  if (
-    state.spriteWindow &&
-    !state.spriteWindow.isDestroyed() &&
-    !state.lastSpriteInteractionLocked &&
-    state.widgetPassthroughClientRect
-  ) {
-    tickWindowPassthrough(state.spriteWindow, state.widgetPassthroughClientRect)
-  } else if (
-    state.spriteWindow &&
-    !state.spriteWindow.isDestroyed() &&
-    !state.lastSpriteInteractionLocked
-  ) {
-    try {
-      state.spriteWindow.setIgnoreMouseEvents(false)
-    } catch {
-      /* noop */
-    }
-  }
+  applyToastWindowMousePolicy()
+  applyWidgetWindowMousePolicy()
 }
 
 export function setToastPassthroughClientRect(payload) {
@@ -93,7 +148,11 @@ export function setToastPassthroughClientRect(payload) {
 
 export function setWidgetPassthroughClientRect(payload) {
   state.widgetPassthroughClientRect = normalizeClientRect(payload)
-  if (state.widgetPassthroughClientRect && !state.lastSpriteInteractionLocked) {
+  if (
+    state.widgetPassthroughClientRect ||
+    state.lastSpriteInteractionLocked ||
+    isWidgetDockActive()
+  ) {
     ensurePassthroughPoll()
   } else {
     stopPassthroughPollIfIdle()
@@ -111,17 +170,13 @@ export function tickToastPassthroughHitTest() {
   tickPassthroughHitTests()
 }
 
-/** 精灵锁定：整窗穿透。未锁：由 `widgetPassthroughClientRect` 控制可点区域。 */
+/** 精灵锁定：边缘吸附 + 漏出条带可 hover 展开；未锁：由 `widgetPassthroughClientRect` 控制可点区域。 */
 export function applyWidgetWindowSpritePassthrough(wantPassthrough) {
   if (!state.spriteWindow || state.spriteWindow.isDestroyed()) return
   if (wantPassthrough) {
     state.widgetPassthroughClientRect = null
-    stopPassthroughPollIfIdle()
-    try {
-      state.spriteWindow.setIgnoreMouseEvents(true, { forward: true })
-    } catch {
-      /* noop */
-    }
+    ensurePassthroughPoll()
+    tickPassthroughHitTests()
     return
   }
   try {

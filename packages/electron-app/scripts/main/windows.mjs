@@ -18,6 +18,7 @@ import {
 import {
   applyToastWindowBounds,
 } from './detachedToast.mjs'
+import { refreshCornerNotificationBoundsIfVisible } from './cornerNotificationLayout.mjs'
 import {
   resolveToastDwellSeconds,
   scheduleToastAutoHide,
@@ -38,7 +39,16 @@ import {
   persistWidgetBounds,
   resolveInitialWidgetBounds,
   schedulePersistWidgetBounds,
+  readSavedWidgetSession,
 } from './widgetBounds.mjs'
+import {
+  applyWidgetDockPlaceOverride,
+  getWidgetDockPlaceOverride,
+  isWidgetDockCollapsed,
+  maybeRevealDockForPush,
+  finishDockPushReveal,
+  restoreWidgetSessionFromSaved,
+} from './widgetEdgeDock.mjs'
 
 export function createSpriteWindow() {
   const window = new BrowserWindow({
@@ -92,6 +102,16 @@ export function createSpriteWindow() {
 
   window.webContents.once('did-finish-load', () => {
     void warmDragTrailWindow()
+    const saved = readSavedWidgetSession()
+    if (saved) {
+      setTimeout(() => {
+        void restoreWidgetSessionFromSaved(saved, { animated: false })
+      }, 450)
+    } else if (getWidgetDockPlaceOverride() !== 0) {
+      setTimeout(() => {
+        void applyWidgetDockPlaceOverride({ animated: false })
+      }, 450)
+    }
   })
 
   window.on('move', () => {
@@ -156,6 +176,9 @@ export function openPanelWindow(panel, opts = {}) {
   const params = { panel }
   if (opts.emotionTab === 'summary' || opts.emotionTab === 'moment') {
     params.emotionTab = opts.emotionTab
+  }
+  if (typeof opts.exportMessage === 'string' && opts.exportMessage.trim()) {
+    params.exportMessage = opts.exportMessage.trim().slice(0, 200)
   }
   if (state.panelWindow && !state.panelWindow.isDestroyed()) {
     void state.panelWindow.loadURL(buildRoute(state.baseUrl, 'panel', params))
@@ -278,7 +301,17 @@ async function applyToastWindowPayload(payload) {
     typeof payload?.favorite === 'boolean' ? payload.favorite : undefined
   const toastIntro = payload?.toastIntro === true
   state.lastPreferredToastAnchor = payload?.anchor === 'bottom' ? 'bottom' : 'top'
-  const dwellSeconds = resolveToastDwellSeconds(payload)
+  let dwellSeconds = resolveToastDwellSeconds(payload)
+  const dockPushFromCollapsed =
+    !toastIntro &&
+    !state.lastSpriteInteractionLocked &&
+    isWidgetDockCollapsed()
+  if (dockPushFromCollapsed) {
+    await maybeRevealDockForPush()
+    if (dwellSeconds > 0) {
+      dwellSeconds = state.dockPushDwellSeconds
+    }
+  }
   stopToastPassthroughHitTest()
 
   if (!state.toastWindow || state.toastWindow.isDestroyed()) {
@@ -372,6 +405,7 @@ async function applyToastWindowPayload(payload) {
     state.toastWindow.showInactive()
     wc.send('sidekick:sprite-interaction-locked', state.lastSpriteInteractionLocked)
     scheduleToastAutoHide(dwellSeconds, { resetDwell })
+    refreshCornerNotificationBoundsIfVisible()
     return
   }
 
@@ -405,6 +439,7 @@ async function applyToastWindowPayload(payload) {
   }
 
   scheduleToastAutoHide(dwellSeconds, { resetDwell: true })
+  refreshCornerNotificationBoundsIfVisible()
 }
 
 export function hideToastWindow() {
@@ -415,4 +450,5 @@ export function hideToastWindow() {
   if (state.toastWindow && !state.toastWindow.isDestroyed()) {
     state.toastWindow.hide()
   }
+  void finishDockPushReveal()
 }

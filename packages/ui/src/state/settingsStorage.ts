@@ -9,9 +9,11 @@ import {
   DEFAULT_PUSH_INTERVAL_MINUTES,
   LEGACY_DEFAULT_DWELL_SECONDS,
   clampDwellMinutes,
+  clampDockPushDwellSeconds,
   normalizeFocusPresetMinutes,
   clampIntervalMinutes,
   clampTextMaxChars,
+  clampAvatarCornerRadiusPercent,
   defaultSettings,
 } from './settingsState'
 
@@ -52,6 +54,12 @@ export async function loadSettings(): Promise<SidekickSettings> {
   }
   delete merged.dwellSeconds
   merged.dwellMinutes = clampDwellMinutes(merged.dwellMinutes)
+  merged.dockPushDwellSeconds = clampDockPushDwellSeconds(
+    merged.dockPushDwellSeconds ?? defaultSettings.dockPushDwellSeconds,
+  )
+  if (typeof merged.favoriteResurfaceEnabled !== 'boolean') {
+    merged.favoriteResurfaceEnabled = defaultSettings.favoriteResurfaceEnabled
+  }
   merged.pushIntervalMinutes = clampIntervalMinutes(merged.pushIntervalMinutes)
   if (
     merged.dwellMinutes === 1 &&
@@ -114,6 +122,9 @@ export async function loadSettings(): Promise<SidekickSettings> {
     Number.isFinite(imgOp) && imgOp >= 0.2 && imgOp <= 1
       ? imgOp
       : defaultSettings.panelBackgroundImageOpacity
+  merged.avatarCornerRadiusPercent = clampAvatarCornerRadiusPercent(
+    merged.avatarCornerRadiusPercent,
+  )
 
   const darkSource = merged.darkModeSource
   merged.darkModeSource =

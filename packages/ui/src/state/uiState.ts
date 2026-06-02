@@ -5,6 +5,7 @@ export type ActivePanel =
   | 'emotion'
   | 'fortune'
   | 'favorites'
+  | 'companion-export'
 export type SkinTab = 'jimeng' | 'upload'
 export type ToastAnchor = 'top' | 'bottom'
 export type MenuState = 'closed' | 'opening' | 'open' | 'closing'

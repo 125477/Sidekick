@@ -1,4 +1,10 @@
-type SidekickPanel = 'skin' | 'settings' | 'emotion' | 'fortune' | 'favorites'
+type SidekickPanel =
+  | 'skin'
+  | 'settings'
+  | 'emotion'
+  | 'fortune'
+  | 'favorites'
+  | 'companion-export'
 
 type SidekickSpriteMenuAction =
   | 'skin'
@@ -111,7 +117,7 @@ type AppUpdateSnapshot = {
 type SidekickDesktopApi = {
   openPanelWindow: (
     panel: SidekickPanel,
-    opts?: { emotionTab?: 'moment' | 'summary' },
+    opts?: { emotionTab?: 'moment' | 'summary'; exportMessage?: string },
   ) => Promise<void>
   /** 系统通知（点击可打开情绪面板并定位到今日小结）。 */
   showSystemNotification?: (payload: {
@@ -166,7 +172,12 @@ type SidekickDesktopApi = {
   syncToastDisplaySettings?: (payload: {
     dwellSeconds: number
     toastAlwaysVisible: boolean
+    dockPushDwellSeconds?: number
   }) => Promise<void>
+  /** 全局快捷键：换一句 / 导出卡片等。 */
+  onGlobalShortcut?: (
+    callback: (payload: { action: string }) => void,
+  ) => () => void
   /**
    * 已展示独立气泡时，主进程优先用 IPC 同步版式；仅在页面未就绪时整页重载。无气泡则仅更新主进程偏好。
    * 精灵窗与独立 Panel 设置窗均可调用（不依赖各窗的 `lastShownToastMessageRef`）。
@@ -227,6 +238,15 @@ type SidekickDesktopApi = {
   resizeWidgetWindow?: (payload: { height: number; width?: number }) => Promise<void>
   /** 挂件精灵窗：在形象 `no-drag` 热区内拖动时，由主进程按增量平移窗口（避免 `-webkit-app-region: drag` 吞点击）。 */
   moveWidgetBy?: (payload: { dx: number; dy: number }) => Promise<void>
+  /** 拖动结束：主进程判断是否吸附屏幕边缘。 */
+  finishWidgetDrag?: () => Promise<void>
+  /** 挂件边缘吸附态（半露 / 展开）视觉同步。 */
+  onWidgetDockVisual?: (
+    callback: (payload: {
+      side: 'right' | null
+      phase: 'free' | 'docking' | 'docked' | 'expanding' | 'expanded'
+    }) => void,
+  ) => () => void
   /** 打开/复用全屏拖尾 overlay，在拖动开始时调用。 */
   beginDragTrail?: (payload: {
     screenX: number

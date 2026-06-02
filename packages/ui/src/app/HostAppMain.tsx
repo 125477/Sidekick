@@ -101,6 +101,7 @@ export function HostAppMain({
                     motionProfile={selectedAvatar?.motionProfile}
                     avatarSize={settings.avatarSize}
                     avatarOpacity={settings.avatarOpacity}
+                    avatarCornerRadiusPercent={settings.avatarCornerRadiusPercent}
                     interactionLocked={spriteInteractionLocked}
                     onToggleMenu={() => {
                       if (!menuExpandedForToggle) {

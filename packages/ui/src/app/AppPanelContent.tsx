@@ -7,6 +7,9 @@ import { SkinningPanel } from '../components/skinning/SkinningPanel'
 import { UploadTab } from '../components/skinning/UploadTab'
 import { DailyFortunePanel } from '../components/fortune/DailyFortunePanel'
 import { FavoriteTextsPanel } from '../components/favorites/FavoriteTextsPanel'
+import { CompanionQuoteExportPanel } from '../components/export/CompanionQuoteExportPanel'
+import { readCompanionExportSession } from '../app/companionExportSession'
+import type { QuoteBubbleDisplayMode } from '../components/emotion/moodHistory/quoteBubbleSettings'
 import {
   defaultSettings,
   onlyAvatarSlidersChanged,
@@ -211,5 +214,17 @@ export function AppPanelContent({
         <FavoriteTextsPanel fillAvailable={isPanelMode} />
       </div>
     </div>
+  ) : uiState.activePanel === 'companion-export' ? (
+    <CompanionQuoteExportPanel
+      initialMessage={
+        readCompanionExportSession()?.message ??
+        '愿你的每一天，都有小小的温暖。'
+      }
+      initialVariant={
+        (readCompanionExportSession()?.variant as
+          | QuoteBubbleDisplayMode
+          | undefined) ?? settings.quoteBubbleVariant
+      }
+    />
   ) : null
 }
