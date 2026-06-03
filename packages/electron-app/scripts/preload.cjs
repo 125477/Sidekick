@@ -60,6 +60,9 @@ contextBridge.exposeInMainWorld('sidekickDesktop', {
   hideToastWindow() {
     return ipcRenderer.invoke('sidekick:hide-toast')
   },
+  isCompanionToastVisible() {
+    return ipcRenderer.invoke('sidekick:is-companion-toast-visible')
+  },
   /** 独立气泡窗：锁定后点击穿透；传 `null` 关闭。`rect` 为视口内 getBoundingClientRect（与主进程 getContentBounds 合成屏幕坐标）。 */
   reportToastPassthroughInteractRect(rect) {
     ipcRenderer.send('sidekick:toast-passthrough-interact-rect', rect)

@@ -2,7 +2,6 @@ const EXPORT_SESSION_KEY = 'sidekick.companion.export.v1'
 
 export type CompanionExportSession = {
   message: string
-  variant?: string
 }
 
 export function stashCompanionExportSession(session: CompanionExportSession): void {
@@ -25,14 +24,19 @@ export function clearCompanionExportSession(): void {
   sessionStorage.removeItem(EXPORT_SESSION_KEY)
 }
 
-export function openCompanionExportPanel(
-  message: string,
-  variant?: string,
-): void {
-  stashCompanionExportSession({
-    message,
-    ...(variant ? { variant } : {}),
-  })
+/** 独立 panel 窗与 widget 不共享 sessionStorage，优先读 URL `exportMessage`。 */
+export function resolveCompanionExportInitialMessage(
+  exportMessageFromQuery?: string | null,
+): string {
+  const fromQuery = exportMessageFromQuery?.trim()
+  if (fromQuery) return fromQuery.slice(0, 200)
+  const fromSession = readCompanionExportSession()?.message?.trim()
+  if (fromSession) return fromSession
+  return ''
+}
+
+export function openCompanionExportPanel(message: string): void {
+  stashCompanionExportSession({ message })
   void window.sidekickDesktop?.openPanelWindow?.('companion-export', {
     exportMessage: message.slice(0, 200),
   })

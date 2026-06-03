@@ -49,6 +49,7 @@ import {
   finishDockPushReveal,
   restoreWidgetSessionFromSaved,
 } from './widgetEdgeDock.mjs'
+import { syncAppDockVisibility } from './appDockVisibility.mjs'
 
 export function createSpriteWindow() {
   const window = new BrowserWindow({
@@ -112,6 +113,7 @@ export function createSpriteWindow() {
         void applyWidgetDockPlaceOverride({ animated: false })
       }, 450)
     }
+    syncAppDockVisibility()
   })
 
   window.on('move', () => {
@@ -184,6 +186,7 @@ export function openPanelWindow(panel, opts = {}) {
     void state.panelWindow.loadURL(buildRoute(state.baseUrl, 'panel', params))
     state.panelWindow.show()
     state.panelWindow.focus()
+    syncAppDockVisibility()
     return
   }
 
@@ -195,6 +198,7 @@ export function openPanelWindow(panel, opts = {}) {
     title: `${APP_DISPLAY_NAME} · ${PANEL_WINDOW_TITLE[panel] ?? panel}`,
     autoHideMenuBar: true,
     show: false,
+    skipTaskbar: true,
     backgroundColor: AUX_WINDOW_BACKGROUND,
     webPreferences: {
       preload: preloadPath,
@@ -206,6 +210,7 @@ export function openPanelWindow(panel, opts = {}) {
     if (!state.panelWindow || state.panelWindow.isDestroyed()) return
     state.panelWindow.show()
     state.panelWindow.focus()
+    syncAppDockVisibility()
   })
   void state.panelWindow.loadURL(buildRoute(state.baseUrl, 'panel', params)).catch((err) => {
     console.error('[sidekick] panel loadURL failed', err)
@@ -216,6 +221,7 @@ export function openPanelWindow(panel, opts = {}) {
   })
   state.panelWindow.on('closed', () => {
     state.panelWindow = null
+    syncAppDockVisibility()
   })
 }
 
@@ -223,6 +229,7 @@ export function openOnboardingWindow() {
   if (state.onboardingWindow && !state.onboardingWindow.isDestroyed()) {
     state.onboardingWindow.show()
     state.onboardingWindow.focus()
+    syncAppDockVisibility()
     return
   }
 
@@ -234,6 +241,7 @@ export function openOnboardingWindow() {
     title: `${APP_DISPLAY_NAME} · 首次引导`,
     autoHideMenuBar: true,
     show: false,
+    skipTaskbar: true,
     backgroundColor: AUX_WINDOW_BACKGROUND,
     webPreferences: {
       preload: preloadPath,
@@ -246,6 +254,7 @@ export function openOnboardingWindow() {
     state.onboardingWindow.show()
     state.onboardingWindow.center()
     state.onboardingWindow.focus()
+    syncAppDockVisibility()
   })
   void state.onboardingWindow.loadURL(buildRoute(state.baseUrl, 'onboarding')).catch((err) => {
     console.error('[sidekick] onboarding loadURL failed', err)
@@ -256,6 +265,7 @@ export function openOnboardingWindow() {
   })
   state.onboardingWindow.on('closed', () => {
     state.onboardingWindow = null
+    syncAppDockVisibility()
   })
 }
 
@@ -406,6 +416,7 @@ async function applyToastWindowPayload(payload) {
     wc.send('sidekick:sprite-interaction-locked', state.lastSpriteInteractionLocked)
     scheduleToastAutoHide(dwellSeconds, { resetDwell })
     refreshCornerNotificationBoundsIfVisible()
+    syncAppDockVisibility()
     return
   }
 
@@ -440,6 +451,19 @@ async function applyToastWindowPayload(payload) {
 
   scheduleToastAutoHide(dwellSeconds, { resetDwell: true })
   refreshCornerNotificationBoundsIfVisible()
+  syncAppDockVisibility()
+}
+
+/** 与 UI `SIDEKICK_MORE_FEATURES_PLACEHOLDER` 一致；引导占位不算「陪伴文案在展示」。 */
+const COMPANION_INTRO_PLACEHOLDER = '更多功能将在 V1.1 解锁。'
+
+export function isCompanionToastVisible() {
+  if (!state.toastWindow || state.toastWindow.isDestroyed()) return false
+  if (!state.toastWindow.isVisible()) return false
+  const message = state.lastToastSession?.message?.replace(/\s+/g, ' ').trim() ?? ''
+  if (message.length < 2) return false
+  if (message === COMPANION_INTRO_PLACEHOLDER) return false
+  return true
 }
 
 export function hideToastWindow() {
@@ -451,4 +475,5 @@ export function hideToastWindow() {
     state.toastWindow.hide()
   }
   void finishDockPushReveal()
+  syncAppDockVisibility()
 }

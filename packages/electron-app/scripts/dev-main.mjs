@@ -10,6 +10,7 @@ import { appDockIconPath } from './main/paths.mjs'
 import { state } from './main/state.mjs'
 import { persistWidgetBounds } from './main/widgetBounds.mjs'
 import { registerGlobalShortcuts } from './main/globalShortcuts.mjs'
+import { syncAppDockVisibility } from './main/appDockVisibility.mjs'
 
 registerSidekickIpcHandlers()
 
@@ -27,6 +28,7 @@ app.whenReady().then(() => {
   }
 
   createSpriteWindow()
+  syncAppDockVisibility()
   registerGlobalShortcuts()
   registerAutoUpdaterLifecycle()
   registerPowerMonitorResume()

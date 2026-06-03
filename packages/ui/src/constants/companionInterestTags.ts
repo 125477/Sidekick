@@ -1,3 +1,6 @@
+/** 问答兴趣补充：单条最多 100 字。 */
+export const COMPANION_INTEREST_ANSWER_MAX_CHARS = 100
+
 /** 设置与首次引导共用的兴趣标签选项 */
 export const COMPANION_INTEREST_TAG_OPTIONS = [
   '音乐',

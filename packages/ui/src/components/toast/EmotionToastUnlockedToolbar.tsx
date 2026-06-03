@@ -10,6 +10,7 @@ import { EmotionToastToolbarIconButton } from './EmotionToastToolbarButton'
 import {
   IconToolbarClose,
   IconToolbarEmotion,
+  IconToolbarExport,
   IconToolbarLockClosed,
   IconToolbarLockOpen,
   IconToolbarMenu,
@@ -215,12 +216,10 @@ export function EmotionToastUnlockedToolbar({
               </div>
             ) : null}
             {!introMode && onInterestAnswer ? (
-              <div className="px-1 pb-1">
-                <ToastInterestCaptureRow
-                  disabled={regenerating}
-                  onSubmit={(answer) => onInterestAnswer(answer)}
-                />
-              </div>
+              <ToastInterestCaptureRow
+                disabled={regenerating}
+                onSubmit={(answer) => onInterestAnswer(answer)}
+              />
             ) : null}
             <div aria-hidden className="h-1.5 w-full shrink-0" />
             <div className="emotion-toast-toolbar -mt-1.5 overflow-hidden rounded-b-2xl">
@@ -298,7 +297,7 @@ export function EmotionToastUnlockedToolbar({
                   await Promise.resolve(onExportCard?.())
                 }}
               >
-                <span className="text-[10px] font-semibold leading-none">导出</span>
+                <IconToolbarExport className="h-[15px] w-[15px] shrink-0" />
               </EmotionToastToolbarIconButton>
             ) : null}
             {!spriteInteractionLockedOnly && showReplay ? (

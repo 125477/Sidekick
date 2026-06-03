@@ -59,6 +59,7 @@ import {
 import {
   createSpriteWindow,
   hideToastWindow,
+  isCompanionToastVisible,
   openOnboardingWindow,
   openPanelWindow,
   showToastWindow,
@@ -170,6 +171,9 @@ export function registerSidekickIpcHandlers() {
   })
   ipcMain.handle('sidekick:hide-toast', () => {
     hideToastWindow()
+  })
+  ipcMain.handle('sidekick:is-companion-toast-visible', () => {
+    return isCompanionToastVisible()
   })
   ipcMain.on('sidekick:toast-passthrough-interact-rect', (_event, payload) => {
     if (!state.toastWindow || state.toastWindow.isDestroyed()) return

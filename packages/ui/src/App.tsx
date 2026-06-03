@@ -187,6 +187,7 @@ function App() {
     toastIntroFromQuery,
     toastAutoTtsFromQuery,
     emotionTabFromQuery,
+    exportMessageFromQuery,
     cornerNotificationTitle,
     cornerNotificationMessage,
   } = readAppSearchParams()
@@ -390,6 +391,8 @@ function App() {
     showToastMessage,
     setToastMeta,
     setSpriteState,
+    toastVisible,
+    lastShownToastMessageRef,
   })
 
   useAppSelfIntroBubble({
@@ -466,6 +469,7 @@ function App() {
       showToastMessage={showToastMessage}
       restartOnboarding={restartOnboarding}
       isPanelMode={isPanelMode}
+      exportMessageFromQuery={exportMessageFromQuery}
       setAvatars={setAvatars}
     />
   )

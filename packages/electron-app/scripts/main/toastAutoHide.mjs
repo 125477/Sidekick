@@ -1,6 +1,7 @@
 import { state } from './state.mjs'
 import { stopToastPassthroughHitTest } from './toastPassthrough.mjs'
 import { finishDockPushReveal } from './widgetEdgeDock.mjs'
+import { syncAppDockVisibility } from './appDockVisibility.mjs'
 
 function hideToastWindowNow() {
   if (state.toastWindow && !state.toastWindow.isDestroyed()) {
@@ -9,6 +10,7 @@ function hideToastWindowNow() {
   }
   state.toastTimerId = null
   void finishDockPushReveal()
+  syncAppDockVisibility()
 }
 
 /** 清除主进程气泡自动隐藏计时（不隐藏窗口）。锁定期间保留截止时刻，解锁后按剩余时间继续。 */

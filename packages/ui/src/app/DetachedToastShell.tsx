@@ -14,6 +14,7 @@ import { saveAppSelfIntroShown } from '../state/appSelfIntroStorage'
 import { broadcastAppSelfIntroDismissed } from '../state/appSelfIntroSync'
 import { openCompanionExportPanel } from './companionExportSession'
 import { appendCompanionInterestAnswer } from './appendCompanionInterestAnswer'
+import { isCompanionQaModeEnabled } from '../constants/companionFeatureFlags'
 import { TOAST_CARD_MAX_CLASS_DETACHED } from '../components/toast/toastCardMetrics'
 import { zLayers } from '../state/uiState'
 
@@ -197,14 +198,15 @@ export function DetachedToastShell({
               }}
               onCopy={() => navigator.clipboard.writeText(displayMessage)}
               onExportCard={() =>
-                openCompanionExportPanel(
-                  displayMessage,
-                  settings.quoteBubbleVariant,
-                )
+                openCompanionExportPanel(displayMessage)
               }
-              onInterestAnswer={(answer) => {
-                void appendCompanionInterestAnswer(settings, answer)
-              }}
+              {...(isCompanionQaModeEnabled()
+                ? {
+                    onInterestAnswer: (answer: string) => {
+                      void appendCompanionInterestAnswer(settings, answer)
+                    },
+                  }
+                : {})}
               onReplayTts={() =>
                 void replayCompanionSpeech(displayMessage, {
                   enabled: settings.companionTtsEnabled,

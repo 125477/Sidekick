@@ -11,6 +11,7 @@ import type {
 import { toggleToastFavorite } from './toastFavoriteToggle'
 import { openCompanionExportPanel } from './companionExportSession'
 import { appendCompanionInterestAnswer } from './appendCompanionInterestAnswer'
+import { isCompanionQaModeEnabled } from '../constants/companionFeatureFlags'
 import { resolveCompanionQuoteBubbleVariant } from '../components/emotion/moodHistory/quoteBubbleSettings'
 import { OnboardingWizard } from '../components/onboarding/OnboardingWizard'
 import { SpriteMenu, type MenuAction } from '../components/menu/SpriteMenu'
@@ -269,19 +270,20 @@ export function WidgetSpriteLayer({
                   navigator.clipboard.writeText(uiState.toastMessage)
                 }
                 onExportCard={() =>
-                  openCompanionExportPanel(
-                    uiState.toastMessage,
-                    settings.quoteBubbleVariant,
-                  )
+                  openCompanionExportPanel(uiState.toastMessage)
                 }
-                onInterestAnswer={(answer) => {
-                  void appendCompanionInterestAnswer(
-                    settingsRef.current,
-                    answer,
-                  ).then((next) => {
-                    settingsRef.current = next
-                  })
-                }}
+                {...(isCompanionQaModeEnabled()
+                  ? {
+                      onInterestAnswer: (answer: string) => {
+                        void appendCompanionInterestAnswer(
+                          settingsRef.current,
+                          answer,
+                        ).then((next) => {
+                          settingsRef.current = next
+                        })
+                      },
+                    }
+                  : {})}
                 onReplayTts={() =>
                   void replayCompanionSpeech(uiState.toastMessage, {
                     enabled: settingsRef.current.companionTtsEnabled,

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { loadData, removeTextFromHistory, subscribeTextsChanged, type TextRecord } from '@sidekick/core'
+import { openCompanionExportPanel } from '../../app/companionExportSession'
 
 type FavoriteTextsPanelProps = {
   /** 独立 panel 窗：占满可用高度并滚动列表 */
@@ -81,6 +82,15 @@ export function FavoriteTextsPanel({
                   }}
                 >
                   {copiedRowId === t.id ? '已复制' : '复制'}
+                </button>
+                <button
+                  type="button"
+                  className="sk-favorite-row-action sk-favorite-row-action--copy"
+                  onClick={() => {
+                    openCompanionExportPanel(t.content)
+                  }}
+                >
+                  导出卡片
                 </button>
                 <button
                   type="button"

@@ -8,8 +8,7 @@ import { UploadTab } from '../components/skinning/UploadTab'
 import { DailyFortunePanel } from '../components/fortune/DailyFortunePanel'
 import { FavoriteTextsPanel } from '../components/favorites/FavoriteTextsPanel'
 import { CompanionQuoteExportPanel } from '../components/export/CompanionQuoteExportPanel'
-import { readCompanionExportSession } from '../app/companionExportSession'
-import type { QuoteBubbleDisplayMode } from '../components/emotion/moodHistory/quoteBubbleSettings'
+import { resolveCompanionExportInitialMessage } from '../app/companionExportSession'
 import {
   defaultSettings,
   onlyAvatarSlidersChanged,
@@ -52,6 +51,7 @@ export type AppPanelContentProps = {
   ) => void | Promise<void>
   restartOnboarding: () => void
   isPanelMode: boolean
+  exportMessageFromQuery?: string
   setAvatars: (v: SetStateAction<AvatarPreset[]>) => void
 }
 
@@ -76,6 +76,7 @@ export function AppPanelContent({
   showToastMessage,
   restartOnboarding,
   isPanelMode,
+  exportMessageFromQuery = '',
   setAvatars,
 }: AppPanelContentProps) {
   return uiState.activePanel === 'skin' ? (
@@ -216,15 +217,9 @@ export function AppPanelContent({
     </div>
   ) : uiState.activePanel === 'companion-export' ? (
     <CompanionQuoteExportPanel
-      initialMessage={
-        readCompanionExportSession()?.message ??
-        '愿你的每一天，都有小小的温暖。'
-      }
-      initialVariant={
-        (readCompanionExportSession()?.variant as
-          | QuoteBubbleDisplayMode
-          | undefined) ?? settings.quoteBubbleVariant
-      }
+      initialMessage={resolveCompanionExportInitialMessage(
+        exportMessageFromQuery,
+      )}
     />
   ) : null
 }

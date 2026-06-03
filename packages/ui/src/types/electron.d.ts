@@ -188,6 +188,8 @@ type SidekickDesktopApi = {
     forceReplay?: boolean
   }) => Promise<void>
   hideToastWindow: () => Promise<void>
+  /** 独立气泡窗当前是否展示有效陪伴文案（非引导占位）。 */
+  isCompanionToastVisible?: () => Promise<boolean>
   /** 系统休眠恢复 / 解锁屏幕（仅 Electron 桌面端）。 */
   onSystemResume?: (callback: () => void) => () => void
   /** 主进程定时唤醒，用于今日心情提醒（macOS 休眠后 renderer 计时可能滞后）。 */

@@ -18,6 +18,7 @@ import {
   saveLastYesterdayGreetingDayKey,
 } from '../state/yesterdayGreetingStorage'
 import { shouldSkipYesterdayGreetingAfterBootstrap } from './companionFetchCoordinator'
+import { isCompanionCopyOnScreen } from './companionCopyOnScreen'
 import { shouldDeferExtraProactiveCopy } from './companionSessionBoot'
 
 const BLOCK_SCHEDULED_MS = 4 * 60 * 1000
@@ -71,6 +72,7 @@ export function useYesterdayEmotionGreeting({
       if (blockScheduledPushRef.current || greetingBusyRef.current) return
       if (shouldDeferExtraProactiveCopy()) return
       if (shouldSkipYesterdayGreetingAfterBootstrap()) return
+      if (await isCompanionCopyOnScreen()) return
       const s = settingsRef.current
       if (!s.pushEnabled || !canPushNow(s)) return
 

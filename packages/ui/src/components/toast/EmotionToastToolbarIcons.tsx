@@ -18,6 +18,26 @@ export function IconToolbarRefresh({ className }: { className?: string }) {
   )
 }
 
+/** 气泡工具栏：导出陪伴卡片（PNG）。 */
+export function IconToolbarExport({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M12 3v12" />
+      <path d="m8 7 4-4 4 4" />
+      <path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" />
+    </svg>
+  )
+}
+
 export function IconToolbarCopy({ className }: { className?: string }) {
   return (
     <svg

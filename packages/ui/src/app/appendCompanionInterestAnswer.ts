@@ -1,4 +1,4 @@
-import { buildCompanionInterestsPayload, parseCompanionInterestNote } from '../constants/companionInterestTags'
+import { buildCompanionInterestsPayload, COMPANION_INTEREST_ANSWER_MAX_CHARS, parseCompanionInterestNote } from '../constants/companionInterestTags'
 import type { SidekickSettings } from '../state/settingsState'
 import { saveSettings } from '../state/settingsStorage'
 import { broadcastSettingsSync } from '../state/settingsSync'
@@ -12,7 +12,10 @@ export async function appendCompanionInterestAnswer(
 ): Promise<SidekickSettings> {
   const trimmed = answer.replace(/\s+/g, ' ').trim()
   if (!trimmed) return settings
-  const note = trimmed.length > 48 ? `${trimmed.slice(0, 47)}…` : trimmed
+  const note =
+    trimmed.length > COMPANION_INTEREST_ANSWER_MAX_CHARS
+      ? `${trimmed.slice(0, COMPANION_INTEREST_ANSWER_MAX_CHARS - 1)}…`
+      : trimmed
   const { tags, note: existingNote } = parseCompanionInterestNote(
     settings.companionInterests,
   )

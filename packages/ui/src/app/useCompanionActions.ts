@@ -673,10 +673,7 @@ export function useCompanionActions({
           uiState.toastMessage.trim() ||
           lastShownToastMessageRef.current.trim()
         if (msg) {
-          openCompanionExportPanel(
-            msg,
-            settingsRef.current.quoteBubbleVariant,
-          )
+          openCompanionExportPanel(msg)
         }
       }
     })

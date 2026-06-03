@@ -195,6 +195,9 @@ function setDock(side, phase) {
   dock.side = side
   dock.phase = phase
   broadcastDockVisual()
+  void import('./appDockVisibility.mjs').then((m) => {
+    m.syncAppDockVisibility()
+  })
 }
 
 function clearCollapseTimer() {

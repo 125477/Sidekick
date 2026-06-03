@@ -1,27 +1,17 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { MoodHistoryQuoteBubble } from '../emotion/moodHistory/MoodHistoryQuoteBubble'
+import { IconToolbarExport } from '../toast/EmotionToastToolbarIcons'
+import {
+  readCompanionExportBubbleVariant,
+  saveCompanionExportBubbleVariant,
+} from '../../app/companionExportBubblePreference'
 import {
   MOOD_HISTORY_QUOTE_BUBBLE_VARIANTS,
   type MoodHistoryQuoteBubbleVariant,
 } from '../emotion/moodHistory/moodHistoryQuoteBubbleVariants'
-import {
-  normalizeQuoteBubbleDisplayMode,
-  type QuoteBubbleDisplayMode,
-} from '../emotion/moodHistory/quoteBubbleSettings'
 
 export type CompanionQuoteExportPanelProps = {
   initialMessage: string
-  initialVariant?: QuoteBubbleDisplayMode
-}
-
-function resolveExportVariant(
-  mode: QuoteBubbleDisplayMode,
-): MoodHistoryQuoteBubbleVariant {
-  const normalized = normalizeQuoteBubbleDisplayMode(mode)
-  if (normalized === 'auto' || normalized === 'companion-tail') {
-    return 'companion-tail'
-  }
-  return normalized
 }
 
 async function nodeToPng(node: HTMLElement, filename: string) {
@@ -39,19 +29,22 @@ async function nodeToPng(node: HTMLElement, filename: string) {
 
 export function CompanionQuoteExportPanel({
   initialMessage,
-  initialVariant = 'companion-tail',
 }: CompanionQuoteExportPanelProps) {
   const previewRef = useRef<HTMLDivElement>(null)
-  const [variantMode, setVariantMode] = useState<QuoteBubbleDisplayMode>(
-    initialVariant,
+  const [bubbleVariant, setBubbleVariant] = useState<MoodHistoryQuoteBubbleVariant>(
+    () => readCompanionExportBubbleVariant(),
   )
   const [message, setMessage] = useState(initialMessage)
   const [exporting, setExporting] = useState(false)
 
-  const bubbleVariant = useMemo(
-    () => resolveExportVariant(variantMode),
-    [variantMode],
-  )
+  useEffect(() => {
+    setMessage(initialMessage)
+  }, [initialMessage])
+
+  const pickVariant = useCallback((variant: MoodHistoryQuoteBubbleVariant) => {
+    setBubbleVariant(variant)
+    saveCompanionExportBubbleVariant(variant)
+  }, [])
 
   const onExport = useCallback(async () => {
     const el = previewRef.current
@@ -93,7 +86,7 @@ export function CompanionQuoteExportPanel({
         <div>
           <span className="sk-label mb-2 block">气泡样式</span>
           <div className="flex flex-wrap gap-2">
-            {MOOD_HISTORY_QUOTE_BUBBLE_VARIANTS.map((meta: { id: MoodHistoryQuoteBubbleVariant; label: string }) => (
+            {MOOD_HISTORY_QUOTE_BUBBLE_VARIANTS.map((meta) => (
               <button
                 key={meta.id}
                 type="button"
@@ -102,7 +95,7 @@ export function CompanionQuoteExportPanel({
                     ? 'border-violet-400 bg-violet-100 text-violet-900 dark:bg-violet-900/40 dark:text-violet-100'
                     : 'border-[color:var(--sk-divider)] text-[color:var(--sk-text-secondary)] hover:border-violet-300'
                 }`}
-                onClick={() => setVariantMode(meta.id)}
+                onClick={() => pickVariant(meta.id)}
               >
                 {meta.label}
               </button>
@@ -111,25 +104,29 @@ export function CompanionQuoteExportPanel({
         </div>
 
         <div className="rounded-xl border border-[color:var(--sk-divider)] bg-white p-6 dark:bg-zinc-900">
-          <p className="mb-3 text-xs text-[color:var(--sk-text-muted)]">预览</p>
-          <div ref={previewRef} className="inline-block max-w-md p-2">
-            <MoodHistoryQuoteBubble variant={bubbleVariant}>
-              {message.trim() || '在这里编辑你的陪伴短句…'}
-            </MoodHistoryQuoteBubble>
-            <p className="mt-3 text-right text-[10px] text-[color:var(--sk-text-muted)]">
-              灵伴 Sidekick
-            </p>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <p className="text-xs text-[color:var(--sk-text-muted)]">预览</p>
+            <button
+              type="button"
+              disabled={exporting || !message.trim()}
+              className="sk-btn-primary inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => void onExport()}
+            >
+              <IconToolbarExport className="h-3.5 w-3.5 shrink-0" />
+              {exporting ? '导出中…' : '导出 PNG'}
+            </button>
+          </div>
+          <div className="flex justify-center">
+            <div ref={previewRef} className="inline-block max-w-md p-2">
+              <MoodHistoryQuoteBubble variant={bubbleVariant}>
+                {message.trim() || '在这里编辑你的陪伴短句…'}
+              </MoodHistoryQuoteBubble>
+              <p className="mt-3 text-right text-[10px] text-[color:var(--sk-text-muted)]">
+                灵伴 Sidekick
+              </p>
+            </div>
           </div>
         </div>
-
-        <button
-          type="button"
-          disabled={exporting || !message.trim()}
-          className="sk-btn-primary w-full max-w-xs py-2 text-sm"
-          onClick={() => void onExport()}
-        >
-          {exporting ? '导出中…' : '导出 PNG'}
-        </button>
       </div>
     </main>
   )

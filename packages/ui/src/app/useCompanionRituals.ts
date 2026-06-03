@@ -3,23 +3,19 @@ import type { MutableRefObject } from 'react'
 import { useEffect, useRef } from 'react'
 import type { SidekickSettings } from '../state/settingsState'
 import type { SpriteState } from '../state/uiState'
-import { buildYesterdayContext } from './buildYesterdayContext'
 import {
   formatFocusEndMoment,
   formatUnlockMoment,
   pushProactiveCompanionCopy,
 } from './companionProactivePush'
+import { isCompanionCopyOnScreen } from './companionCopyOnScreen'
 import {
   canFireFocusEndRitual,
   canFireInterestDeepen,
-  canFireUnlockRitual,
   markFocusEndRitualFired,
   markInterestDeepenFired,
   markUnlockRitualFired,
 } from '../state/companionProactiveStorage'
-import {
-  loadLastYesterdayGreetingDayKey,
-} from '../state/yesterdayGreetingStorage'
 import { localDayKey } from '../state/moodJournalStorage'
 import { shouldDeferExtraProactiveCopy } from './companionSessionBoot'
 
@@ -45,6 +41,8 @@ export type UseCompanionRitualsArgs = {
   ) => Promise<void>
   setToastMeta?: (meta: { id: string; favorite: boolean } | null) => void
   setSpriteState?: (state: SpriteState) => void
+  toastVisible?: boolean
+  lastShownToastMessageRef?: MutableRefObject<string>
 }
 
 export function useCompanionRituals({
@@ -60,6 +58,8 @@ export function useCompanionRituals({
   showToastMessage,
   setToastMeta,
   setSpriteState,
+  toastVisible,
+  lastShownToastMessageRef,
 }: UseCompanionRitualsArgs) {
   const unlockBusyRef = useRef(false)
   const focusEndBusyRef = useRef(false)
@@ -84,12 +84,16 @@ export function useCompanionRituals({
       if (!isWidgetMode || !settingsReady || onboardingDone !== true) return
       if (unlockBusyRef.current || blockScheduledPushRef.current) return
       if (shouldDeferExtraProactiveCopy()) return
-      if (!(await canFireUnlockRitual())) return
-
-      const today = localDayKey()
-      const lastGreeting = await loadLastYesterdayGreetingDayKey()
-      const ctx = await buildYesterdayContext(emotionRecords)
-      if (ctx && lastGreeting !== today) return
+      if (
+        await isCompanionCopyOnScreen({
+          ...(toastVisible !== undefined ? { toastVisible } : {}),
+          ...(lastShownToastMessageRef
+            ? { toastMessage: lastShownToastMessageRef.current }
+            : {}),
+        })
+      ) {
+        return
+      }
 
       unlockBusyRef.current = true
       try {

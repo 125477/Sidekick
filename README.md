@@ -16,7 +16,7 @@
     
 ### 更换形象
 
-内置多套 Lottie / 图片形象，支持上传 JPG、PNG、WebP、GIF、MP4。
+内置多套形象，支持上传 JPG、PNG、WebP、GIF、MP4。
 
 ![更换形象](docs/images/readme/skin-panel.png)
 

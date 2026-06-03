@@ -15,6 +15,7 @@ export const DEFAULT_AVATARS = moveDefaultAvatarToFront(
   buildDefaultAvatarsFromParts(HTTPS_BUILTIN_AVATARS, [
     ...LOTTIE_FOLDER_BUILTIN_PRESETS,
     ...GIF_FOLDER_BUILTIN_PRESETS,
+    // ...VIDEO_FOLDER_BUILTIN_PRESETS,
   ]),
   DEFAULT_AT_FIRST_ID,
 )
