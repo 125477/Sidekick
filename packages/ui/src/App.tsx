@@ -188,6 +188,7 @@ function App() {
     toastAutoTtsFromQuery,
     emotionTabFromQuery,
     exportMessageFromQuery,
+    toastCopyTriggerFromQuery,
     cornerNotificationTitle,
     cornerNotificationMessage,
   } = readAppSearchParams()
@@ -206,6 +207,11 @@ function App() {
   >(null)
   const [detachedToastContentRevision, setDetachedToastContentRevision] =
     useState(0)
+  const [detachedToastLiveCopyTrigger, setDetachedToastLiveCopyTrigger] =
+    useState<string | null>(toastCopyTriggerFromQuery)
+  const [widgetToastCopyTrigger, setWidgetToastCopyTrigger] = useState<
+    string | null
+  >(null)
   const detachedToastBridgeInstalledRef = useRef(false)
   const toastDetachAnchor = detachPlacementFromMain?.anchor ?? toastAnchorFromQuery
   const toastDetachBubblePlacement =
@@ -376,6 +382,7 @@ function App() {
     setSettings,
     handleMenuActionRef,
     blockScheduledPushRef,
+    setToastCopyTrigger: setWidgetToastCopyTrigger,
   })
 
   useCompanionRituals({
@@ -515,6 +522,7 @@ function App() {
       spriteShellHovered={spriteShellHovered}
       settingsRef={settingsRef}
       spriteMenuUsesBrowserPopup={spriteMenuUsesBrowserPopup}
+      toastCopyTrigger={widgetToastCopyTrigger}
     />
   )
 
@@ -558,6 +566,21 @@ function App() {
       if (payload.favorite !== undefined) {
         setDetachedToastLiveFavorite(payload.favorite)
       }
+      if (payload.copyTrigger !== undefined) {
+        const nextTrigger = payload.copyTrigger.trim() || null
+        setDetachedToastLiveCopyTrigger(nextTrigger)
+        try {
+          const url = new URL(window.location.href)
+          if (nextTrigger) {
+            url.searchParams.set('copyTrigger', nextTrigger)
+          } else {
+            url.searchParams.delete('copyTrigger')
+          }
+          window.history.replaceState(null, '', url.toString())
+        } catch {
+          // ignore invalid URL in dev
+        }
+      }
     })
   }, [isToastMode])
 
@@ -566,6 +589,8 @@ function App() {
   )
   const detachedToastDisplayTextId =
     detachedToastLiveTextId ?? toastTextIdFromQuery
+  const detachedToastDisplayCopyTrigger =
+    detachedToastLiveCopyTrigger ?? toastCopyTriggerFromQuery
 
   if (isMoodHistoryBubbleGalleryMode) {
     return <MoodHistoryQuoteBubbleGallery />
@@ -611,6 +636,7 @@ function App() {
         holdToastToolbarForMenu={
           menuOpen && spriteMenuSurface === 'toast-bubble'
         }
+        toastCopyTrigger={detachedToastDisplayCopyTrigger}
       />
     )
   }

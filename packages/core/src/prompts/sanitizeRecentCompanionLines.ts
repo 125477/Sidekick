@@ -1,7 +1,7 @@
 import { companionLineTooSimilarToAny } from './companionLineSimilarity'
 
 /** 与 UI `RECENT_COMPANION_LINES_MAX` 对齐。 */
-export const COMPANION_AVOID_RECENT_MAX = 6
+export const COMPANION_AVOID_RECENT_MAX = 24
 
 /**
  * 写入 prompt 前的 recent 列表：去空、去重、去掉与相邻句高度相似的条目。

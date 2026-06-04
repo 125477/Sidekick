@@ -8,7 +8,7 @@ type ToastInterestCaptureRowProps = {
 
 const interestRowClass = 'flex items-center gap-1.5 px-1 pb-1 pt-0.5'
 
-/** 问答模式（VITE_SIDEKICK_COMPANION_QA_MODE=1）下直接展示输入框，提交兴趣补充。 */
+/** 兴趣深化问句（interest-deepen）hover 展开时展示输入框，提交兴趣补充（最多 100 字）。 */
 export function ToastInterestCaptureRow({
   disabled = false,
   onSubmit,

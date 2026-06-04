@@ -15,6 +15,8 @@ export type AppUrlState = {
   emotionTabFromQuery: 'moment' | 'summary' | null
   /** 导出卡片 panel：来自 openPanelWindow URL 的当前气泡文案。 */
   exportMessageFromQuery: string
+  /** 独立气泡：文案触发场景（如 interest-deepen）。 */
+  toastCopyTriggerFromQuery: string | null
   cornerNotificationTitle: string
   cornerNotificationMessage: string
 }
@@ -34,6 +36,7 @@ export function readAppSearchParams(): AppUrlState {
       toastAutoTtsFromQuery: false,
       emotionTabFromQuery: null,
       exportMessageFromQuery: '',
+      toastCopyTriggerFromQuery: null,
       cornerNotificationTitle: '灵伴 · 今日心情',
       cornerNotificationMessage: '',
     }
@@ -63,6 +66,9 @@ export function readAppSearchParams(): AppUrlState {
           ? 'moment'
           : null,
     exportMessageFromQuery: sp.get('exportMessage')?.trim() ?? '',
+    toastCopyTriggerFromQuery: isToastMode
+      ? sp.get('copyTrigger')?.trim() || null
+      : null,
     cornerNotificationTitle: sp.get('title')?.trim() || '灵伴 · 今日心情',
     cornerNotificationMessage: sp.get('message') ?? '',
   }

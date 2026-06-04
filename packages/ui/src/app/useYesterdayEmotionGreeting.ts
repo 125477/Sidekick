@@ -20,6 +20,7 @@ import {
 import { shouldSkipYesterdayGreetingAfterBootstrap } from './companionFetchCoordinator'
 import { isCompanionCopyOnScreen } from './companionCopyOnScreen'
 import { shouldDeferExtraProactiveCopy } from './companionSessionBoot'
+import { recordFavoriteResurfaceShown } from './favoriteResurface'
 
 const BLOCK_SCHEDULED_MS = 4 * 60 * 1000
 
@@ -88,6 +89,7 @@ export function useYesterdayEmotionGreeting({
       try {
         const yesterdayText = formatYesterdayContextForAgent(ctx)
         let text: string
+        let resurfaceFavoriteId: string | undefined
         try {
           const result = await fetchCompanionCopy(
             s,
@@ -103,6 +105,7 @@ export function useYesterdayEmotionGreeting({
           )
           await persistBailianAgentSessionId(settingsRef, result.sessionId)
           text = result.text.trim()
+          resurfaceFavoriteId = result.resurfaceFavoriteId
           if (!text) return
         } catch {
           text = buildYesterdayGreetingText(ctx)
@@ -115,6 +118,7 @@ export function useYesterdayEmotionGreeting({
           source: 'model',
           favorite: false,
         })
+        await recordFavoriteResurfaceShown(resurfaceFavoriteId)
         const newId = next.texts.history[0]?.id
         await showToastMessage(text, {
           dwellSeconds: s.toastAlwaysVisible ? 0 : s.dwellMinutes * 60,

@@ -269,6 +269,23 @@ export async function toggleTextFavorite(id: string): Promise<SidekickData> {
   return next
 }
 
+/** 记录收藏句已作为「再现」展示，启动 3 天冷却。 */
+export async function markFavoriteTextResurfaced(id: string): Promise<SidekickData> {
+  const data = await loadData()
+  const now = new Date().toISOString()
+  const next: SidekickData = {
+    ...data,
+    texts: {
+      history: data.texts.history.map((t) =>
+        t.id === id ? { ...t, lastResurfacedAt: now } : t,
+      ),
+    },
+  }
+  await saveData(next)
+  notifyTextsChanged()
+  return next
+}
+
 export async function removeTextFromHistory(id: string): Promise<SidekickData> {
   const data = await loadData()
   const next: SidekickData = {

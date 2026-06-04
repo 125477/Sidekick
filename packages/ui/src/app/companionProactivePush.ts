@@ -16,6 +16,7 @@ import {
 import { usesDetachedToastWindow } from '../utils/companionTts'
 import { reportSpriteAnchorToMain } from '../utils/reportSpriteAnchor'
 import { buildShowToastWindowPayload } from '../utils/toastWindowPayload'
+import { recordFavoriteResurfaceShown } from './favoriteResurface'
 
 const BLOCK_SCHEDULED_MS = 4 * 60 * 1000
 
@@ -64,6 +65,7 @@ export async function pushProactiveCompanionCopy(
   let text: string
   let source: 'model' | 'fallback' = 'model'
   let sessionId: string | null | undefined
+  let resurfaceFavoriteId: string | undefined
 
   try {
     const result = await fetchCompanionCopy(
@@ -82,6 +84,7 @@ export async function pushProactiveCompanionCopy(
     text = result.text.trim()
     source = result.source
     sessionId = result.sessionId
+    resurfaceFavoriteId = result.resurfaceFavoriteId
   } catch {
     text = pickCompanionTriggerFallback(trigger).trim()
     source = 'fallback'
@@ -96,6 +99,7 @@ export async function pushProactiveCompanionCopy(
     source,
     favorite: false,
   })
+  await recordFavoriteResurfaceShown(resurfaceFavoriteId)
   const newId = next.texts.history[0]?.id
   const dwell = s.toastAlwaysVisible ? 0 : s.dwellMinutes * 60
   const copyMeta = { trigger, source }

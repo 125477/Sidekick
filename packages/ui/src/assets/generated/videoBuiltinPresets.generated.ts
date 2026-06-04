@@ -6,6 +6,7 @@
 import { buildVideoBuiltinPresetsFromFilenames } from '../videoFolderBuiltinPresets'
 
 const VIDEO_BUILTIN_FILES = [
+  "party-animation-gif-download-12340042.mp4",
   "拍我AI_V6_图文模式_720P_这是一个可爱的动漫女孩坐在云朵上。请让她的眼睛眨动，嘴角 (1).mp4",
 ] as const
 

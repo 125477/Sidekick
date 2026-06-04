@@ -6,6 +6,7 @@ export type DetachedToastContentPayload = {
   textId?: string
   favorite?: boolean
   autoTts?: boolean
+  copyTrigger?: string
 }
 
 type DetachedToastContentListener = (payload: DetachedToastContentPayload) => void

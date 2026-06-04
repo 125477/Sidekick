@@ -69,6 +69,41 @@ export function companionAgentLineRejected(
   return false
 }
 
+/** 自动推送：与本地历史精确相同则拒（全量 history，不限条数）。 */
+export function companionLineExactDuplicateInList(
+  candidate: string,
+  lines: string[] | undefined,
+): boolean {
+  const t = candidate.replace(/\s+/g, ' ').trim()
+  if (!t || !lines?.length) return false
+  for (const line of lines) {
+    if (line.replace(/\s+/g, ' ').trim() === t) return true
+  }
+  return false
+}
+
+/** 自动推送：全量 history 精确去重 + 近期句相似度去重。 */
+export function companionLineDuplicateOfStoredHistory(
+  candidate: string,
+  allHistoryLines: string[] | undefined,
+  recentForSimilarity: string[] | undefined,
+): boolean {
+  if (companionLineExactDuplicateInList(candidate, allHistoryLines)) {
+    return true
+  }
+  const recent = recentForSimilarity?.filter(Boolean) ?? []
+  if (recent.length === 0) return false
+  return companionLineTooSimilarToAny(candidate, recent, { sameFirstChar: false })
+}
+
+/** @deprecated 使用 companionLineDuplicateOfStoredHistory */
+export function companionLineDuplicateOfRecentHistory(
+  candidate: string,
+  recent: string[] | undefined,
+): boolean {
+  return companionLineDuplicateOfStoredHistory(candidate, recent, recent)
+}
+
 /** 去掉模型输出的外层直角/弯引号，气泡直接展示正文。 */
 export function stripCompanionLineCornerQuotes(text: string): string {
   return text

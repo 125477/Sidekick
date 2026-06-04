@@ -2,6 +2,7 @@ import {
   companionAgentLineRejected,
   companionAgentLineStructurallyRejected,
   companionInterestTagsRequireQuote,
+  companionLineDuplicateOfStoredHistory,
   companionLineDuplicateOfReplaceTarget,
   companionRegenerateLineFailsInterestQuoteMode,
   companionStyleForEmotion,
@@ -14,7 +15,6 @@ import {
   pickCompanionRegenerateLineDistinct,
   pickCompanionInterestRegenerateLine,
   pickCompanionTriggerFallback,
-  sanitizeRecentCompanionLinesForPrompt,
   type CompanionCopyTrigger,
   type CompanionTextResult,
   type DashScopeTextRequest,
@@ -31,6 +31,7 @@ import {
   type CompanionFetchKind,
 } from './companionFetchCoordinator'
 import { markStartupCompanionCopyFinished } from './companionSessionBoot'
+import { buildCompanionAvoidContext } from './recentCompanionLines'
 
 export type FetchCompanionCopyOptions = {
   trigger?: CompanionCopyTrigger
@@ -55,6 +56,8 @@ export type FetchCompanionCopyResult = CompanionTextResult & {
   sessionId?: string | null
   /** 并发换句被 gate 跳过：勿上屏、勿 notify 假文案。 */
   skipped?: boolean
+  /** 收藏再现来源 id；上屏后须 recordFavoriteResurfaceShown。 */
+  resurfaceFavoriteId?: string
 }
 
 function bailianAppIdFromEnv(): string | undefined {
@@ -256,11 +259,19 @@ export async function fetchCompanionCopy(
   return execute()
 }
 
+function mergeCompanionAvoidForPool(
+  promptAvoid: string[],
+  allHistoryLines: string[],
+): string[] {
+  return [...new Set([...promptAvoid, ...allHistoryLines].filter(Boolean))]
+}
+
 function pickPushCopyFallback(
   settings: SidekickSettings,
   trigger: CompanionCopyTrigger,
   emotion: EmotionKind | undefined,
-  sanitizedAvoid: string[],
+  promptAvoid: string[],
+  allHistoryLines: string[],
   generationSeed: number,
 ): string {
   const style =
@@ -268,19 +279,20 @@ function pickPushCopyFallback(
   const { tags: interestTags } = parseCompanionInterestTags(
     settings.companionInterests,
   )
+  const avoidForPool = mergeCompanionAvoidForPool(promptAvoid, allHistoryLines)
   if (companionInterestTagsRequireQuote(interestTags)) {
     return pickCompanionInterestRegenerateLine({
       interestTags,
       maxChars: settings.textMaxChars,
       style,
       seed: generationSeed,
-      ...(sanitizedAvoid.length ? { avoidRecent: sanitizedAvoid } : {}),
+      ...(avoidForPool.length ? { avoidRecent: avoidForPool } : {}),
     })
   }
   return pickCompanionTriggerFallback(trigger, {
     maxChars: settings.textMaxChars,
     seed: generationSeed,
-    ...(sanitizedAvoid.length ? { avoidRecent: sanitizedAvoid } : {}),
+    ...(avoidForPool.length ? { avoidRecent: avoidForPool } : {}),
   })
 }
 
@@ -288,14 +300,15 @@ function pushCompanionLineRejected(
   text: string,
   settings: SidekickSettings,
   emotion: EmotionKind | undefined,
-  sanitizedAvoid: string[],
+  promptAvoid: string[],
+  allHistoryLines: string[],
 ): boolean {
   const style =
     emotion != null ? companionStyleForEmotion(emotion) : settings.textStyle
   const gateCtx = {
     style,
     maxChars: settings.textMaxChars,
-    avoidRecent: sanitizedAvoid,
+    avoidRecent: promptAvoid,
     now: new Date(),
   }
   const { tags: interestTags } = parseCompanionInterestTags(
@@ -305,6 +318,11 @@ function pushCompanionLineRejected(
   if (
     companionInterestTagsRequireQuote(interestTags) &&
     companionRegenerateLineFailsInterestQuoteMode(text)
+  ) {
+    return true
+  }
+  if (
+    companionLineDuplicateOfStoredHistory(text, allHistoryLines, promptAvoid)
   ) {
     return true
   }
@@ -323,19 +341,29 @@ async function fetchCompanionCopyInner(
   const trigger = options?.trigger ?? resolveFetchTrigger(keyword, emotion)
   const fetchKind = resolveFetchKind(trigger, options?.fetchKind)
   const lightHints = getCompanionLightFeedbackHints()
-  const sanitizedAvoid = sanitizeRecentCompanionLinesForPrompt(avoidRecentOutputs)
+  const { promptAvoid, allHistoryLines } =
+    await buildCompanionAvoidContext(avoidRecentOutputs)
   const generationSeed =
     options?.seed ??
     (Date.now() ^ Math.floor(Math.random() * 1_000_000_000))
 
-  const resurfaced = await pickFavoriteResurfaceLine(
+  const resurfacePick = await pickFavoriteResurfaceLine(
     settings.favoriteResurfaceEnabled,
     trigger,
-    sanitizedAvoid,
+    mergeCompanionAvoidForPool(promptAvoid, allHistoryLines),
+    { skipForStartup: fetchKind === 'startup' },
   )
-  if (resurfaced) {
-    logCompanionCopy('favorite resurface', { trigger, text: resurfaced.slice(0, 40) })
-    return { text: resurfaced, source: 'fallback' as const }
+  if (resurfacePick) {
+    logCompanionCopy('favorite resurface', {
+      trigger,
+      text: resurfacePick.text.slice(0, 40),
+      favoriteId: resurfacePick.favoriteId,
+    })
+    return {
+      text: resurfacePick.text,
+      source: 'fallback' as const,
+      resurfaceFavoriteId: resurfacePick.favoriteId,
+    }
   }
 
   const common = {
@@ -345,7 +373,7 @@ async function fetchCompanionCopyInner(
     seed: generationSeed,
     ...(keyword !== undefined ? { keyword } : {}),
     ...(emotion !== undefined ? { emotion } : {}),
-    ...(sanitizedAvoid.length ? { avoidRecentOutputs: sanitizedAvoid } : {}),
+    ...(promptAvoid.length ? { avoidRecentOutputs: promptAvoid } : {}),
     ...(settings.companionInterests?.length
       ? { companionInterests: settings.companionInterests }
       : {}),
@@ -419,7 +447,7 @@ async function fetchCompanionCopyInner(
         const gateCtx = {
           style,
           maxChars: settings.textMaxChars,
-          avoidRecent: sanitizedAvoid,
+          avoidRecent: promptAvoid,
           now: new Date(),
         }
         const replaceTarget = options?.replaceTargetLine?.trim()
@@ -454,9 +482,14 @@ async function fetchCompanionCopyInner(
           }
         }
         if (
-          !structureRejected &&
           !interestQuoteRejected &&
-          !companionAgentLineRejected(agentText, gateCtx)
+          !pushCompanionLineRejected(
+            agentText,
+            settings,
+            emotion,
+            promptAvoid,
+            allHistoryLines,
+          )
         ) {
           return {
             text: agentText,
@@ -471,7 +504,13 @@ async function fetchCompanionCopyInner(
               ? '结构套句'
               : interestQuoteRejected
                 ? '未写兴趣金句'
-                : '与最近句过近',
+                : companionLineDuplicateOfStoredHistory(
+                    agentText,
+                    allHistoryLines,
+                    promptAvoid,
+                  )
+                  ? '与历史句重复'
+                  : '与最近句过近',
             agentText.slice(0, 48),
           )
         }
@@ -504,11 +543,12 @@ async function fetchCompanionCopyInner(
   }
 
   if (shouldSkipChatFallbackForTrigger(trigger, fetchKind)) {
+    const avoidForPool = mergeCompanionAvoidForPool(promptAvoid, allHistoryLines)
     const fallbackText = trimFallbackLine(
       pickCompanionTriggerFallback(trigger, {
         maxChars: settings.textMaxChars,
         seed: generationSeed,
-        ...(sanitizedAvoid.length ? { avoidRecent: sanitizedAvoid } : {}),
+        ...(avoidForPool.length ? { avoidRecent: avoidForPool } : {}),
       }),
       settings.textMaxChars,
     )
@@ -538,7 +578,8 @@ async function fetchCompanionCopyInner(
       hasBailianAgent: shouldUseBailianAgentForRequest(settings, trigger),
       replaceTargetLine: options?.replaceTargetLine,
       seed: generationSeed,
-      avoidCount: sanitizedAvoid.length,
+      avoidCount: promptAvoid.length,
+      historyCount: allHistoryLines.length,
     })
   }
 
@@ -595,14 +636,21 @@ async function fetchCompanionCopyInner(
   if (chatText) {
     if (
       fetchKind !== 'interactive' &&
-      pushCompanionLineRejected(chatText, settings, emotion, sanitizedAvoid)
+      pushCompanionLineRejected(
+        chatText,
+        settings,
+        emotion,
+        promptAvoid,
+        allHistoryLines,
+      )
     ) {
       const fallbackText = trimFallbackLine(
         pickPushCopyFallback(
           settings,
           trigger,
           emotion,
-          sanitizedAvoid,
+          promptAvoid,
+          allHistoryLines,
           generationSeed,
         ),
         settings.textMaxChars,
@@ -622,13 +670,14 @@ async function fetchCompanionCopyInner(
   }
 
   if (fetchKind === 'interactive') {
+    const avoidForPool = mergeCompanionAvoidForPool(promptAvoid, allHistoryLines)
     const poolPick =
       trigger === 'regenerate' || trigger === 'similar'
         ? pickCompanionRegenerateLineDistinct({
             maxChars: settings.textMaxChars,
             style: settings.textStyle,
             seed: generationSeed,
-            ...(sanitizedAvoid.length ? { avoidRecent: sanitizedAvoid } : {}),
+            ...(avoidForPool.length ? { avoidRecent: avoidForPool } : {}),
             ...(options?.replaceTargetLine != null
               ? { mustDifferFrom: options.replaceTargetLine }
               : {}),
@@ -636,7 +685,7 @@ async function fetchCompanionCopyInner(
         : pickCompanionTriggerFallback(trigger, {
             maxChars: settings.textMaxChars,
             seed: generationSeed,
-            ...(sanitizedAvoid.length ? { avoidRecent: sanitizedAvoid } : {}),
+            ...(avoidForPool.length ? { avoidRecent: avoidForPool } : {}),
             ...(options?.replaceTargetLine != null
               ? { replaceTarget: options.replaceTargetLine }
               : {}),

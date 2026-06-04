@@ -5,9 +5,8 @@ function envTruthy(raw: string | undefined): boolean {
 }
 
 /**
- * 陪伴气泡「问答模式」：在仓库根目录 `.env.local` 设 `VITE_SIDEKICK_COMPANION_QA_MODE=1`
- * （Vite `envDir` 指向 monorepo 根，非 `packages/ui/.env.local`）。
- * hover 气泡工具栏区域时直接展示输入框（最多 100 字），提交写入兴趣补充；首启自我介绍气泡不显示。
+ * 本地开发：`VITE_SIDEKICK_COMPANION_QA_MODE=1` 时任意气泡均可测兴趣输入框。
+ * 正式产品：仅 `interest-deepen` 推送句展示输入框。
  */
 export function isCompanionQaModeEnabled(): boolean {
   return envTruthy(

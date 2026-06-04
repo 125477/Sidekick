@@ -9,8 +9,8 @@ const TIERS: FortuneTier[] = [
   '下签',
 ]
 
-/** 权重总和 100；中签仍略多；上上/上签略抬高；下签刻意压低（约 3%）。 */
-const WEIGHTS = [12, 20, 20, 31, 14, 3]
+/** 权重总和 100；中签仍略多；上上签约 20%；下签刻意压低（约 3%）。 */
+const WEIGHTS = [20, 20, 20, 31, 6, 3]
 
 const VERSES: Record<FortuneTier, readonly string[]> = {
   上上签: [

@@ -73,6 +73,7 @@ export type UseCompanionActionsArgs = {
   setSettings: Dispatch<SetStateAction<SidekickSettings>>
   handleMenuActionRef: MutableRefObject<(action: MenuAction) => void>
   blockScheduledPushRef?: MutableRefObject<boolean>
+  setToastCopyTrigger?: Dispatch<SetStateAction<string | null>>
 }
 
 export function useCompanionActions({
@@ -101,6 +102,7 @@ export function useCompanionActions({
   setSettings,
   handleMenuActionRef,
   blockScheduledPushRef,
+  setToastCopyTrigger,
 }: UseCompanionActionsArgs) {
   const companionFetchBusyRef = useRef(false)
   const regenerateSeqRef = useRef(0)
@@ -126,6 +128,9 @@ export function useCompanionActions({
     }
     const normalized = message.replace(/\s+/g, ' ').trim()
     const prevShown = lastShownToastMessageRef.current.replace(/\s+/g, ' ').trim()
+    setToastCopyTrigger?.(
+      opts?.toastMode === 'intro' ? null : (opts?.copyMeta?.trigger ?? null),
+    )
     if (
       normalized &&
       normalized === prevShown &&

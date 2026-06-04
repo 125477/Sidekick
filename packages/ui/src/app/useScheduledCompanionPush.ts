@@ -17,6 +17,7 @@ import type { SpriteState, UiAction } from '../state/uiState'
 import { reportSpriteAnchorToMain } from '../utils/reportSpriteAnchor'
 import { usesDetachedToastWindow } from '../utils/companionTts'
 import { buildShowToastWindowPayload } from '../utils/toastWindowPayload'
+import { recordFavoriteResurfaceShown } from './favoriteResurface'
 import { markStartupCompanionCopyFinished } from './companionSessionBoot'
 import { subscribeAppSelfIntroDismissed } from '../state/appSelfIntroSync'
 import { loadAppSelfIntroShown } from '../state/appSelfIntroStorage'
@@ -125,6 +126,7 @@ export function useScheduledCompanionPush({
         source: result.source,
         favorite: false,
       })
+      await recordFavoriteResurfaceShown(result.resurfaceFavoriteId)
       const newId = next.texts.history[0]?.id
       const anchor = s.toastAnchor
       const dwell = s.toastAlwaysVisible ? 0 : s.dwellMinutes * 60

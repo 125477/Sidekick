@@ -11,7 +11,7 @@ import type {
 import { toggleToastFavorite } from './toastFavoriteToggle'
 import { openCompanionExportPanel } from './companionExportSession'
 import { appendCompanionInterestAnswer } from './appendCompanionInterestAnswer'
-import { isCompanionQaModeEnabled } from '../constants/companionFeatureFlags'
+import { shouldShowCompanionInterestInput } from './companionInterestCapture'
 import { resolveCompanionQuoteBubbleVariant } from '../components/emotion/moodHistory/quoteBubbleSettings'
 import { OnboardingWizard } from '../components/onboarding/OnboardingWizard'
 import { SpriteMenu, type MenuAction } from '../components/menu/SpriteMenu'
@@ -79,6 +79,7 @@ export type WidgetSpriteLayerProps = {
   spriteShellHovered: boolean
   settingsRef: MutableRefObject<SidekickSettings>
   spriteMenuUsesBrowserPopup: boolean
+  toastCopyTrigger?: string | null
 }
 
 export function WidgetSpriteLayer({
@@ -121,6 +122,7 @@ export function WidgetSpriteLayer({
   spriteShellHovered,
   settingsRef,
   spriteMenuUsesBrowserPopup,
+  toastCopyTrigger = null,
 }: WidgetSpriteLayerProps) {
   const dragStarTrailEnabled = isWidgetMode && settings.motionEnabled
   const widgetDock = useWidgetDockVisual(isWidgetMode)
@@ -129,6 +131,7 @@ export function WidgetSpriteLayer({
   const dockScale = widgetDockScale(widgetDock.phase)
   const dockOrigin = widgetDockTransformOrigin(widgetDock.side)
   const dockOpacity = widgetDockPeekOpacity(widgetDock.phase)
+  const showInterestInput = shouldShowCompanionInterestInput(toastCopyTrigger)
 
   const dockTransformParts: string[] = []
   if (dockActive) {
@@ -272,7 +275,7 @@ export function WidgetSpriteLayer({
                 onExportCard={() =>
                   openCompanionExportPanel(uiState.toastMessage)
                 }
-                {...(isCompanionQaModeEnabled()
+                {...(showInterestInput
                   ? {
                       onInterestAnswer: (answer: string) => {
                         void appendCompanionInterestAnswer(

@@ -52,6 +52,7 @@ export function resolveInitialBaseUrl() {
  *     textId?: string
  *     favorite?: boolean
  *     autoTts?: boolean
+ *     copyTrigger?: string
  *   }
  *   detachToastAnchorRefreshRunning: boolean
  *   detachToastAnchorRefreshQueued: boolean

@@ -16,6 +16,8 @@ export type TextRecord = {
   createdAt: string
   source: 'model' | 'fallback'
   favorite: boolean
+  /** 上次作为「收藏再现」展示的时间（ISO）；再现后 3 天内不再抽同句。 */
+  lastResurfacedAt?: string
 }
 
 /** 观音灵签式六档，仅娱乐寓意。 */

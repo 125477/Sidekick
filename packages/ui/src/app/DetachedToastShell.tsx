@@ -14,7 +14,7 @@ import { saveAppSelfIntroShown } from '../state/appSelfIntroStorage'
 import { broadcastAppSelfIntroDismissed } from '../state/appSelfIntroSync'
 import { openCompanionExportPanel } from './companionExportSession'
 import { appendCompanionInterestAnswer } from './appendCompanionInterestAnswer'
-import { isCompanionQaModeEnabled } from '../constants/companionFeatureFlags'
+import { shouldShowCompanionInterestInput } from './companionInterestCapture'
 import { TOAST_CARD_MAX_CLASS_DETACHED } from '../components/toast/toastCardMetrics'
 import { zLayers } from '../state/uiState'
 
@@ -46,6 +46,7 @@ type DetachedToastShellProps = {
   onMenuAction: (action: MenuAction) => void
   /** 从气泡工具栏发起的菜单会话中为 true，用于底栏保持展开（见 EmotionToast）。 */
   holdToastToolbarForMenu: boolean
+  toastCopyTrigger?: string | null
 }
 
 export function DetachedToastShell({
@@ -73,9 +74,12 @@ export function DetachedToastShell({
   onMenuClose,
   onMenuAction,
   holdToastToolbarForMenu,
+  toastCopyTrigger = null,
 }: DetachedToastShellProps) {
   const introMode = toastIntroFromQuery
   const displayMessage = stripCompanionLineCornerQuotes(toastMessageFromQuery)
+  const showInterestInput =
+    !introMode && shouldShowCompanionInterestInput(toastCopyTrigger)
   const lastAutoTtsRef = useRef('')
 
   useEffect(() => {
@@ -200,7 +204,7 @@ export function DetachedToastShell({
               onExportCard={() =>
                 openCompanionExportPanel(displayMessage)
               }
-              {...(isCompanionQaModeEnabled()
+              {...(showInterestInput
                 ? {
                     onInterestAnswer: (answer: string) => {
                       void appendCompanionInterestAnswer(settings, answer)

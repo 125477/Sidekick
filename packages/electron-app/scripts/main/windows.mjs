@@ -310,6 +310,11 @@ async function applyToastWindowPayload(payload) {
   const favorite =
     typeof payload?.favorite === 'boolean' ? payload.favorite : undefined
   const toastIntro = payload?.toastIntro === true
+  const copyTrigger =
+    typeof payload?.copyMeta?.trigger === 'string' &&
+    payload.copyMeta.trigger.trim()
+      ? payload.copyMeta.trigger.trim()
+      : undefined
   state.lastPreferredToastAnchor = payload?.anchor === 'bottom' ? 'bottom' : 'top'
   let dwellSeconds = resolveToastDwellSeconds(payload)
   const dockPushFromCollapsed =
@@ -401,6 +406,7 @@ async function applyToastWindowPayload(payload) {
       ...(textId ? { textId } : {}),
       ...(typeof favorite === 'boolean' ? { favorite } : {}),
       autoTts: payload?.autoTts === true,
+      copyTrigger: copyTrigger ?? '',
     }
     logToastShow(payload, message, dwellSeconds)
     wc.send('sidekick:detached-toast-content', syncPayload)
@@ -411,6 +417,7 @@ async function applyToastWindowPayload(payload) {
       textId,
       favorite,
       autoTts: payload?.autoTts === true,
+      ...(copyTrigger ? { copyTrigger } : {}),
     }
     state.toastWindow.showInactive()
     wc.send('sidekick:sprite-interaction-locked', state.lastSpriteInteractionLocked)
@@ -428,6 +435,7 @@ async function applyToastWindowPayload(payload) {
       ...(typeof favorite === 'boolean' ? { favorite: favorite ? '1' : '0' } : {}),
       ...(toastIntro ? { toastIntro: '1' } : {}),
       autoTts: payload?.autoTts === true ? '1' : '0',
+      ...(copyTrigger ? { copyTrigger } : {}),
       anchor: effectiveAnchor,
       placement: effectiveAnchor === 'top' ? 'above' : 'below',
       tailDown: effectiveAnchor === 'top' ? '1' : '0',
@@ -447,6 +455,7 @@ async function applyToastWindowPayload(payload) {
     textId,
     favorite,
     autoTts: payload?.autoTts === true,
+    ...(copyTrigger ? { copyTrigger } : {}),
   }
 
   scheduleToastAutoHide(dwellSeconds, { resetDwell: true })

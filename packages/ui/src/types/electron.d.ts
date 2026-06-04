@@ -230,6 +230,7 @@ type SidekickDesktopApi = {
       textId?: string
       favorite?: boolean
       autoTts?: boolean
+      copyTrigger?: string
     }) => void,
   ) => () => void
   resizeToastWindow?: (payload: {

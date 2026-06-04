@@ -592,6 +592,9 @@ export function SettingsPanel({
                 checked={settings.favoriteResurfaceEnabled}
                 onCheckedChange={(v) => update('favoriteResurfaceEnabled', v)}
               />
+              <span className="text-xs text-[var(--sk-text-muted)]">
+                再现后 3 天内不会再次出现同一句。
+              </span>
             </SettingsSubsection>
 
             <SettingsSubsection title="气泡位置">
