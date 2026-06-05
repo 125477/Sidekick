@@ -2,8 +2,10 @@
  * 换句兜底：歌词 / 影视台词 / 书本文摘，且须与「语气类型」一致。
  * API 失败时上屏；按 style × 兴趣标签抽取，避免治愈语气落到恐惧/撕裂类金句。
  */
+import { companionLineExactDuplicateInList } from '../prompts/companionOutputGate'
 import { companionLineTooSimilarToAny } from '../prompts/companionLineSimilarity'
 import type { CompanionCopyStyle } from '../prompts/textPrompt'
+import { pickCompanionRegenerateLine } from './companionRegeneratePool'
 
 /** 语气 × 兴趣 → 金句池（≤32 字为主）。 */
 const QUOTE_BY_STYLE_AND_TAG: Record<
@@ -62,7 +64,11 @@ const QUOTE_BY_STYLE_AND_TAG: Record<
       '我养你啊。',
       '你过来啊。',
     ],
-    书籍: ['生活不止眼前的苟且，还有诗和远方的田野。'],
+    书籍: [
+      '生活不止眼前的苟且，还有诗和远方的田野。',
+      '人间值得，但不必每天都证明。',
+      '书页翻过去，今天也可以翻篇。',
+    ],
     运动: ['运动五分钟，拍照两小时。'],
     游戏: ['又菜又爱玩，也是一种坚持。'],
     旅行: ['人在囧途，心在远方。'],
@@ -124,7 +130,11 @@ const QUOTE_BY_STYLE_AND_TAG: Record<
   沙雕: {
     音乐: ['我是一只小小小小鸟，想要飞呀飞却飞也飞不高。', '爱情不是你想买，想买就能买。'],
     影视: ['做人如果没有梦想，跟咸鱼有什么分别。', '你过来啊。'],
-    书籍: ['生活不止眼前的苟且，还有诗和远方的田野。'],
+    书籍: [
+      '生活不止眼前的苟且，还有诗和远方的田野。',
+      '人间值得，但不必每天都证明。',
+      '书页翻过去，今天也可以翻篇。',
+    ],
     运动: ['运动五分钟，拍照两小时。'],
     游戏: ['又菜又爱玩，也是一种坚持。'],
     旅行: ['人在囧途，心在远方。'],
@@ -157,6 +167,75 @@ function resolveStylePool(style: CompanionCopyStyle | undefined): Record<string,
   return QUOTE_BY_STYLE_AND_TAG[style ?? DEFAULT_STYLE] ?? QUOTE_BY_STYLE_AND_TAG[DEFAULT_STYLE]
 }
 
+function normalizeInterestLine(text: string): string {
+  return text.replace(/\s+/g, ' ').trim()
+}
+
+function isInterestPoolLineBlocked(
+  line: string,
+  recent: string[],
+  replaceTarget?: string,
+): boolean {
+  const t = normalizeInterestLine(line)
+  if (!t) return true
+  const target = replaceTarget ? normalizeInterestLine(replaceTarget) : ''
+  if (target && t === target) return true
+  if (companionLineExactDuplicateInList(t, recent)) return true
+  return companionLineTooSimilarToAny(t, recent, {
+    maxContiguousOverlap: 6,
+    sameFirstChar: false,
+  })
+}
+
+function collectInterestQuotePool(
+  interestTags: string[],
+  style: CompanionCopyStyle,
+): string[] {
+  const byTag = resolveStylePool(style)
+  const seen = new Set<string>()
+  const pool: string[] = []
+
+  const pushUnique = (line: string) => {
+    const t = normalizeInterestLine(line)
+    if (!t || seen.has(t)) return
+    seen.add(t)
+    pool.push(line)
+  }
+
+  for (const tag of interestTags) {
+    const lines = byTag[tag]
+    if (lines) lines.forEach(pushUnique)
+  }
+  if (pool.length === 0) {
+    ;(STYLE_GENERIC_QUOTE[style] ?? STYLE_GENERIC_QUOTE[DEFAULT_STYLE]).forEach(
+      pushUnique,
+    )
+  }
+  for (const line of STYLE_GENERIC_QUOTE[style] ?? STYLE_GENERIC_QUOTE[DEFAULT_STYLE]) {
+    pushUnique(line)
+  }
+  for (const lines of Object.values(byTag)) {
+    lines.forEach(pushUnique)
+  }
+  return pool
+}
+
+function pickFromCandidates(
+  candidates: string[],
+  input: { maxChars: number; seed?: number },
+): string {
+  const seed =
+    input.seed ?? (Date.now() ^ Math.floor(Math.random() * 1_000_000_000))
+  const start = Math.abs(seed) % Math.max(1, candidates.length)
+  for (let i = 0; i < candidates.length; i++) {
+    const line = candidates[(start + i) % candidates.length]!
+    return line.length <= input.maxChars
+      ? line
+      : `${line.slice(0, Math.max(1, input.maxChars - 1))}…`
+  }
+  return candidates[0]!
+}
+
 export function pickCompanionInterestRegenerateLine(input: {
   interestTags: string[]
   style?: CompanionCopyStyle
@@ -166,43 +245,45 @@ export function pickCompanionInterestRegenerateLine(input: {
   replaceTarget?: string
 }): string {
   const style = input.style ?? DEFAULT_STYLE
-  const byTag = resolveStylePool(style)
-  const pool: string[] = []
-  for (const tag of input.interestTags) {
-    const lines = byTag[tag]
-    if (lines) pool.push(...lines)
-  }
-  if (pool.length === 0) {
-    pool.push(...(STYLE_GENERIC_QUOTE[style] ?? STYLE_GENERIC_QUOTE[DEFAULT_STYLE]))
-  }
+  const pool = collectInterestQuotePool(input.interestTags, style)
 
   const recent = [...(input.avoidRecent ?? [])]
   const target = input.replaceTarget?.replace(/\s+/g, ' ').trim()
   if (target) recent.push(target)
 
-  const fits = pool.filter(
+  const candidates = pool.filter(
     (line) =>
       line.length <= input.maxChars &&
-      !companionLineTooSimilarToAny(line, recent, {
-        maxContiguousOverlap: 6,
-        sameFirstChar: false,
-      }),
+      !isInterestPoolLineBlocked(line, recent, target),
   )
-  const candidates = fits.length > 0 ? fits : pool.filter((l) => l.length <= input.maxChars)
-  const seed =
-    input.seed ?? (Date.now() ^ Math.floor(Math.random() * 1_000_000_000))
-  const start = Math.abs(seed) % Math.max(1, candidates.length)
-  for (let i = 0; i < candidates.length; i++) {
-    const line = candidates[(start + i) % candidates.length]!
-    if (target && line.replace(/\s+/g, ' ').trim() === target) continue
-    return line.length <= input.maxChars
-      ? line
-      : `${line.slice(0, Math.max(1, input.maxChars - 1))}…`
+
+  if (candidates.length > 0) {
+    return pickFromCandidates(candidates, input)
   }
-  const fallback = STYLE_GENERIC_QUOTE[style]?.[0] ?? STYLE_GENERIC_QUOTE[DEFAULT_STYLE][0]!
-  return fallback.length <= input.maxChars
-    ? fallback
-    : `${fallback.slice(0, Math.max(1, input.maxChars - 1))}…`
+
+  const baseSeed = input.seed ?? Date.now()
+  for (let i = 0; i < 16; i++) {
+    const line = pickCompanionRegenerateLine({
+      maxChars: input.maxChars,
+      style,
+      seed: baseSeed + i * 991,
+      avoidRecent: recent,
+      ...(target ? { replaceTarget: target } : {}),
+    })
+    if (!isInterestPoolLineBlocked(line, recent, target)) {
+      return line.length <= input.maxChars
+        ? line
+        : `${line.slice(0, Math.max(1, input.maxChars - 1))}…`
+    }
+  }
+
+  return pickCompanionRegenerateLine({
+    maxChars: input.maxChars,
+    style,
+    seed: baseSeed + 16_003,
+    avoidRecent: recent,
+    ...(target ? { replaceTarget: target } : {}),
+  })
 }
 
 /** 换句 prompt：抽 2 条与语气一致的歌词/台词参考（勿照抄）。 */

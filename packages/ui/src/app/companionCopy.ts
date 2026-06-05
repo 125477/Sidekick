@@ -4,6 +4,7 @@ import {
   companionInterestTagsRequireQuote,
   companionLineDuplicateOfStoredHistory,
   companionLineDuplicateOfReplaceTarget,
+  companionLineExactDuplicateInList,
   companionRegenerateLineFailsInterestQuoteMode,
   companionStyleForEmotion,
   generateCompanionCopy,
@@ -13,6 +14,7 @@ import {
   logCompanionCopy,
   parseCompanionInterestTags,
   pickCompanionRegenerateLineDistinct,
+  pickCompanionRegenerateLine,
   pickCompanionInterestRegenerateLine,
   pickCompanionTriggerFallback,
   type CompanionCopyTrigger,
@@ -266,6 +268,34 @@ function mergeCompanionAvoidForPool(
   return [...new Set([...promptAvoid, ...allHistoryLines].filter(Boolean))]
 }
 
+function ensureDistinctPushFallback(
+  text: string,
+  avoidForPool: string[],
+  settings: SidekickSettings,
+  emotion: EmotionKind | undefined,
+  generationSeed: number,
+): string {
+  const normalized = text.replace(/\s+/g, ' ').trim()
+  if (
+    !avoidForPool.length ||
+    !companionLineExactDuplicateInList(normalized, avoidForPool)
+  ) {
+    return text
+  }
+  const style =
+    emotion != null ? companionStyleForEmotion(emotion) : settings.textStyle
+  for (let i = 0; i < 16; i++) {
+    const line = pickCompanionRegenerateLine({
+      maxChars: settings.textMaxChars,
+      style,
+      seed: generationSeed + i * 1_048_583,
+      avoidRecent: avoidForPool,
+    })
+    if (!companionLineExactDuplicateInList(line, avoidForPool)) return line
+  }
+  return text
+}
+
 function pickPushCopyFallback(
   settings: SidekickSettings,
   trigger: CompanionCopyTrigger,
@@ -281,19 +311,31 @@ function pickPushCopyFallback(
   )
   const avoidForPool = mergeCompanionAvoidForPool(promptAvoid, allHistoryLines)
   if (companionInterestTagsRequireQuote(interestTags)) {
-    return pickCompanionInterestRegenerateLine({
-      interestTags,
+    return ensureDistinctPushFallback(
+      pickCompanionInterestRegenerateLine({
+        interestTags,
+        maxChars: settings.textMaxChars,
+        style,
+        seed: generationSeed,
+        ...(avoidForPool.length ? { avoidRecent: avoidForPool } : {}),
+      }),
+      avoidForPool,
+      settings,
+      emotion,
+      generationSeed,
+    )
+  }
+  return ensureDistinctPushFallback(
+    pickCompanionTriggerFallback(trigger, {
       maxChars: settings.textMaxChars,
-      style,
       seed: generationSeed,
       ...(avoidForPool.length ? { avoidRecent: avoidForPool } : {}),
-    })
-  }
-  return pickCompanionTriggerFallback(trigger, {
-    maxChars: settings.textMaxChars,
-    seed: generationSeed,
-    ...(avoidForPool.length ? { avoidRecent: avoidForPool } : {}),
-  })
+    }),
+    avoidForPool,
+    settings,
+    emotion,
+    generationSeed,
+  )
 }
 
 function pushCompanionLineRejected(

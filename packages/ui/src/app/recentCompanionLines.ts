@@ -51,9 +51,22 @@ export async function buildCompanionAvoidContext(
     if (t) mergedForPrompt.push(t)
   }
 
+  const sessionNewestFirst = [...(sessionRecent ?? [])]
+    .map((line) => normalizeCompanionLine(line))
+    .filter((c) => c.length > 0)
+    .reverse()
+
+  const seenHistory = new Set<string>()
+  const allHistoryLines: string[] = []
+  for (const line of [...sessionNewestFirst, ...historyNewestFirst]) {
+    if (seenHistory.has(line)) continue
+    seenHistory.add(line)
+    allHistoryLines.push(line)
+  }
+
   return {
     promptAvoid: sanitizeRecentCompanionLinesForPrompt(mergedForPrompt),
-    allHistoryLines: historyNewestFirst,
+    allHistoryLines,
   }
 }
 

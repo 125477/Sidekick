@@ -1,6 +1,9 @@
 import { companionRegenerateModelLineUnacceptable } from '../prompts/companionRegenerateGate'
 import type { CompanionCopyStyle } from '../prompts/textPrompt'
-import { companionLineDuplicateOfReplaceTarget } from '../prompts/companionOutputGate'
+import {
+  companionLineDuplicateOfReplaceTarget,
+  companionLineExactDuplicateInList,
+} from '../prompts/companionOutputGate'
 import { companionLineTooSimilarToAny } from '../prompts/companionLineSimilarity'
 
 /**
@@ -148,6 +151,7 @@ export function pickCompanionRegenerateLine(
         )
 
   const diverse = pool.filter((line) => {
+    if (companionLineExactDuplicateInList(line, recent)) return false
     if (companionLineTooSimilarToAny(line, recent)) return false
     const target = input.replaceTarget?.replace(/\s+/g, ' ').trim()
     if (target && companionLineDuplicateOfReplaceTarget(line, target)) {
@@ -156,7 +160,10 @@ export function pickCompanionRegenerateLine(
     return true
   })
 
-  const candidates = diverse.length > 0 ? diverse : pool
+  const candidates =
+    diverse.length > 0
+      ? diverse
+      : pool.filter((line) => !companionLineExactDuplicateInList(line, recent))
   const seed =
     input.seed ?? (Date.now() ^ Math.floor(Math.random() * 1_000_000_000))
   const start = Math.abs(seed) % candidates.length
